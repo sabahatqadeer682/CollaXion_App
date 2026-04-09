@@ -3,6 +3,12 @@ import mongoose from "mongoose";
 import cors from "cors";
 import studentRoutes from "./student/routes/studentRoutes.js";
 import aiRoutes from "./student/routes/aiRoutes.js";
+
+import mouRoutes from "./industry/routes/IndustryMouRoutes.js";
+// server.js ke upar
+// File ka exact naam aur path check karlein
+
+
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -16,6 +22,7 @@ app.use(cors());
 app.use("/uploads", express.static("uploads"));
 app.use("/uploads/profile", express.static("uploads/profile"));
 app.use("/uploads/cv", express.static("uploads/cv"));
+app.use("/api/industry/mous", mouRoutes);
 
 
 // MongoDB connection
@@ -54,3 +61,4 @@ app.listen(PORT, () => {
 
   console.log("=".repeat(50) + "\n");
 });
+
