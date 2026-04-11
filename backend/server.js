@@ -5,6 +5,9 @@ import studentRoutes from "./student/routes/studentRoutes.js";
 import aiRoutes from "./student/routes/aiRoutes.js";
 
 import mouRoutes from "./industry/routes/IndustryMouRoutes.js";
+
+
+import industryRoutes from "./student/routes/industryRoutes.js"
 // server.js ke upar
 // File ka exact naam aur path check karlein
 
@@ -23,6 +26,8 @@ app.use("/uploads", express.static("uploads"));
 app.use("/uploads/profile", express.static("uploads/profile"));
 app.use("/uploads/cv", express.static("uploads/cv"));
 app.use("/api/industry/mous", mouRoutes);
+// student nearby industry 
+app.use('/api/industries', industryRoutes);
 
 
 // MongoDB connection
@@ -61,4 +66,6 @@ app.listen(PORT, () => {
 
   console.log("=".repeat(50) + "\n");
 });
+
+
 
