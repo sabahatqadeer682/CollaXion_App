@@ -1,6 +1,7 @@
 export const CONSTANT = {
     API_BASE_URL:
 
-        "http://192.168.0.204:5000"
+        "http://192.168.0.245:5000"
 }
 
+//192.168.0.204

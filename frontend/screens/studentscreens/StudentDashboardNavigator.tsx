@@ -36,6 +36,9 @@ import SettingsScreen from "./SettingsScreen";
 import StudentHomeScreen from "./StudentHomeScreen";
 import StudentLogin from "./StudentLogin";
 
+import NearbyIndustriesScreen from "./NearbyIndustriesScreen";
+
+
 const Drawer = createDrawerNavigator();
 
 
@@ -260,7 +263,16 @@ const StudentDashboardNavigator = () => {
                     drawerIcon: ({ color, size }) => <MaterialIcons name="dashboard" color={color} size={size} />,
                 })}
             />
-
+<Drawer.Screen
+    name="Nearby Industries"
+    component={NearbyIndustriesScreen}
+    options={{
+        drawerLabel: "Nearby Industries",
+        drawerIcon: ({ color, size }) => (
+            <MaterialIcons name="location-on" color={color} size={size} />
+        ),
+    }}
+/>
             <Drawer.Screen
                 name="AI Recommendations"
                 component={AIRecommendationsScreen}
