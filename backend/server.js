@@ -7,7 +7,7 @@ import postRoutes from "./industry/routes/postRoutes.js";
 import mouRoutes from "./industry/routes/IndustryMouRoutes.js";
 import industryAiRoutes from "./industry/routes/industryAiroutes.js";
 import eventRoutes from "./industry/routes/Eventroutes.js";
-import industryRoutes from "./student/routes/industryRoutes.js";
+import industryRoutes from "./student/routes/industryRoutes.js"
 import cxbotRoutes from "./industry/routes/Cxbotroutes.js";
 
 
@@ -31,7 +31,7 @@ app.use("/uploads/profile", express.static("uploads/profile"));
 app.use("/uploads/cv", express.static("uploads/cv"));
 app.use("/api/industry/mous", mouRoutes);
 // student nearby industry 
-app.use('/api/industries', industryRoutes);
+ app.use('/api/industries', industryRoutes);
 app.use("/api/industry/posts", postRoutes);
 app.use("/api/industry/events", eventRoutes);
 app.use("/api/ai", industryAiRoutes);

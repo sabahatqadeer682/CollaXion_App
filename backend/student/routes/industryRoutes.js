@@ -103,7 +103,9 @@ const key = process.env.GOOGLE_MAPS_API_KEY;
       `?query=software+house+IT+company` +
       `&location=${lat},${lng}` +
       `&radius=10000` +
-      `&key=${GOOGLE_KEY}`
+      // `&key=${GOOGLE_KEY}`
+      `&key=${key}`
+      
     );
 
     // 2. Registered industries from our DB (with internships populated)
