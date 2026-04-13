@@ -3,17 +3,21 @@ import mongoose from "mongoose";
 import cors from "cors";
 import studentRoutes from "./student/routes/studentRoutes.js";
 import aiRoutes from "./student/routes/aiRoutes.js";
-
+import postRoutes from "./industry/routes/postRoutes.js";
 import mouRoutes from "./industry/routes/IndustryMouRoutes.js";
+import industryAiRoutes from "./industry/routes/industryAiroutes.js";
+import eventRoutes from "./industry/routes/Eventroutes.js";
+import industryRoutes from "./student/routes/industryRoutes.js";
+import cxbotRoutes from "./industry/routes/Cxbotroutes.js";
 
 
-import industryRoutes from "./student/routes/industryRoutes.js"
-// server.js ke upar
-// File ka exact naam aur path check karlein
+
 
 
 import dotenv from "dotenv";
 dotenv.config();
+
+console.log("🚀 GEMINI KEY LOADED:", process.env.GEMINI_KEY);
 
 const app = express();
 
@@ -28,6 +32,10 @@ app.use("/uploads/cv", express.static("uploads/cv"));
 app.use("/api/industry/mous", mouRoutes);
 // student nearby industry 
 app.use('/api/industries', industryRoutes);
+app.use("/api/industry/posts", postRoutes);
+app.use("/api/industry/events", eventRoutes);
+app.use("/api/ai", industryAiRoutes);
+app.use("/api/cxbot", cxbotRoutes);
 
 
 // MongoDB connection
@@ -66,6 +74,7 @@ app.listen(PORT, () => {
 
   console.log("=".repeat(50) + "\n");
 });
+
 
 
 

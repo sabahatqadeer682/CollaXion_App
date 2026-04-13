@@ -101,7 +101,9 @@ export const recommendInternships = async (studentSkills, availableInternships) 
         if (!studentSkills || studentSkills.length === 0) return [];
         if (!availableInternships || availableInternships.length === 0) return [];
 
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        // const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const internshipsData = availableInternships.map(i => ({
             id: i._id.toString(),
@@ -166,7 +168,7 @@ Include only internships with matchScore > 40. Return top 8 by score. JSON only.
  */
 export const generateCVFeedback = async (extractedData) => {
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const prompt = `
 Provide professional feedback for this CV data:
