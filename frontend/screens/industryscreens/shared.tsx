@@ -38,7 +38,7 @@ export const C = {
 };
 
 // ─── API ────────────────────────────────────────────────────────
-export const BASE = "http://192.168.0.103:5000";
+export const BASE = "http://192.168.0.245:5000";
 export const API_MOU  = `${BASE}/api/industry/mous`;
 export const API_INT  = `${BASE}/api/industry/internships`;
 export const API_PROJ = `${BASE}/api/industry/projects`;
@@ -100,7 +100,8 @@ export const UserCtx = createContext<any>(null);
 export const useUser = () => useContext(UserCtx);
 
 export const DEFAULT_USER = {
-  _id: "industry_001",
+  //507f1f77bcf86cd799439011
+  _id: "507f1f77bcf86cd799439011",
   name: "Edit Industry Name",
   email: "hr@techsolutions.com",
   industry: "Information Technology",
@@ -111,14 +112,43 @@ export const DEFAULT_USER = {
   logo: "",
 };
 
+// export const UserProvider = ({ children }: { children: React.ReactNode }) => {
+//   const [user, setUser] = useState(DEFAULT_USER);
+//   // const ax = useCallback(() => axios.create({ timeout: 10000 }), []);
+//   const ax = useCallback(() =>
+//   axios.create({
+//     baseURL: BASE,   // 🔥 YE LINE ADD KARO
+    
+//   }),
+// []);
+//   const updateUser = (data: Partial<typeof DEFAULT_USER>) => setUser((p) => ({ ...p, ...data }));
+//   return <UserCtx.Provider value={{ user, updateUser, ax }}>{children}</UserCtx.Provider>;
+// };
+
+// ─── TOAST ───────────────────────────────────────────────────────
+
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState(DEFAULT_USER);
-  const ax = useCallback(() => axios.create({ timeout: 10000 }), []);
+  
+  const ax = useCallback(() =>
+    axios.create({
+      baseURL: BASE,
+      headers: {
+        "x-industry-id":  user._id,
+        "x-company-name": user.name,
+        "Content-Type":   "application/json",
+      },
+    }),
+  [user._id, user.name]  // ← user change ho to rebuild ho
+  );
+
   const updateUser = (data: Partial<typeof DEFAULT_USER>) => setUser((p) => ({ ...p, ...data }));
   return <UserCtx.Provider value={{ user, updateUser, ax }}>{children}</UserCtx.Provider>;
 };
 
-// ─── TOAST ───────────────────────────────────────────────────────
+
+
+
 export const ToastCtx = createContext<any>(null);
 export const useToast = () => useContext(ToastCtx);
 

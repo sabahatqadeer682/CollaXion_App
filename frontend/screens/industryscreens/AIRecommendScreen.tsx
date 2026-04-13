@@ -20,29 +20,43 @@ import {
 const { width, height } = Dimensions.get("window");
 
 // ─── GEMINI ───────────────────────────────────────────────────────
-const GEMINI_API_KEY = "AIzaSyCS05tzDvviOrZa5r4BZGkEQHKIAk7uwC4";
-// ✅ FIXED: Updated from gemini-1.5-flash to gemini-2.0-flash
-const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+// const GEMINI_API_KEY = "AIzaSyAEet8v2U-HhJx0gAOIGM_wwowM0M0EHSM";
+// // ✅ FIXED: Updated from gemini-1.5-flash to gemini-2.0-flash
+// const GEMINI_URL =
+//   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
-async function callGemini(prompt: string): Promise<string> {
-  const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+
+
+// async function callGemini(prompt: string): Promise<string> {
+//   const res = await fetch("http://192.168.0.245:5000/api/ai/recommend", {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/json",
+//     },
+//     body: JSON.stringify({ prompt }),
+//   });
+
+//   const data = await res.json();
+
+//   if (!res.ok) {
+//     throw new Error(data?.error || "AI error");
+//   }
+
+//   // return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+//   return data.text;
+// }
+
+async function callGemini(prompt: string) {
+  const res = await fetch("http://192.168.0.245:5000/api/ai/recommend", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 3000 },
-    }),
+    body: JSON.stringify({ prompt }),
   });
-  // ✅ FIXED: Better error logging — logs exact Gemini error message
-  if (!res.ok) {
-    const errBody = await res.json();
-    console.error("Gemini error body:", JSON.stringify(errBody));
-    throw new Error(`Gemini ${res.status}: ${errBody?.error?.message || "Unknown error"}`);
-  }
+
   const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  return data.text;
 }
+
 
 function parseJSON(raw: string): any[] {
   try { return JSON.parse(raw.replace(/```json|```/g, "").trim()); }
@@ -564,13 +578,28 @@ Sort by matchScore descending.`;
     try {
       const skills = requiredSkills.split(",").map(s=>s.trim()).filter(Boolean);
       const raw    = await callGemini(buildPrompt(jobTitle,skills));
-      const parsed = parseJSON(raw) as Rec[];
-      setSearchRecs(parsed.map(r=>({
-        ...r,
-        cgpa:       ALL_STUDENTS.find(s=>s._id===r.studentId)?.cgpa       ||"N/A",
-        university: ALL_STUDENTS.find(s=>s._id===r.studentId)?.university  ||"",
-        degree:     ALL_STUDENTS.find(s=>s._id===r.studentId)?.degree      ||"",
-      })));
+      // const parsed = parseJSON(raw) as Rec[];
+      const parsed = (parseJSON(raw) || []) as Rec[];
+      // setSearchRecs(parsed.map(r=>({
+      //   ...r,
+      //   cgpa:       ALL_STUDENTS.find(s=>s._id===r.studentId)?.cgpa       ||"N/A",
+      //   university: ALL_STUDENTS.find(s=>s._id===r.studentId)?.university  ||"",
+      //   degree:     ALL_STUDENTS.find(s=>s._id===r.studentId)?.degree      ||"",
+      // })));
+      setSearchRecs(
+  (parsed || []).map(r => ({
+    studentId: r.studentId ?? "",
+    studentName: r.studentName ?? "Unknown",
+    matchScore: r.matchScore ?? 0,
+    matchedSkills: r.matchedSkills ?? [],
+    missingSkills: r.missingSkills ?? [],
+    aiReason: r.aiReason ?? "No AI reason provided",
+
+    cgpa: ALL_STUDENTS.find(s => s._id === r.studentId)?.cgpa ?? "N/A",
+    university: ALL_STUDENTS.find(s => s._id === r.studentId)?.university ?? "",
+    degree: ALL_STUDENTS.find(s => s._id === r.studentId)?.degree ?? "",
+  }))
+);
     } catch(e:any) {
       setSearchError("Gemini API error: " + e.message);
     } finally {

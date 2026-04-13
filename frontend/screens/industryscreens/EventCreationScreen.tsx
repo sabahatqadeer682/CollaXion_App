@@ -1,16 +1,16 @@
 /**
- * EventCreationScreen.tsx
- * Multi-step event creation screen for industry partners.
- * Step 1 → Event Details (type, title, description, date/time, location, mode, capacity)
- * Step 2 → Media & Tags (banner image, tags)
- * Step 3 → Invite Universities (select unis + custom invite message, then publish)
+ * EventCreationScreen.tsx  — COMPLETE + UPDATED VERSION
+ * ✅ Real API integration (POST create / PUT edit)
+ * ✅ Edit mode support (prefill all fields)
+ * ✅ Notifications
+ * ✅ Color theme #193648
  */
 
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -60,33 +60,57 @@ const SUGGESTED_TAGS = [
 const STEPS = ["Event Details", "Media & Tags", "Invite Unis"];
 
 export function EventCreationScreen() {
-  const nav = useNavigation<any>();
-  const { user } = useUser();
+  const nav    = useNavigation<any>();
+  const route  = useRoute<any>();
+  const { user, ax } = useUser();
   const insets = useSafeAreaInsets();
+
+  // ── Edit mode check ─────────────────────────────────────────────
+  const editMode  = route.params?.editMode  || false;
+  const eventData = route.params?.eventData || null;
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   /* ── Step 1 fields ── */
   const [eventType, setEventType] = useState<EventType>("Seminar");
-  const [title, setTitle] = useState("");
-  const [description, setDesc] = useState("");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-  const [location, setLocation] = useState("");
-  const [mode, setMode] = useState<EventMode>("Physical");
-  const [capacity, setCapacity] = useState("");
-  const [deadline, setDeadline] = useState("");
+  const [title,       setTitle]   = useState("");
+  const [description, setDesc]    = useState("");
+  const [date,        setDate]    = useState("");
+  const [time,        setTime]    = useState("");
+  const [location,    setLocation]= useState("");
+  const [mode,        setMode]    = useState<EventMode>("Physical");
+  const [capacity,    setCapacity]= useState("");
+  const [deadline,    setDeadline]= useState("");
 
   /* ── Step 2 fields ── */
-  const [banner, setBanner] = useState<string | null>(null);
-  const [tags, setTags] = useState<string[]>([]);
-  const [customTag, setCustomTag] = useState("");
+  const [banner,    setBanner]   = useState<string | null>(null);
+  const [tags,      setTags]     = useState<string[]>([]);
+  const [customTag, setCustomTag]= useState("");
 
   /* ── Step 3 fields ── */
   const [selectedUnis, setSelectedUnis] = useState<string[]>(["Riphah International University"]);
-  const [inviteMsg, setInviteMsg] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [inviteMsg,    setInviteMsg]    = useState("");
+  const [loading,      setLoading]      = useState(false);
+
+  // ── Prefill fields when editing ─────────────────────────────────
+  useEffect(() => {
+    if (editMode && eventData) {
+      setEventType(eventData.eventType   || "Seminar");
+      setTitle(eventData.title           || "");
+      setDesc(eventData.description      || "");
+      setDate(eventData.date             || "");
+      setTime(eventData.time             || "");
+      setLocation(eventData.location     || "");
+      setMode(eventData.mode             || "Physical");
+      setCapacity(eventData.capacity ? String(eventData.capacity) : "");
+      setDeadline(eventData.deadline     || "");
+      setBanner(eventData.banner         || null);
+      setTags(eventData.tags             || []);
+      setSelectedUnis(eventData.invitedUniversities || []);
+      setInviteMsg(eventData.inviteMessage           || "");
+    }
+  }, [editMode, eventData]);
 
   /* ────────────────────────── helpers ─────────────────────────── */
   const animateStep = (next: 1 | 2 | 3) => {
@@ -103,7 +127,10 @@ export function EventCreationScreen() {
       quality: 0.85,
       aspect: [16, 9],
     });
-    if (!res.canceled) setBanner(res.assets[0].uri);
+    if (!res.canceled) {
+  const uri = res.assets[0].uri;
+  setBanner(uri);
+}
   };
 
   const toggleTag = (t: string) =>
@@ -119,28 +146,115 @@ export function EventCreationScreen() {
     setSelectedUnis((prev) => (prev.includes(u) ? prev.filter((x) => x !== u) : [...prev, u]));
 
   const validateStep1 = () => {
-    if (!title.trim()) { Alert.alert("Required", "Event title is required."); return false; }
-    if (!description.trim()) { Alert.alert("Required", "Description is required."); return false; }
-    if (!date.trim()) { Alert.alert("Required", "Event date is required."); return false; }
+    if (!title.trim())       { Alert.alert("Required", "Event title is required.");   return false; }
+    if (!description.trim()) { Alert.alert("Required", "Description is required.");   return false; }
+    if (!date.trim())        { Alert.alert("Required", "Event date is required.");    return false; }
     if (!location.trim() && mode !== "Virtual") {
       Alert.alert("Required", "Location is required for physical/hybrid events."); return false;
     }
     return true;
   };
 
+  // ── REAL API CALL ──────────────────────────────────────────────
   const handlePublish = async () => {
     if (selectedUnis.length === 0) {
-      Alert.alert("No Universities", "Select at least one university to invite."); return;
+      Alert.alert("No Universities", "Select at least one university to invite.");
+      return;
     }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      Alert.alert(
-        "Event Published 🎉",
-        `Your event has been published and invitations sent to ${selectedUnis.length} university(s).`,
-        [{ text: "OK", onPress: () => nav.goBack() }]
-      );
-    }, 1400);
+
+    const payload = {
+      industryId:          user?._id,
+      companyName:         user?.name,
+      eventType,
+      title,
+      description,
+      date,
+      time,
+      location,
+      mode,
+      capacity: capacity ? Number(capacity) : null,
+      deadline,
+      banner,
+      tags,
+      invitedUniversities: selectedUnis,
+      inviteMessage:       inviteMsg,
+    };
+
+    try {
+       const a = ax();
+     
+      const headers = {
+        "x-industry-id":  user?._id,
+        "x-company-name": user?.name || "Partner",
+      };
+
+      if (editMode && eventData?._id) {
+        // ── Edit mode: PUT request ──────────────────────────────
+        await a.put(`/api/industry/events/${eventData._id}`, payload, { headers });
+        setLoading(false);
+        Alert.alert(
+          "Updated ✏️",
+          "Event update ho gaya!",
+          [{ text: "OK", onPress: () => nav.goBack() }]
+        );
+      } else {
+        // ── Create mode: POST request ───────────────────────────
+        // await a.post("/api/industry/events", payload, { headers });
+        const formData = new FormData();
+
+formData.append("industryId", user?._id);
+formData.append("companyName", user?.name);
+formData.append("eventType", eventType);
+formData.append("title", title);
+formData.append("description", description);
+formData.append("date", date);
+formData.append("time", time);
+formData.append("location", location);
+formData.append("mode", mode);
+formData.append("capacity", capacity);
+formData.append("deadline", deadline);
+formData.append("tags", JSON.stringify(tags));
+formData.append("invitedUniversities", JSON.stringify(selectedUnis));
+formData.append("inviteMessage", inviteMsg);
+
+if (banner) {
+  formData.append("banner", {
+    uri: banner,
+    name: "event.jpg",
+    type: "image/jpeg",
+  } as any);
+}
+
+await a.post("/api/industry/events", formData, {
+  headers: {
+    ...headers,
+    "Content-Type": "multipart/form-data",
+  },
+});
+        setLoading(false);
+        Alert.alert(
+          "Event Published 🎉",
+          `Event publish ho gaya aur ${selectedUnis.length} university(s) ko invite bhej diya!`,
+          [{ text: "OK", onPress: () => nav.goBack() }]
+        );
+      }
+    // } catch (err: any) {
+    //   setLoading(false);
+    //   Alert.alert("Error", err?.response?.data?.message || "Publish failed. Dobara try karein.");
+    // }
+    } catch (err: any) {
+  console.log("FULL ERROR:", err);
+  console.log("RESPONSE:", err?.response);
+  console.log("DATA:", err?.response?.data);
+
+  Alert.alert(
+    "Error",
+    err?.response?.data?.message ||
+    err?.message ||
+    "Publish failed"
+  );
+}
   };
 
   const typeConfig = EVENT_TYPES.find((e) => e.label === eventType)!;
@@ -149,7 +263,7 @@ export function EventCreationScreen() {
   const renderStepIndicator = () => (
     <View style={s.stepIndicator}>
       {STEPS.map((lbl, i) => {
-        const n = i + 1;
+        const n    = i + 1;
         const done = step > n;
         const active = step === n;
         return (
@@ -280,9 +394,7 @@ export function EventCreationScreen() {
       {/* Location */}
       {mode !== "Virtual" && (
         <View style={s.sec}>
-          <Text style={s.secLabel}>
-            Location <Text style={s.required}>*</Text>
-          </Text>
+          <Text style={s.secLabel}>Location <Text style={s.required}>*</Text></Text>
           <View style={s.inputIcon}>
             <Ionicons name="location-outline" size={16} color="#64748B" style={s.inputIconImg} />
             <TextInput
@@ -397,7 +509,7 @@ export function EventCreationScreen() {
           })}
         </View>
 
-        {/* Custom tag input */}
+        {/* Custom tag */}
         <View style={s.customTagRow}>
           <TextInput
             style={[s.input, { flex: 1, marginBottom: 0 }]}
@@ -413,7 +525,7 @@ export function EventCreationScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Selected custom tags */}
+        {/* Custom tags list */}
         {tags.filter((t) => !SUGGESTED_TAGS.includes(t)).length > 0 && (
           <View style={[s.tagGrid, { marginTop: 10 }]}>
             {tags
@@ -432,7 +544,7 @@ export function EventCreationScreen() {
         )}
       </View>
 
-      {/* Preview card */}
+      {/* Preview */}
       <View style={s.sec}>
         <Text style={s.secLabel}>Preview</Text>
         <View style={s.previewCard}>
@@ -485,7 +597,6 @@ export function EventCreationScreen() {
             : `${selectedUnis.length} university(s) selected`}
         </Text>
 
-        {/* Select all / Clear */}
         <View style={s.uniActions}>
           <TouchableOpacity
             style={s.uniActionBtn}
@@ -540,11 +651,13 @@ export function EventCreationScreen() {
         />
       </View>
 
-      {/* Summary before publish */}
+      {/* Summary */}
       {selectedUnis.length > 0 && (
         <View style={s.sec}>
           <View style={s.summaryCard}>
-            <Text style={s.summaryTitle}>Ready to Publish</Text>
+            <Text style={s.summaryTitle}>
+              {editMode ? "Ready to Update" : "Ready to Publish"}
+            </Text>
             <View style={s.summaryRow}>
               <Ionicons name="calendar" size={14} color="#0066CC" />
               <Text style={s.summaryTxt}>{title || "Untitled Event"}</Text>
@@ -570,11 +683,11 @@ export function EventCreationScreen() {
   /* ─────────────────────────── main render ─────────────────────── */
   return (
     <View style={{ flex: 1, backgroundColor: "#F0F4F8" }}>
-      <StatusBar barStyle="light-content" backgroundColor="#050D1A" />
+      <StatusBar barStyle="light-content" backgroundColor="#193648" />
 
       {/* ── Header ── */}
       <LinearGradient
-        colors={["#050D1A", "#0A1628", "#0D2137"]}
+        colors={["#0A1929", "#132D40", "#193648"]}
         style={s.header}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -584,10 +697,11 @@ export function EventCreationScreen() {
             <Ionicons name="arrow-back" size={21} color="#fff" />
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 14 }}>
-            <Text style={s.headerTitle}>Create Event</Text>
+            <Text style={s.headerTitle}>
+              {editMode ? "Edit Event" : "Create Event"}
+            </Text>
             <Text style={s.headerSub}>Step {step} of {STEPS.length} — {STEPS[step - 1]}</Text>
           </View>
-          {/* Type badge in header */}
           <LinearGradient colors={typeConfig.grad} style={s.headerTypeBadge}>
             <Ionicons name={typeConfig.icon as any} size={14} color="#fff" />
             <Text style={s.headerTypeTxt}>{eventType}</Text>
@@ -625,7 +739,10 @@ export function EventCreationScreen() {
         )}
 
         <TouchableOpacity
-          style={[s.nextBtn, { flex: step > 1 ? 1 : undefined, width: step === 1 ? "100%" : undefined }]}
+          style={[
+            s.nextBtn,
+            { flex: step > 1 ? 1 : undefined, width: step === 1 ? "100%" : undefined },
+          ]}
           activeOpacity={0.88}
           onPress={() => {
             if (step === 1) {
@@ -645,9 +762,9 @@ export function EventCreationScreen() {
             end={{ x: 1, y: 0 }}
           >
             {loading ? (
-              <>
-                <Text style={s.nextBtnTxt}>Publishing...</Text>
-              </>
+              <Text style={s.nextBtnTxt}>
+                {editMode ? "Updating..." : "Publishing..."}
+              </Text>
             ) : step < 3 ? (
               <>
                 <Text style={s.nextBtnTxt}>Continue</Text>
@@ -656,7 +773,9 @@ export function EventCreationScreen() {
             ) : (
               <>
                 <Ionicons name="send" size={16} color="#fff" />
-                <Text style={s.nextBtnTxt}>Publish & Send Invites</Text>
+                <Text style={s.nextBtnTxt}>
+                  {editMode ? "Save Changes" : "Publish & Send Invites"}
+                </Text>
               </>
             )}
           </LinearGradient>
@@ -666,7 +785,9 @@ export function EventCreationScreen() {
   );
 }
 
-/* ═══════════════════════════════ styles ═══════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  STYLES                                                             */
+/* ═══════════════════════════════════════════════════════════════════ */
 const s = StyleSheet.create({
   header: {
     paddingTop: Platform.OS === "ios" ? 56 : 44,
@@ -680,7 +801,7 @@ const s = StyleSheet.create({
     justifyContent: "center", alignItems: "center",
   },
   headerTitle: { fontSize: 19, fontWeight: "900", color: "#fff" },
-  headerSub: { fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 2 },
+  headerSub:   { fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 2 },
   headerTypeBadge: {
     flexDirection: "row", alignItems: "center", gap: 5,
     paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
@@ -693,27 +814,27 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.06)",
     borderRadius: 14, padding: 12,
   },
-  stepItem: { alignItems: "center", gap: 5 },
-  stepCircle: {
+  stepItem:        { alignItems: "center", gap: 5 },
+  stepCircle:      {
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.12)",
     justifyContent: "center", alignItems: "center",
   },
-  stepCircleActive: { backgroundColor: "#0066CC" },
-  stepCircleDone: { backgroundColor: "#059669" },
-  stepCircleTxt: { fontSize: 12, fontWeight: "700", color: "rgba(255,255,255,0.5)" },
-  stepLbl: { fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: "600" },
-  stepLblActive: { color: "#fff" },
-  stepLine: {
+  stepCircleActive:{ backgroundColor: "#0066CC" },
+  stepCircleDone:  { backgroundColor: "#059669" },
+  stepCircleTxt:   { fontSize: 12, fontWeight: "700", color: "rgba(255,255,255,0.5)" },
+  stepLbl:         { fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: "600" },
+  stepLblActive:   { color: "#fff" },
+  stepLine:        {
     flex: 1, height: 2, backgroundColor: "rgba(255,255,255,0.12)",
     borderRadius: 2, marginHorizontal: 4, marginBottom: 14,
   },
-  stepLineDone: { backgroundColor: "#059669" },
+  stepLineDone:    { backgroundColor: "#059669" },
 
   /* Sections */
-  sec: { paddingHorizontal: 16, paddingTop: 18 },
+  sec:      { paddingHorizontal: 16, paddingTop: 18 },
   secLabel: { fontSize: 13, fontWeight: "700", color: "#0A1628", marginBottom: 8 },
-  secHint: { fontSize: 12, color: "#64748B", marginBottom: 10, marginTop: -4 },
+  secHint:  { fontSize: 12, color: "#64748B", marginBottom: 10, marginTop: -4 },
   required: { color: "#DC2626" },
 
   /* Type grid */
@@ -722,26 +843,29 @@ const s = StyleSheet.create({
     backgroundColor: "#fff", borderRadius: 16, padding: 12,
     alignItems: "center", borderWidth: 2, borderColor: "#E2E8F0",
   },
-  typeTileActive: { borderColor: "#0066CC", backgroundColor: "#EFF6FF" },
-  typeTileIcon: { width: 46, height: 46, borderRadius: 13, justifyContent: "center", alignItems: "center", marginBottom: 8 },
-  typeTileLbl: { fontSize: 11, fontWeight: "700", color: "#334155" },
-  typeTileDesc: { fontSize: 9, color: "#94A3B8", textAlign: "center", marginTop: 2 },
-  typeBadge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
-  typeBadgeTxt: { fontSize: 11, fontWeight: "700" },
+  typeTileActive:  { borderColor: "#0066CC", backgroundColor: "#EFF6FF" },
+  typeTileIcon:    {
+    width: 46, height: 46, borderRadius: 13,
+    justifyContent: "center", alignItems: "center", marginBottom: 8,
+  },
+  typeTileLbl:     { fontSize: 11, fontWeight: "700", color: "#334155" },
+  typeTileDesc:    { fontSize: 9, color: "#94A3B8", textAlign: "center", marginTop: 2 },
+  typeBadge:       { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
+  typeBadgeTxt:    { fontSize: 11, fontWeight: "700" },
 
   /* Inputs */
   input: {
     backgroundColor: "#fff", borderRadius: 12, borderWidth: 1.5,
     borderColor: "#E2E8F0", paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 14, color: "#0A1628", marginBottom: 0,
+    fontSize: 14, color: "#0A1628",
   },
-  textarea: { minHeight: 100, paddingTop: 12 },
-  inputIcon: {
+  textarea:     { minHeight: 100, paddingTop: 12 },
+  inputIcon:    {
     flexDirection: "row", alignItems: "center",
     backgroundColor: "#fff", borderRadius: 12,
     borderWidth: 1.5, borderColor: "#E2E8F0", overflow: "hidden",
   },
-  inputIconImg: { paddingLeft: 14 },
+  inputIconImg:  { paddingLeft: 14 },
   inputWithIcon: { flex: 1, paddingHorizontal: 10, paddingVertical: 12, fontSize: 14, color: "#0A1628" },
 
   /* Mode */
@@ -751,8 +875,8 @@ const s = StyleSheet.create({
     gap: 6, paddingVertical: 10, borderRadius: 12,
     backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0",
   },
-  modeBtnActive: { backgroundColor: "#0A1628", borderColor: "#0A1628" },
-  modeBtnTxt: { fontSize: 12, fontWeight: "700", color: "#64748B" },
+  modeBtnActive: { backgroundColor: "#193648", borderColor: "#193648" },
+  modeBtnTxt:    { fontSize: 12, fontWeight: "700", color: "#64748B" },
 
   /* Banner */
   bannerPicker: {
@@ -760,15 +884,15 @@ const s = StyleSheet.create({
     borderWidth: 2, borderColor: "#E2E8F0", borderStyle: "dashed",
     overflow: "hidden", justifyContent: "center",
   },
-  bannerImg: { width: "100%", height: "100%", resizeMode: "cover" },
-  bannerPlaceholder: { alignItems: "center", justifyContent: "center", padding: 20 },
-  bannerIconBox: {
+  bannerImg:            { width: "100%", height: "100%", resizeMode: "cover" },
+  bannerPlaceholder:    { alignItems: "center", justifyContent: "center", padding: 20 },
+  bannerIconBox:        {
     width: 56, height: 56, borderRadius: 28, backgroundColor: "#EFF6FF",
     justifyContent: "center", alignItems: "center", marginBottom: 10,
   },
   bannerPlaceholderTxt: { fontSize: 14, fontWeight: "700", color: "#334155" },
   bannerPlaceholderSub: { fontSize: 12, color: "#94A3B8", marginTop: 4 },
-  bannerOverlay: {
+  bannerOverlay:        {
     position: "absolute", bottom: 0, left: 0, right: 0,
     backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center",
     justifyContent: "center", paddingVertical: 10,
@@ -779,69 +903,69 @@ const s = StyleSheet.create({
   },
 
   /* Tags */
-  tagGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  tagChip: {
+  tagGrid:        { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  tagChip:        {
     flexDirection: "row", alignItems: "center", gap: 4,
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
     backgroundColor: "#F1F5F9", borderWidth: 1.5, borderColor: "#E2E8F0",
   },
-  tagChipActive: { backgroundColor: "#EFF6FF", borderColor: "#0066CC" },
-  tagChipTxt: { fontSize: 12, fontWeight: "600", color: "#64748B" },
+  tagChipActive:    { backgroundColor: "#EFF6FF", borderColor: "#0066CC" },
+  tagChipTxt:       { fontSize: 12, fontWeight: "600", color: "#64748B" },
   tagChipTxtActive: { color: "#0066CC" },
-  customTagRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12 },
-  addTagBtn: {
-    width: 44, height: 44, borderRadius: 12, backgroundColor: "#0066CC",
+  customTagRow:     { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12 },
+  addTagBtn:        {
+    width: 44, height: 44, borderRadius: 12, backgroundColor: "#193648",
     justifyContent: "center", alignItems: "center",
   },
 
-  /* Preview card */
+  /* Preview */
   previewCard: {
     backgroundColor: "#fff", borderRadius: 16, overflow: "hidden",
     borderWidth: 1, borderColor: "#E2E8F0",
-    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
-  previewStripe: { height: 4, width: "100%" },
+  previewStripe:   { height: 4, width: "100%" },
   previewTypeIcon: { width: 30, height: 30, borderRadius: 8, justifyContent: "center", alignItems: "center" },
-  previewTitle: { fontSize: 15, fontWeight: "800", color: "#0A1628" },
-  previewMeta: { fontSize: 12, color: "#64748B" },
-  previewTag: { backgroundColor: "#F1F5F9", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  previewTagTxt: { fontSize: 11, fontWeight: "600", color: "#475569" },
+  previewTitle:    { fontSize: 15, fontWeight: "800", color: "#0A1628" },
+  previewMeta:     { fontSize: 12, color: "#64748B" },
+  previewTag:      { backgroundColor: "#F1F5F9", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  previewTagTxt:   { fontSize: 11, fontWeight: "600", color: "#475569" },
 
   /* Universities */
-  uniActions: { flexDirection: "row", gap: 10, marginBottom: 12 },
-  uniActionBtn: {
+  uniActions:    { flexDirection: "row", gap: 10, marginBottom: 12 },
+  uniActionBtn:  {
     flexDirection: "row", alignItems: "center", gap: 5,
     paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
     backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0",
   },
-  uniActionTxt: { fontSize: 12, fontWeight: "600", color: "#0066CC" },
-  uniRow: {
+  uniActionTxt:  { fontSize: 12, fontWeight: "600", color: "#0066CC" },
+  uniRow:        {
     flexDirection: "row", alignItems: "center", gap: 12,
     paddingHorizontal: 14, paddingVertical: 12,
     backgroundColor: "#fff", borderRadius: 13, marginBottom: 8,
     borderWidth: 1.5, borderColor: "#E2E8F0",
   },
-  uniRowActive: { borderColor: "#0066CC", backgroundColor: "#EFF6FF" },
-  uniCheckBox: {
+  uniRowActive:     { borderColor: "#0066CC", backgroundColor: "#EFF6FF" },
+  uniCheckBox:      {
     width: 22, height: 22, borderRadius: 6, borderWidth: 2,
     borderColor: "#CBD5E1", justifyContent: "center", alignItems: "center",
   },
-  uniCheckBoxActive: { backgroundColor: "#0066CC", borderColor: "#0066CC" },
-  uniAvatarBox: {
+  uniCheckBoxActive:{ backgroundColor: "#0066CC", borderColor: "#0066CC" },
+  uniAvatarBox:     {
     width: 34, height: 34, borderRadius: 10, backgroundColor: "#F1F5F9",
     justifyContent: "center", alignItems: "center",
   },
   uniName: { flex: 1, fontSize: 13, fontWeight: "600", color: "#475569" },
 
-  /* Summary card */
-  summaryCard: {
+  /* Summary */
+  summaryCard:  {
     backgroundColor: "#EFF6FF", borderRadius: 14,
     padding: 16, borderWidth: 1.5, borderColor: "#BFDBFE",
   },
   summaryTitle: { fontSize: 13, fontWeight: "800", color: "#0A1628", marginBottom: 10 },
-  summaryRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
-  summaryTxt: { fontSize: 13, color: "#334155", flex: 1 },
+  summaryRow:   { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  summaryTxt:   { fontSize: 13, color: "#334155", flex: 1 },
 
   /* Bottom bar */
   bottomBar: {
@@ -855,11 +979,11 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 14,
     borderRadius: 14, backgroundColor: "#F1F5F9", borderWidth: 1.5, borderColor: "#E2E8F0",
   },
-  backStepTxt: { fontSize: 14, fontWeight: "700", color: "#334155" },
-  nextBtn: { borderRadius: 14, overflow: "hidden" },
-  nextBtnGrad: {
+  backStepTxt:  { fontSize: 14, fontWeight: "700", color: "#334155" },
+  nextBtn:      { borderRadius: 14, overflow: "hidden" },
+  nextBtnGrad:  {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
     gap: 8, paddingVertical: 14, paddingHorizontal: 24,
   },
-  nextBtnTxt: { fontSize: 15, fontWeight: "800", color: "#fff" },
+  nextBtnTxt:   { fontSize: 15, fontWeight: "800", color: "#fff" },
 });

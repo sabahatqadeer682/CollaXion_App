@@ -25,9 +25,10 @@ export function MoUScreen() {
   const load = useCallback(async (show = true) => {
     if (show) setLd(true);
     try {
-      const r = await ax().get(`${API_MOU}/mine`, {
-        params: { industryId: user?._id, industry: user?.name }
-      });
+      // const r = await ax().get(`${API_MOU}/mine`, {
+      //   params: { industryId: user?._id, industry: user?.name }
+      // });
+      const r = await ax().get(`${API_MOU}/mine`);
       setMous(r.data || []);
     } catch (e: any) {
       console.log("MOU load error:", e?.response?.data || e.message);

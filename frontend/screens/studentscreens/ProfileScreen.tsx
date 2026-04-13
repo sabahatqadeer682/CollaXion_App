@@ -198,12 +198,13 @@ const ProfileScreen = ({ navigation, setGlobalProfileImage }) => {
             } as any);
 
             const response = await fetch(
-                `http://192.168.0.204:5000/api/student/upload-cv/${student.email}`,
+               `http://192.168.0.245:5000/api/student/upload-cv/${student.email}`,
                 {
                     method: "POST",
                     body: formData,
                     headers: {
                         Accept: "application/json",
+                        //  "Content-Type": "multipart/form-data",
 
                     },
                 }
