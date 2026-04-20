@@ -335,34 +335,769 @@
 
 
 
+// import React, { useEffect, useState, useRef } from 'react';
+// import {
+//   StyleSheet, View, Text, FlatList, TouchableOpacity,
+//   ActivityIndicator, Dimensions, Linking, Animated,
+//   Platform, StatusBar
+// } from 'react-native';
+// import MapView, { Marker, Circle, PROVIDER_GOOGLE, Callout } from 'react-native-maps';
+// import * as Location from 'expo-location';
+// import axios from 'axios';
+// import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+// const MOCK_INDUSTRIES: Industry[] = [
+//   {
+//     _id: 'mock1',
+//     name: 'TechNova Solutions',
+//     address: 'Blue Area, Islamabad',
+//     location: { lat: 33.707, lng: 73.055 },
+//     isRegistered: true,
+//     distanceKm: '2.1',
+//     rating: 4.5,
+//     website: 'technova.com',
+//     internships: [
+//       { title: 'Frontend Intern', type: 'Remote' },
+//       { title: 'Backend Intern', type: 'Onsite' },
+//     ],
+//   },
+//   {
+//     _id: 'mock2',
+//     name: 'Softify Labs',
+//     address: 'Bahria Town, Rawalpindi',
+//     location: { lat: 33.565, lng: 73.136 },
+//     isRegistered: true,
+//     distanceKm: '5.3',
+//     rating: 4.2,
+//     website: 'softify.pk',
+//     internships: [
+//       { title: 'AI Intern', type: 'Hybrid' },
+//     ],
+//   },
+//   {
+//     _id: 'mock3',
+//     name: 'InnoTech Pvt Ltd',
+//     address: 'I-8 Markaz, Islamabad',
+//     location: { lat: 33.684, lng: 73.047 },
+//     isRegistered: true,
+//     distanceKm: '3.8',
+//     rating: 4.0,
+//   },
+// ];
+
+
+
+// const { width, height } = Dimensions.get('window');
+
+// const DARK_MAP_STYLE = [
+//   { elementType: 'geometry', stylers: [{ color: '#1a2332' }] },
+//   { elementType: 'labels.text.fill', stylers: [{ color: '#8ec6e6' }] },
+//   { elementType: 'labels.text.stroke', stylers: [{ color: '#1a2332' }] },
+//   { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#2a3f5f' }] },
+//   { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#1e3248' }] },
+//   { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#162a20' }] },
+//   { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2d4a6e' }] },
+//   { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#3a5f8a' }] },
+//   { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#4a7ab5' }] },
+//   { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#b0cce8' }] },
+//   { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#1e3450' }] },
+//   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0d1f3c' }] },
+//   { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#4e8cbe' }] },
+// ];
+
+// const { width: W, height: H } = Dimensions.get('window');
+
+// type Industry = {
+//   _id: string;
+//   name: string;
+//   address: string;
+//   location: { lat: number; lng: number };
+//   isRegistered: boolean;
+//   distanceKm: string;
+//   rating: number;
+//   website?: string;
+//   internships?: { title: string; type: string }[];
+// };
+
+// const NearbyIndustriesScreen = () => {
+//   const [userLocation, setUserLocation] = useState<any>(null);
+//   const [industries, setIndustries] = useState<Industry[]>([]);
+//   const [loading, setLoading] = useState(true);
+//   const [activeFilter, setActiveFilter] = useState<'all' | 'partner' | 'hiring'>('all');
+//   const [selectedIndustry, setSelectedIndustry] = useState<Industry | null>(null);
+//   const mapRef = useRef<MapView>(null);
+//   const slideAnim = useRef(new Animated.Value(0)).current;
+
+//   useEffect(() => {
+//     (async () => {
+//       let { status } = await Location.requestForegroundPermissionsAsync();
+//       if (status !== 'granted') return;
+//       let loc = await Location.getCurrentPositionAsync({});
+//       const coords = {
+//         latitude: loc.coords.latitude,
+//         longitude: loc.coords.longitude,
+//         latitudeDelta: 0.05,
+//         longitudeDelta: 0.05,
+//       };
+//       setUserLocation(coords);
+//       fetchData(coords.latitude, coords.longitude);
+//     })();
+//   }, []);
+
+//   // const fetchData = async (lat: number, lng: number) => {
+//   //   try {
+//   //     setLoading(true);
+//   //     const res = await axios.post('http://192.168.0.245:5000/api/industries/nearby-students', { lat, lng });
+//   //     setIndustries(res.data.industries);
+//   //   } catch (e) {
+//   //     console.log('Error fetching:', e);
+//   //   } finally {
+//   //     setLoading(false);
+//   //   }
+//   // };
+
+// const fetchData = async (lat: number, lng: number) => {
+//   try {
+//     setLoading(true);
+
+//     const res = await axios.post(
+//       'http://192.168.0.245:5000/api/industries/nearby-students',
+//       { lat, lng }
+//     );
+
+//     const realData: Industry[] = res.data.industries || [];
+
+//     // 🔥 Remove duplicates (based on name)
+//     const uniqueData = [
+//       ...realData,
+//       ...MOCK_INDUSTRIES.filter(
+//         mock => !realData.some(real => real.name === mock.name)
+//       ),
+//     ];
+
+//     setIndustries(uniqueData);
+
+//   } catch (e) {
+//     console.log('Error fetching:', e);
+
+//     // ❗ fallback → sirf mock
+//     setIndustries(MOCK_INDUSTRIES);
+
+//   } finally {
+//     setLoading(false);
+//   }
+// };
+
+
+
+
+
+//   const openWebsite = (url: string) => {
+//     const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+//     Linking.openURL(fullUrl).catch(() =>
+//       console.log('Could not open URL:', fullUrl)
+//     );
+//   };
+
+//   const focusMarker = (ind: Industry) => {
+//     setSelectedIndustry(ind);
+//     mapRef.current?.animateToRegion({
+//       latitude: ind.location.lat,
+//       longitude: ind.location.lng,
+//       latitudeDelta: 0.015,
+//       longitudeDelta: 0.015,
+//     }, 600);
+//     Animated.spring(slideAnim, {
+//       toValue: 1,
+//       useNativeDriver: true,
+//       tension: 65,
+//       friction: 9,
+//     }).start();
+//   };
+
+//   const filteredIndustries = industries.filter(i => {
+//     if (activeFilter === 'partner') return i.isRegistered;
+//     if (activeFilter === 'hiring') return i.isRegistered && (i.internships?.length ?? 0) > 0;
+//     return true;
+//   });
+
+//   const partnerCount = industries.filter(i => i.isRegistered).length;
+//   const hiringCount = industries.filter(i => i.isRegistered && (i.internships?.length ?? 0) > 0).length;
+
+//   const renderStars = (rating: number) => {
+//     const full = Math.floor(rating);
+//     const empty = 5 - full;
+//     return '★'.repeat(full) + '☆'.repeat(empty);
+//   };
+
+//   const renderCard = ({ item, index }: { item: Industry; index: number }) => {
+//     const isSelected = selectedIndustry?._id === item._id;
+//     return (
+//       <TouchableOpacity
+//         style={[styles.card, item.isRegistered && styles.cardPartner, isSelected && styles.cardSelected]}
+//         onPress={() => focusMarker(item)}
+//         activeOpacity={0.85}
+//       >
+//         {/* Left accent bar for partners */}
+//         {item.isRegistered && <View style={styles.cardAccent} />}
+
+//         <View style={styles.cardInner}>
+//           {/* Header Row */}
+//           <View style={styles.cardHeader}>
+//             <View style={[styles.iconWrap, item.isRegistered ? styles.iconWrapGreen : styles.iconWrapGray]}>
+//               <MaterialCommunityIcons
+//                 name="office-building"
+//                 size={22}
+//                 color={item.isRegistered ? '#0F6E56' : '#888'}
+//               />
+//             </View>
+
+//             <View style={styles.cardTextBlock}>
+//               <View style={styles.nameRow}>
+//                 <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
+//                 {item.isRegistered && (
+//                   <View style={styles.partnerBadge}>
+//                     <Ionicons name="checkmark-circle" size={10} color="#fff" />
+//                     <Text style={styles.partnerBadgeText}>Partner</Text>
+//                   </View>
+//                 )}
+//               </View>
+//               <Text style={styles.cardAddr} numberOfLines={1}>
+//                 <Ionicons name="location-outline" size={11} color="#999" /> {item.address}
+//               </Text>
+//               <View style={styles.metaRow}>
+//                 <Text style={styles.stars}>{renderStars(item.rating)}</Text>
+//                 <Text style={styles.ratingNum}>{item.rating.toFixed(1)}</Text>
+//                 {item.isRegistered && (item.internships?.length ?? 0) > 0 && (
+//                   <View style={styles.hiringBadge}>
+//                     <FontAwesome5 name="briefcase" size={8} color="#085041" />
+//                     <Text style={styles.hiringText}>{item.internships!.length} open</Text>
+//                   </View>
+//                 )}
+//               </View>
+//             </View>
+
+//             <View style={styles.distBlock}>
+//               <Ionicons name="navigate" size={12} color="#185FA5" />
+//               <Text style={styles.distText}>{item.distanceKm}</Text>
+//               <Text style={styles.distUnit}>km</Text>
+//             </View>
+//           </View>
+
+//           {/* Internship chips — only if registered & has internships */}
+//           {item.isRegistered && item.internships && item.internships.length > 0 && (
+//             <View style={styles.chipsRow}>
+//               {item.internships.slice(0, 3).map((int, i) => (
+//                 <View key={i} style={styles.chip}>
+//                   <Text style={styles.chipText}>{int.title}</Text>
+//                 </View>
+//               ))}
+//             </View>
+//           )}
+
+//           {/* Footer Actions */}
+//           <View style={styles.cardFooter}>
+//             {item.website ? (
+//               <TouchableOpacity
+//                 style={styles.webBtn}
+//                 onPress={() => openWebsite(item.website!)}
+//                 activeOpacity={0.7}
+//               >
+//                 <Ionicons name="globe-outline" size={13} color="#185FA5" />
+//                 <Text style={styles.webBtnText}>Visit Website</Text>
+//                 <Ionicons name="open-outline" size={11} color="#185FA5" />
+//               </TouchableOpacity>
+//             ) : (
+//               <View style={styles.noWebsite}>
+//                 <Text style={styles.noWebsiteText}>No website</Text>
+//               </View>
+//             )}
+
+//             {item.isRegistered ? (
+//               <TouchableOpacity style={styles.internBtn} activeOpacity={0.85}>
+//                 <FontAwesome5 name="briefcase" size={11} color="#fff" />
+//                 <Text style={styles.internBtnText}>Internships</Text>
+//               </TouchableOpacity>
+//             ) : (
+//               <View style={styles.notRegWrap}>
+//                 <Text style={styles.notRegText}>Not on platform</Text>
+//               </View>
+//             )}
+//           </View>
+//         </View>
+//       </TouchableOpacity>
+//     );
+//   };
+
+//   return (
+//     <View style={styles.container}>
+//       <StatusBar barStyle="light-content" backgroundColor="#0d1f3c" />
+
+//       {/* ───── MAP ───── */}
+//       <View style={styles.mapWrap}>
+       
+  
+//         {userLocation ? (
+//           <MapView
+//             ref={mapRef}
+//             provider={PROVIDER_GOOGLE}
+//             style={StyleSheet.absoluteFillObject}
+//             initialRegion={userLocation}
+//             customMapStyle={DARK_MAP_STYLE}
+//             showsUserLocation={false}
+//             showsCompass={false}
+//             showsTraffic={false}
+//             showsBuildings={true}
+//           >
+//             {/* User location pulse circle */}
+//             <Circle
+//               center={{ latitude: userLocation.latitude, longitude: userLocation.longitude }}
+//               radius={300}
+//               fillColor="rgba(24,95,165,0.15)"
+//               strokeColor="rgba(24,95,165,0.4)"
+//               strokeWidth={1}
+//             />
+//             <Circle
+//               center={{ latitude: userLocation.latitude, longitude: userLocation.longitude }}
+//               radius={80}
+//               fillColor="rgba(24,95,165,0.35)"
+//               strokeColor="#185FA5"
+//               strokeWidth={2}
+//             />
+//             {/* Search radius */}
+//             <Circle
+//               center={{ latitude: userLocation.latitude, longitude: userLocation.longitude }}
+//               radius={5000}
+//               fillColor="rgba(29,158,117,0.04)"
+//               strokeColor="rgba(29,158,117,0.25)"
+//               strokeWidth={1}
+//               lineDashPattern={[6, 4]}
+//             />
+
+// {/* 👇 YAHAN ADD KARNA HAI USER MARKER */}
+// {userLocation && (
+//   <Marker
+//     coordinate={{
+//       latitude: userLocation.latitude,
+//       longitude: userLocation.longitude,
+//     }}
+//   >
+//     <View style={styles.userMarker}>
+//       <View style={styles.userDot} />
+//     </View>
+//   </Marker>
+// )}
+
+
+//             {/* Industry markers */}
+//             {industries.map(ind => (
+//               <Marker
+//                 key={ind._id}
+//                 coordinate={{ latitude: ind.location.lat, longitude: ind.location.lng }}
+//                 onPress={() => focusMarker(ind)}
+//               >
+//                 {/* Custom marker view */}
+//                 <View style={[
+//                   styles.markerWrap,
+//                   ind.isRegistered ? styles.markerGreen : styles.markerBlue,
+//                   selectedIndustry?._id === ind._id && styles.markerSelected,
+//                 ]}>
+//                   <MaterialCommunityIcons
+//                     name="office-building"
+//                     size={14}
+//                     color="#fff"
+//                   />
+//                 </View>
+//                 <View style={[
+//                   styles.markerTail,
+//                   ind.isRegistered ? styles.tailGreen : styles.tailBlue,
+//                 ]} />
+
+//                 <Callout tooltip>
+//                   <View style={styles.callout}>
+//                     <Text style={styles.calloutName} numberOfLines={1}>{ind.name}</Text>
+//                     <Text style={styles.calloutDist}>{ind.distanceKm} km away</Text>
+//                     {ind.isRegistered && (
+//                       <Text style={styles.calloutPartner}>✓ Partner</Text>
+//                     )}
+//                   </View>
+//                 </Callout>
+//               </Marker>
+//             ))}
+//           </MapView>
+          
+//         ) : (
+//           <View style={styles.mapLoading}>
+//             <ActivityIndicator size="large" color="#185FA5" />
+//             <Text style={styles.mapLoadingText}>Getting your location...</Text>
+//           </View>
+//         )}
+
+//         {/* Map header overlay */}
+//         <View style={styles.mapHeader}>
+//           <View style={styles.cityChip}>
+//             <Ionicons name="location" size={12} color="#5DCAA5" />
+//             <Text style={styles.cityChipText}>Rawalpindi / Islamabad</Text>
+//           </View>
+//           <View style={styles.radiusChip}>
+//             <MaterialCommunityIcons name="radar" size={12} color="#8ec6e6" />
+//             <Text style={styles.radiusChipText}>10 km radius</Text>
+//           </View>
+//         </View>
+
+//         {/* Map legend */}
+//         <View style={styles.legend}>
+//           <View style={styles.legItem}>
+//             <View style={[styles.legDot, { backgroundColor: '#1D9E75' }]} />
+//             <Text style={styles.legText}>Registered</Text>
+//           </View>
+//           <View style={styles.legDivider} />
+//           <View style={styles.legItem}>
+//             <View style={[styles.legDot, { backgroundColor: '#185FA5' }]} />
+//             <Text style={styles.legText}>Other</Text>
+//           </View>
+//           <View style={styles.legDivider} />
+//           <View style={styles.legItem}>
+//             <View style={[styles.legDot, { backgroundColor: '#185FA5', borderWidth: 2, borderColor: '#fff' }]} />
+//             <Text style={styles.legText}>You</Text>
+//           </View>
+//         </View>
+//         {/* 👇 CENTER LOCATION BUTTON */}
+// {/* <TouchableOpacity
+//   style={styles.centerBtn}
+//   onPress={() => {
+//     mapRef.current?.animateToRegion({
+//       latitude: userLocation.latitude,
+//       longitude: userLocation.longitude,
+//       latitudeDelta: 0.01,
+//       longitudeDelta: 0.01,
+//     });
+//   }}
+// >
+//   <Ionicons name="locate" size={22} color="#fff" />
+// </TouchableOpacity> */}
+
+
+
+
+// <TouchableOpacity
+//   style={styles.centerBtn}
+//   onPress={() => {
+//     if (!userLocation) return;
+
+//     mapRef.current?.animateToRegion({
+//       latitude: userLocation.latitude,
+//       longitude: userLocation.longitude,
+//       latitudeDelta: 0.01,
+//       longitudeDelta: 0.01,
+//     });
+//   }}
+// >
+//   <Ionicons name="locate" size={22} color="#fff" />
+// </TouchableOpacity>
+      
+      
+//       </View>
+
+//       {/* ───── LIST PANEL ───── */}
+//       <View style={styles.panel}>
+//         {/* Pull handle */}
+//         <View style={styles.handle} />
+
+//         {/* Header */}
+//         <View style={styles.panelHeader}>
+//           <View>
+//             <Text style={styles.panelTitle}>Nearby Opportunities</Text>
+//             <Text style={styles.panelSub}>
+//               {filteredIndustries.length} companies • sorted by distance
+//             </Text>
+//           </View>
+//           <View style={styles.statsRow}>
+//             <View style={styles.statPill}>
+//               <Text style={styles.statPillNum}>{partnerCount}</Text>
+//               <Text style={styles.statPillLabel}>Partners</Text>
+//             </View>
+//             <View style={[styles.statPill, { backgroundColor: '#E6F1FB' }]}>
+//               <Text style={[styles.statPillNum, { color: '#185FA5' }]}>{hiringCount}</Text>
+//               <Text style={[styles.statPillLabel, { color: '#185FA5' }]}>Hiring</Text>
+//             </View>
+//           </View>
+//         </View>
+
+//         {/* Filter tabs */}
+//         <View style={styles.filterRow}>
+//           {(['all', 'partner', 'hiring'] as const).map(f => (
+//             <TouchableOpacity
+//               key={f}
+//               style={[styles.filterTab, activeFilter === f && styles.filterTabActive]}
+//               onPress={() => setActiveFilter(f)}
+//             >
+//               <Text style={[styles.filterTabText, activeFilter === f && styles.filterTabTextActive]}>
+//                 {f === 'all' ? `All (${industries.length})` :
+//                  f === 'partner' ? `Partners (${partnerCount})` :
+//                  `Hiring (${hiringCount})`}
+//               </Text>
+//             </TouchableOpacity>
+//           ))}
+//         </View>
+
+//         {/* List */}
+//         {loading ? (
+//           <View style={styles.loadingWrap}>
+//             <ActivityIndicator size="large" color="#193648" />
+//             <Text style={styles.loadingText}>Finding nearby companies...</Text>
+//           </View>
+//         ) : filteredIndustries.length > 0 ? (
+//           <FlatList
+//             data={filteredIndustries}
+//             keyExtractor={item => item._id}
+//             renderItem={renderCard}
+//             contentContainerStyle={styles.listContent}
+//             showsVerticalScrollIndicator={false}
+//           />
+//         ) : (
+//           <View style={styles.emptyWrap}>
+//             <Ionicons name="search-outline" size={44} color="#ccc" />
+//             <Text style={styles.emptyTitle}>No companies found</Text>
+//             <Text style={styles.emptySub}>Try changing the filter or expand the search radius</Text>
+//           </View>
+//         )}
+//       </View>
+//     </View>
+//   );
+// };
+
+// const styles = StyleSheet.create({
+//   container: { flex: 1, backgroundColor: '#0d1f3c' },
+
+//   // ── MAP ──
+//   mapWrap: { height: H * 0.46, position: 'relative' },
+//   mapLoading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a2d4a' },
+//   mapLoadingText: { color: '#8ec6e6', marginTop: 10, fontSize: 13 },
+
+//   mapHeader: {
+//     position: 'absolute', top: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 10 : 50,
+//     left: 14, right: 14,
+//     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+//   },
+//   cityChip: {
+//     flexDirection: 'row', alignItems: 'center', gap: 5,
+//     backgroundColor: 'rgba(13,31,60,0.82)', paddingHorizontal: 12, paddingVertical: 7,
+//     borderRadius: 20, borderWidth: 0.5, borderColor: 'rgba(94,202,165,0.3)',
+//   },
+//   cityChipText: { color: '#e2f0fb', fontSize: 12, fontWeight: '500' },
+//   radiusChip: {
+//     flexDirection: 'row', alignItems: 'center', gap: 5,
+//     backgroundColor: 'rgba(13,31,60,0.82)', paddingHorizontal: 10, paddingVertical: 7,
+//     borderRadius: 20, borderWidth: 0.5, borderColor: 'rgba(142,198,230,0.3)',
+//   },
+//   radiusChipText: { color: '#8ec6e6', fontSize: 11 },
+
+//   legend: {
+//     position: 'absolute', bottom: 16, left: 14,
+//     flexDirection: 'row', alignItems: 'center', gap: 8,
+//     backgroundColor: 'rgba(13,31,60,0.85)', paddingHorizontal: 12, paddingVertical: 7,
+//     borderRadius: 20, borderWidth: 0.5, borderColor: 'rgba(142,198,230,0.2)',
+//   },
+//   legItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+//   legDot: { width: 8, height: 8, borderRadius: 4 },
+//   legText: { color: '#b0cce8', fontSize: 10 },
+//   legDivider: { width: 0.5, height: 12, backgroundColor: 'rgba(255,255,255,0.2)' },
+
+//   // ── MARKERS ──
+//   markerWrap: {
+//     width: 30, height: 30, borderRadius: 15,
+//     alignItems: 'center', justifyContent: 'center',
+//     borderWidth: 2, borderColor: '#fff',
+//   },
+//   markerGreen: { backgroundColor: '#0F6E56' },
+//   markerBlue: { backgroundColor: '#185FA5' },
+//   markerSelected: { width: 36, height: 36, borderRadius: 18, borderWidth: 3 },
+//   markerTail: { width: 4, height: 8, alignSelf: 'center', borderRadius: 2, marginTop: -2 },
+//   tailGreen: { backgroundColor: '#0F6E56' },
+//   tailBlue: { backgroundColor: '#185FA5' },
+
+//   callout: {
+//     backgroundColor: '#0d1f3c', borderRadius: 10, padding: 10, minWidth: 130,
+//     borderWidth: 0.5, borderColor: 'rgba(142,198,230,0.3)',
+//   },
+//   calloutName: { color: '#e2f0fb', fontSize: 12, fontWeight: '600', maxWidth: 140 },
+//   calloutDist: { color: '#8ec6e6', fontSize: 10, marginTop: 2 },
+//   calloutPartner: { color: '#5DCAA5', fontSize: 10, marginTop: 3, fontWeight: '500' },
+
+//   // ── PANEL ──
+//   panel: {
+//     flex: 1,
+//     backgroundColor: '#f5f7fa',
+//     borderTopLeftRadius: 26, borderTopRightRadius: 26,
+//     marginTop: -26,
+//     overflow: 'hidden',
+//   },
+//   handle: {
+//     width: 36, height: 4, borderRadius: 2,
+//     backgroundColor: '#d0d5dd', alignSelf: 'center', marginTop: 10, marginBottom: 4,
+//   },
+
+//   panelHeader: {
+//     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+//     paddingHorizontal: 18, paddingTop: 12, paddingBottom: 8,
+//   },
+//   panelTitle: { fontSize: 20, fontWeight: '700', color: '#101828', letterSpacing: -0.3 },
+//   panelSub: { fontSize: 12, color: '#667085', marginTop: 2 },
+
+//   statsRow: { flexDirection: 'row', gap: 6 },
+//   statPill: {
+//     backgroundColor: '#E1F5EE', borderRadius: 10,
+//     paddingHorizontal: 10, paddingVertical: 5, alignItems: 'center',
+//   },
+//   statPillNum: { fontSize: 15, fontWeight: '700', color: '#0F6E56' },
+//   statPillLabel: { fontSize: 9, color: '#0F6E56', fontWeight: '500' },
+
+//   filterRow: {
+//     flexDirection: 'row', paddingHorizontal: 18, gap: 8, marginBottom: 10,
+//   },
+//   filterTab: {
+//     paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
+//     borderWidth: 0.5, borderColor: '#d0d5dd', backgroundColor: '#fff',
+//   },
+//   filterTabActive: { backgroundColor: '#193648', borderColor: '#193648' },
+//   filterTabText: { fontSize: 12, color: '#667085', fontWeight: '500' },
+//   filterTabTextActive: { color: '#fff' },
+
+//   listContent: { paddingHorizontal: 16, paddingBottom: 24 },
+
+//   // ── CARD ──
+//   card: {
+//     backgroundColor: '#fff', borderRadius: 16,
+//     marginBottom: 12, overflow: 'hidden',
+//     borderWidth: 0.5, borderColor: '#e4e7ec',
+//     shadowColor: '#101828', shadowOffset: { width: 0, height: 2 },
+//     shadowOpacity: 0.07, shadowRadius: 6, elevation: 3,
+//   },
+//   cardPartner: { borderColor: '#b7e5d4' },
+//   cardSelected: { borderColor: '#185FA5', borderWidth: 1.5 },
+//   cardAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: '#1D9E75' },
+//   cardInner: { padding: 14, paddingLeft: 18 },
+
+//   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+//   iconWrap: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+//   iconWrapGreen: { backgroundColor: '#E1F5EE' },
+//   iconWrapGray: { backgroundColor: '#f2f4f7' },
+
+//   cardTextBlock: { flex: 1 },
+//   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+//   cardName: { fontSize: 14, fontWeight: '700', color: '#101828', maxWidth: '65%' },
+//   partnerBadge: {
+//     flexDirection: 'row', alignItems: 'center', gap: 3,
+//     backgroundColor: '#1D9E75', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6,
+//   },
+//   partnerBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+//   cardAddr: { fontSize: 11, color: '#667085', marginTop: 3 },
+//   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+//   stars: { fontSize: 11, color: '#EA9F27' },
+//   ratingNum: { fontSize: 11, color: '#667085', fontWeight: '500' },
+//   hiringBadge: {
+//     flexDirection: 'row', alignItems: 'center', gap: 3,
+//     backgroundColor: '#E1F5EE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+//   },
+//   hiringText: { fontSize: 9, color: '#085041', fontWeight: '600' },
+
+//   distBlock: { alignItems: 'center', paddingTop: 2 },
+//   distText: { fontSize: 15, fontWeight: '700', color: '#185FA5', lineHeight: 18 },
+//   distUnit: { fontSize: 9, color: '#185FA5', fontWeight: '500' },
+
+//   chipsRow: { flexDirection: 'row', gap: 6, marginTop: 10, flexWrap: 'wrap' },
+//   chip: {
+//     backgroundColor: '#EBF5FF', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6,
+//     borderWidth: 0.5, borderColor: '#b3d4f4',
+//   },
+//   chipText: { fontSize: 10, color: '#185FA5', fontWeight: '500' },
+
+//   cardFooter: {
+//     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+//     marginTop: 12, paddingTop: 10,
+//     borderTopWidth: 0.5, borderTopColor: '#f2f4f7',
+//   },
+//   webBtn: {
+//     flexDirection: 'row', alignItems: 'center', gap: 5,
+//     borderWidth: 1, borderColor: '#b3d4f4',
+//     paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9,
+//     backgroundColor: '#EBF5FF',
+//   },
+//   webBtnText: { color: '#185FA5', fontSize: 12, fontWeight: '600' },
+//   noWebsite: { paddingVertical: 7 },
+//   noWebsiteText: { fontSize: 11, color: '#b0b7c3', fontStyle: 'italic' },
+//   internBtn: {
+//     flexDirection: 'row', alignItems: 'center', gap: 6,
+//     backgroundColor: '#193648', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9,
+//   },
+//   internBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+//   notRegWrap: { paddingVertical: 8 },
+//   notRegText: { fontSize: 11, color: '#b0b7c3', fontStyle: 'italic' },
+
+//   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 40 },
+//   loadingText: { color: '#667085', marginTop: 12, fontSize: 14 },
+//   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 60 },
+//   emptyTitle: { fontSize: 16, fontWeight: '600', color: '#344054', marginTop: 14 },
+//   emptySub: { fontSize: 13, color: '#667085', marginTop: 6, textAlign: 'center', paddingHorizontal: 40 },
+// //   searchBar: {
+// //   position: 'absolute',
+// //   top: 100,
+// //   left: 14,
+// //   right: 14,
+// //   flexDirection: 'row',
+// //   alignItems: 'center',
+// //   gap: 8,
+// //   backgroundColor: 'rgba(13,31,60,0.9)',
+// //   padding: 10,
+// //   borderRadius: 12,
+// //   borderWidth: 0.5,
+// //   borderColor: 'rgba(142,198,230,0.3)',
+// //   zIndex: 10,
+// // },
+// // searchText: {
+// //   color: '#8ec6e6',
+// //   fontSize: 12,
+// // },
+
+// centerBtn: {
+//   position: 'absolute',
+//   right: 16,
+//   bottom: 90, // 👈 legend se upar rakha
+//   backgroundColor: '#185FA5',
+//   padding: 12,
+//   borderRadius: 30,
+//   elevation: 5,
+//   shadowColor: '#000',
+//   shadowOpacity: 0.2,
+// },
+// });
+
+// export default NearbyIndustriesScreen;
+
+
+
+
+
+
+
+
+
+
+
+
+import { CONSTANT } from "@/constants/constant";
+
 import React, { useEffect, useState, useRef } from 'react';
 import {
   StyleSheet, View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, Dimensions, Linking, Animated,
   Platform, StatusBar
 } from 'react-native';
-import MapView, { Marker, Circle, PROVIDER_GOOGLE, Callout } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import axios from 'axios';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
-
-const { width, height } = Dimensions.get('window');
-
-const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#1a2332' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#8ec6e6' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a2332' }] },
-  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#2a3f5f' }] },
-  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#1e3248' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#162a20' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2d4a6e' }] },
-  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#3a5f8a' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#4a7ab5' }] },
-  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#b0cce8' }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#1e3450' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0d1f3c' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#4e8cbe' }] },
-];
+import { useNavigation } from '@react-navigation/native'; // Navigation import kiya
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -378,14 +1113,122 @@ type Industry = {
   internships?: { title: string; type: string }[];
 };
 
+// --- 10 Mock Industries ---
+const MOCK_INDUSTRIES: Industry[] = [
+  {
+    _id: 'mock1',
+    name: 'TechNova Solutions',
+    address: 'Blue Area, Islamabad',
+    location: { lat: 33.707, lng: 73.055 },
+    isRegistered: true,
+    distanceKm: '2.1',
+    rating: 4.5,
+    website: 'technova.com',
+  },
+  {
+    _id: 'mock2',
+    name: 'Softify Labs',
+    address: 'Bahria Town, Rawalpindi',
+    location: { lat: 33.565, lng: 73.136 },
+    isRegistered: true,
+    distanceKm: '5.3',
+    rating: 4.2,
+    website: 'softify.pk',
+  },
+  {
+    _id: 'mock3',
+    name: 'InnoTech Pvt Ltd',
+    address: 'I-8 Markaz, Islamabad',
+    location: { lat: 33.684, lng: 73.047 },
+    isRegistered: true,
+    distanceKm: '3.8',
+    rating: 4.0,
+  },
+  {
+    _id: 'mock4',
+    name: 'CyberShield Security',
+    address: 'F-10 Markaz, Islamabad',
+    location: { lat: 33.691, lng: 73.011 },
+    isRegistered: true,
+    distanceKm: '4.2',
+    rating: 4.8,
+    website: 'cybershield.com',
+  },
+  {
+    _id: 'mock5',
+    name: 'DataSync Analytics',
+    address: 'Saddar, Rawalpindi',
+    location: { lat: 33.595, lng: 73.054 },
+    isRegistered: true,
+    distanceKm: '6.1',
+    rating: 4.3,
+  },
+  {
+    _id: 'mock6',
+    name: 'PixelPerfect Design',
+    address: 'E-11, Islamabad',
+    location: { lat: 33.698, lng: 72.983 },
+    isRegistered: true,
+    distanceKm: '7.5',
+    rating: 4.6,
+    website: 'pixelperfect.io',
+  },
+  {
+    _id: 'mock7',
+    name: 'CloudScale Systems',
+    address: 'G-11 Markaz, Islamabad',
+    location: { lat: 33.668, lng: 72.998 },
+    isRegistered: true,
+    distanceKm: '3.9',
+    rating: 4.1,
+  },
+  {
+    _id: 'mock8',
+    name: 'AppVantage Mobile',
+    address: 'Satellite Town, Pindi',
+    location: { lat: 33.642, lng: 73.076 },
+    isRegistered: false,
+    distanceKm: '1.8',
+    rating: 3.9,
+  },
+  {
+    _id: 'mock9',
+    name: 'GameGenic Studios',
+    address: 'DHA Phase 2, Islamabad',
+    location: { lat: 33.524, lng: 73.149 },
+    isRegistered: true,
+    distanceKm: '12.4',
+    rating: 4.7,
+    website: 'gamegenic.pk',
+  },
+  {
+    _id: 'mock10',
+    name: 'MetaLogic AI',
+    address: 'Gulberg Greens, Islamabad',
+    location: { lat: 33.601, lng: 73.141 },
+    isRegistered: true,
+    distanceKm: '9.2',
+    rating: 4.4,
+  },
+];
+
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#1a2332' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8ec6e6' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a2332' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2d4a6e' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0d1f3c' }] },
+];
+
 const NearbyIndustriesScreen = () => {
+  const navigation = useNavigation<any>(); // Navigation initialize kiya
   const [userLocation, setUserLocation] = useState<any>(null);
   const [industries, setIndustries] = useState<Industry[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<'all' | 'partner' | 'hiring'>('all');
   const [selectedIndustry, setSelectedIndustry] = useState<Industry | null>(null);
+
   const mapRef = useRef<MapView>(null);
-  const slideAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     (async () => {
@@ -406,20 +1249,24 @@ const NearbyIndustriesScreen = () => {
   const fetchData = async (lat: number, lng: number) => {
     try {
       setLoading(true);
-      const res = await axios.post('http://192.168.0.245:5000/api/industries/nearby-students', { lat, lng });
-      setIndustries(res.data.industries);
+      // const res = await axios.post('${CONSTANT.API_BASE_URL}/api/industries/nearby-students', { lat, lng });
+
+
+      const res = await axios.post(
+  `${CONSTANT.API_BASE_URL}/api/industries/nearby-students`,
+  { lat, lng }
+);
+      const realData: Industry[] = res.data.industries || [];
+      const uniqueData = [
+        ...realData,
+        ...MOCK_INDUSTRIES.filter(mock => !realData.some(real => real.name === mock.name)),
+      ];
+      setIndustries(uniqueData);
     } catch (e) {
-      console.log('Error fetching:', e);
+      setIndustries(MOCK_INDUSTRIES);
     } finally {
       setLoading(false);
     }
-  };
-
-  const openWebsite = (url: string) => {
-    const fullUrl = url.startsWith('http') ? url : `https://${url}`;
-    Linking.openURL(fullUrl).catch(() =>
-      console.log('Could not open URL:', fullUrl)
-    );
   };
 
   const focusMarker = (ind: Industry) => {
@@ -430,30 +1277,14 @@ const NearbyIndustriesScreen = () => {
       latitudeDelta: 0.015,
       longitudeDelta: 0.015,
     }, 600);
-    Animated.spring(slideAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 65,
-      friction: 9,
-    }).start();
   };
 
   const filteredIndustries = industries.filter(i => {
     if (activeFilter === 'partner') return i.isRegistered;
-    if (activeFilter === 'hiring') return i.isRegistered && (i.internships?.length ?? 0) > 0;
     return true;
   });
 
-  const partnerCount = industries.filter(i => i.isRegistered).length;
-  const hiringCount = industries.filter(i => i.isRegistered && (i.internships?.length ?? 0) > 0).length;
-
-  const renderStars = (rating: number) => {
-    const full = Math.floor(rating);
-    const empty = 5 - full;
-    return '★'.repeat(full) + '☆'.repeat(empty);
-  };
-
-  const renderCard = ({ item, index }: { item: Industry; index: number }) => {
+  const renderCard = ({ item }: { item: Industry }) => {
     const isSelected = selectedIndustry?._id === item._id;
     return (
       <TouchableOpacity
@@ -461,90 +1292,47 @@ const NearbyIndustriesScreen = () => {
         onPress={() => focusMarker(item)}
         activeOpacity={0.85}
       >
-        {/* Left accent bar for partners */}
         {item.isRegistered && <View style={styles.cardAccent} />}
-
         <View style={styles.cardInner}>
-          {/* Header Row */}
           <View style={styles.cardHeader}>
             <View style={[styles.iconWrap, item.isRegistered ? styles.iconWrapGreen : styles.iconWrapGray]}>
-              <MaterialCommunityIcons
-                name="office-building"
-                size={22}
-                color={item.isRegistered ? '#0F6E56' : '#888'}
-              />
+              <MaterialCommunityIcons name="office-building" size={22} color={item.isRegistered ? '#0F6E56' : '#888'} />
             </View>
-
             <View style={styles.cardTextBlock}>
-              <View style={styles.nameRow}>
-                <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
-                {item.isRegistered && (
-                  <View style={styles.partnerBadge}>
-                    <Ionicons name="checkmark-circle" size={10} color="#fff" />
-                    <Text style={styles.partnerBadgeText}>Partner</Text>
-                  </View>
-                )}
-              </View>
+              <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
               <Text style={styles.cardAddr} numberOfLines={1}>
                 <Ionicons name="location-outline" size={11} color="#999" /> {item.address}
               </Text>
               <View style={styles.metaRow}>
-                <Text style={styles.stars}>{renderStars(item.rating)}</Text>
+                <Text style={styles.stars}>{'★'.repeat(Math.floor(item.rating))}</Text>
                 <Text style={styles.ratingNum}>{item.rating.toFixed(1)}</Text>
-                {item.isRegistered && (item.internships?.length ?? 0) > 0 && (
-                  <View style={styles.hiringBadge}>
-                    <FontAwesome5 name="briefcase" size={8} color="#085041" />
-                    <Text style={styles.hiringText}>{item.internships!.length} open</Text>
-                  </View>
-                )}
               </View>
             </View>
-
             <View style={styles.distBlock}>
-              <Ionicons name="navigate" size={12} color="#185FA5" />
               <Text style={styles.distText}>{item.distanceKm}</Text>
               <Text style={styles.distUnit}>km</Text>
             </View>
           </View>
 
-          {/* Internship chips — only if registered & has internships */}
-          {item.isRegistered && item.internships && item.internships.length > 0 && (
-            <View style={styles.chipsRow}>
-              {item.internships.slice(0, 3).map((int, i) => (
-                <View key={i} style={styles.chip}>
-                  <Text style={styles.chipText}>{int.title}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Footer Actions */}
           <View style={styles.cardFooter}>
-            {item.website ? (
-              <TouchableOpacity
-                style={styles.webBtn}
-                onPress={() => openWebsite(item.website!)}
-                activeOpacity={0.7}
-              >
+             <TouchableOpacity 
+                style={styles.webBtn} 
+                onPress={() => item.website && Linking.openURL(`https://${item.website}`)}
+             >
                 <Ionicons name="globe-outline" size={13} color="#185FA5" />
-                <Text style={styles.webBtnText}>Visit Website</Text>
-                <Ionicons name="open-outline" size={11} color="#185FA5" />
+                <Text style={styles.webBtnText}>Website</Text>
               </TouchableOpacity>
-            ) : (
-              <View style={styles.noWebsite}>
-                <Text style={styles.noWebsiteText}>No website</Text>
-              </View>
-            )}
 
             {item.isRegistered ? (
-              <TouchableOpacity style={styles.internBtn} activeOpacity={0.85}>
+              <TouchableOpacity 
+                style={styles.internBtn} 
+                onPress={() => navigation.navigate("Internships")} // <-- Navigation added here
+              >
                 <FontAwesome5 name="briefcase" size={11} color="#fff" />
                 <Text style={styles.internBtnText}>Internships</Text>
               </TouchableOpacity>
             ) : (
-              <View style={styles.notRegWrap}>
-                <Text style={styles.notRegText}>Not on platform</Text>
-              </View>
+                <View style={styles.notRegWrap}><Text style={styles.notRegText}>Not Registered</Text></View>
             )}
           </View>
         </View>
@@ -554,183 +1342,57 @@ const NearbyIndustriesScreen = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0d1f3c" />
+      <StatusBar barStyle="light-content" />
 
-      {/* ───── MAP ───── */}
+      {/* MAP */}
       <View style={styles.mapWrap}>
-        {userLocation ? (
+        {userLocation && (
           <MapView
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
             style={StyleSheet.absoluteFillObject}
             initialRegion={userLocation}
             customMapStyle={DARK_MAP_STYLE}
-            showsUserLocation={false}
-            showsCompass={false}
-            showsTraffic={false}
-            showsBuildings={true}
           >
-            {/* User location pulse circle */}
-            <Circle
-              center={{ latitude: userLocation.latitude, longitude: userLocation.longitude }}
-              radius={300}
-              fillColor="rgba(24,95,165,0.15)"
-              strokeColor="rgba(24,95,165,0.4)"
-              strokeWidth={1}
-            />
-            <Circle
-              center={{ latitude: userLocation.latitude, longitude: userLocation.longitude }}
-              radius={80}
-              fillColor="rgba(24,95,165,0.35)"
-              strokeColor="#185FA5"
-              strokeWidth={2}
-            />
-            {/* Search radius */}
-            <Circle
-              center={{ latitude: userLocation.latitude, longitude: userLocation.longitude }}
-              radius={5000}
-              fillColor="rgba(29,158,117,0.04)"
-              strokeColor="rgba(29,158,117,0.25)"
-              strokeWidth={1}
-              lineDashPattern={[6, 4]}
-            />
-
-            {/* Industry markers */}
             {industries.map(ind => (
               <Marker
                 key={ind._id}
                 coordinate={{ latitude: ind.location.lat, longitude: ind.location.lng }}
                 onPress={() => focusMarker(ind)}
               >
-                {/* Custom marker view */}
-                <View style={[
-                  styles.markerWrap,
-                  ind.isRegistered ? styles.markerGreen : styles.markerBlue,
-                  selectedIndustry?._id === ind._id && styles.markerSelected,
-                ]}>
-                  <MaterialCommunityIcons
-                    name="office-building"
-                    size={14}
-                    color="#fff"
-                  />
+                <View style={[styles.markerWrap, ind.isRegistered ? styles.markerGreen : styles.markerBlue, selectedIndustry?._id === ind._id && styles.markerSelected]}>
+                  <MaterialCommunityIcons name="office-building" size={14} color="#fff" />
                 </View>
-                <View style={[
-                  styles.markerTail,
-                  ind.isRegistered ? styles.tailGreen : styles.tailBlue,
-                ]} />
-
-                <Callout tooltip>
-                  <View style={styles.callout}>
-                    <Text style={styles.calloutName} numberOfLines={1}>{ind.name}</Text>
-                    <Text style={styles.calloutDist}>{ind.distanceKm} km away</Text>
-                    {ind.isRegistered && (
-                      <Text style={styles.calloutPartner}>✓ Partner</Text>
-                    )}
-                  </View>
-                </Callout>
               </Marker>
             ))}
           </MapView>
-        ) : (
-          <View style={styles.mapLoading}>
-            <ActivityIndicator size="large" color="#185FA5" />
-            <Text style={styles.mapLoadingText}>Getting your location...</Text>
-          </View>
         )}
-
-        {/* Map header overlay */}
-        <View style={styles.mapHeader}>
-          <View style={styles.cityChip}>
-            <Ionicons name="location" size={12} color="#5DCAA5" />
-            <Text style={styles.cityChipText}>Rawalpindi / Islamabad</Text>
-          </View>
-          <View style={styles.radiusChip}>
-            <MaterialCommunityIcons name="radar" size={12} color="#8ec6e6" />
-            <Text style={styles.radiusChipText}>10 km radius</Text>
-          </View>
-        </View>
-
-        {/* Map legend */}
-        <View style={styles.legend}>
-          <View style={styles.legItem}>
-            <View style={[styles.legDot, { backgroundColor: '#1D9E75' }]} />
-            <Text style={styles.legText}>Registered</Text>
-          </View>
-          <View style={styles.legDivider} />
-          <View style={styles.legItem}>
-            <View style={[styles.legDot, { backgroundColor: '#185FA5' }]} />
-            <Text style={styles.legText}>Other</Text>
-          </View>
-          <View style={styles.legDivider} />
-          <View style={styles.legItem}>
-            <View style={[styles.legDot, { backgroundColor: '#185FA5', borderWidth: 2, borderColor: '#fff' }]} />
-            <Text style={styles.legText}>You</Text>
-          </View>
-        </View>
+        <TouchableOpacity style={styles.centerBtn} onPress={() => mapRef.current?.animateToRegion(userLocation)}>
+          <Ionicons name="locate" size={22} color="#fff" />
+        </TouchableOpacity>
       </View>
 
-      {/* ───── LIST PANEL ───── */}
+      {/* LIST PANEL */}
       <View style={styles.panel}>
-        {/* Pull handle */}
         <View style={styles.handle} />
-
-        {/* Header */}
         <View style={styles.panelHeader}>
-          <View>
-            <Text style={styles.panelTitle}>Nearby Opportunities</Text>
-            <Text style={styles.panelSub}>
-              {filteredIndustries.length} companies • sorted by distance
-            </Text>
-          </View>
-          <View style={styles.statsRow}>
-            <View style={styles.statPill}>
-              <Text style={styles.statPillNum}>{partnerCount}</Text>
-              <Text style={styles.statPillLabel}>Partners</Text>
-            </View>
-            <View style={[styles.statPill, { backgroundColor: '#E6F1FB' }]}>
-              <Text style={[styles.statPillNum, { color: '#185FA5' }]}>{hiringCount}</Text>
-              <Text style={[styles.statPillLabel, { color: '#185FA5' }]}>Hiring</Text>
-            </View>
+          <Text style={styles.panelTitle}>Nearby Industries</Text>
+          <View style={styles.filterRow}>
+            {(['all', 'partner'] as const).map(f => (
+              <TouchableOpacity key={f} style={[styles.filterTab, activeFilter === f && styles.filterTabActive]} onPress={() => setActiveFilter(f)}>
+                <Text style={[styles.filterTabText, activeFilter === f && styles.filterTabTextActive]}>{f.toUpperCase()}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
-        {/* Filter tabs */}
-        <View style={styles.filterRow}>
-          {(['all', 'partner', 'hiring'] as const).map(f => (
-            <TouchableOpacity
-              key={f}
-              style={[styles.filterTab, activeFilter === f && styles.filterTabActive]}
-              onPress={() => setActiveFilter(f)}
-            >
-              <Text style={[styles.filterTabText, activeFilter === f && styles.filterTabTextActive]}>
-                {f === 'all' ? `All (${industries.length})` :
-                 f === 'partner' ? `Partners (${partnerCount})` :
-                 `Hiring (${hiringCount})`}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* List */}
-        {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color="#193648" />
-            <Text style={styles.loadingText}>Finding nearby companies...</Text>
-          </View>
-        ) : filteredIndustries.length > 0 ? (
+        {loading ? <ActivityIndicator size="large" style={{marginTop: 50}} color="#193648" /> : (
           <FlatList
             data={filteredIndustries}
             keyExtractor={item => item._id}
             renderItem={renderCard}
             contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
           />
-        ) : (
-          <View style={styles.emptyWrap}>
-            <Ionicons name="search-outline" size={44} color="#ccc" />
-            <Text style={styles.emptyTitle}>No companies found</Text>
-            <Text style={styles.emptySub}>Try changing the filter or expand the search radius</Text>
-          </View>
         )}
       </View>
     </View>
@@ -739,177 +1401,47 @@ const NearbyIndustriesScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0d1f3c' },
-
-  // ── MAP ──
-  mapWrap: { height: H * 0.46, position: 'relative' },
-  mapLoading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a2d4a' },
-  mapLoadingText: { color: '#8ec6e6', marginTop: 10, fontSize: 13 },
-
-  mapHeader: {
-    position: 'absolute', top: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 10 : 50,
-    left: 14, right: 14,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-  },
-  cityChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: 'rgba(13,31,60,0.82)', paddingHorizontal: 12, paddingVertical: 7,
-    borderRadius: 20, borderWidth: 0.5, borderColor: 'rgba(94,202,165,0.3)',
-  },
-  cityChipText: { color: '#e2f0fb', fontSize: 12, fontWeight: '500' },
-  radiusChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: 'rgba(13,31,60,0.82)', paddingHorizontal: 10, paddingVertical: 7,
-    borderRadius: 20, borderWidth: 0.5, borderColor: 'rgba(142,198,230,0.3)',
-  },
-  radiusChipText: { color: '#8ec6e6', fontSize: 11 },
-
-  legend: {
-    position: 'absolute', bottom: 16, left: 14,
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(13,31,60,0.85)', paddingHorizontal: 12, paddingVertical: 7,
-    borderRadius: 20, borderWidth: 0.5, borderColor: 'rgba(142,198,230,0.2)',
-  },
-  legItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legDot: { width: 8, height: 8, borderRadius: 4 },
-  legText: { color: '#b0cce8', fontSize: 10 },
-  legDivider: { width: 0.5, height: 12, backgroundColor: 'rgba(255,255,255,0.2)' },
-
-  // ── MARKERS ──
-  markerWrap: {
-    width: 30, height: 30, borderRadius: 15,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#fff',
-  },
+  mapWrap: { height: H * 0.46 },
+  centerBtn: { position: 'absolute', right: 16, bottom: 40, backgroundColor: '#185FA5', padding: 12, borderRadius: 30 },
+  markerWrap: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
   markerGreen: { backgroundColor: '#0F6E56' },
   markerBlue: { backgroundColor: '#185FA5' },
-  markerSelected: { width: 36, height: 36, borderRadius: 18, borderWidth: 3 },
-  markerTail: { width: 4, height: 8, alignSelf: 'center', borderRadius: 2, marginTop: -2 },
-  tailGreen: { backgroundColor: '#0F6E56' },
-  tailBlue: { backgroundColor: '#185FA5' },
-
-  callout: {
-    backgroundColor: '#0d1f3c', borderRadius: 10, padding: 10, minWidth: 130,
-    borderWidth: 0.5, borderColor: 'rgba(142,198,230,0.3)',
-  },
-  calloutName: { color: '#e2f0fb', fontSize: 12, fontWeight: '600', maxWidth: 140 },
-  calloutDist: { color: '#8ec6e6', fontSize: 10, marginTop: 2 },
-  calloutPartner: { color: '#5DCAA5', fontSize: 10, marginTop: 3, fontWeight: '500' },
-
-  // ── PANEL ──
-  panel: {
-    flex: 1,
-    backgroundColor: '#f5f7fa',
-    borderTopLeftRadius: 26, borderTopRightRadius: 26,
-    marginTop: -26,
-    overflow: 'hidden',
-  },
-  handle: {
-    width: 36, height: 4, borderRadius: 2,
-    backgroundColor: '#d0d5dd', alignSelf: 'center', marginTop: 10, marginBottom: 4,
-  },
-
-  panelHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 18, paddingTop: 12, paddingBottom: 8,
-  },
-  panelTitle: { fontSize: 20, fontWeight: '700', color: '#101828', letterSpacing: -0.3 },
-  panelSub: { fontSize: 12, color: '#667085', marginTop: 2 },
-
-  statsRow: { flexDirection: 'row', gap: 6 },
-  statPill: {
-    backgroundColor: '#E1F5EE', borderRadius: 10,
-    paddingHorizontal: 10, paddingVertical: 5, alignItems: 'center',
-  },
-  statPillNum: { fontSize: 15, fontWeight: '700', color: '#0F6E56' },
-  statPillLabel: { fontSize: 9, color: '#0F6E56', fontWeight: '500' },
-
-  filterRow: {
-    flexDirection: 'row', paddingHorizontal: 18, gap: 8, marginBottom: 10,
-  },
-  filterTab: {
-    paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
-    borderWidth: 0.5, borderColor: '#d0d5dd', backgroundColor: '#fff',
-  },
-  filterTabActive: { backgroundColor: '#193648', borderColor: '#193648' },
-  filterTabText: { fontSize: 12, color: '#667085', fontWeight: '500' },
+  markerSelected: { width: 38, height: 38, borderRadius: 19, borderWidth: 3 },
+  panel: { flex: 1, backgroundColor: '#f5f7fa', borderTopLeftRadius: 26, borderTopRightRadius: 26, marginTop: -26 },
+  handle: { width: 40, height: 5, backgroundColor: '#ccc', alignSelf: 'center', marginVertical: 10, borderRadius: 10 },
+  panelHeader: { paddingHorizontal: 20 },
+  panelTitle: { fontSize: 20, fontWeight: 'bold', color: '#193648' },
+  filterRow: { flexDirection: 'row', gap: 8, marginVertical: 10 },
+  filterTab: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd' },
+  filterTabActive: { backgroundColor: '#193648' },
+  filterTabText: { fontSize: 10, color: '#666' },
   filterTabTextActive: { color: '#fff' },
-
-  listContent: { paddingHorizontal: 16, paddingBottom: 24 },
-
-  // ── CARD ──
-  card: {
-    backgroundColor: '#fff', borderRadius: 16,
-    marginBottom: 12, overflow: 'hidden',
-    borderWidth: 0.5, borderColor: '#e4e7ec',
-    shadowColor: '#101828', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07, shadowRadius: 6, elevation: 3,
-  },
-  cardPartner: { borderColor: '#b7e5d4' },
-  cardSelected: { borderColor: '#185FA5', borderWidth: 1.5 },
-  cardAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: '#1D9E75' },
-  cardInner: { padding: 14, paddingLeft: 18 },
-
-  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  iconWrap: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  listContent: { padding: 16 },
+  card: { backgroundColor: '#fff', borderRadius: 15, marginBottom: 12, elevation: 3 },
+  cardPartner: { borderColor: '#b7e5d4', borderWidth: 1 },
+  cardSelected: { borderColor: '#185FA5', borderWidth: 2 },
+  cardAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: '#1D9E75', borderTopLeftRadius: 15, borderBottomLeftRadius: 15 },
+  cardInner: { padding: 15 },
+  cardHeader: { flexDirection: 'row', gap: 12 },
+  iconWrap: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   iconWrapGreen: { backgroundColor: '#E1F5EE' },
-  iconWrapGray: { backgroundColor: '#f2f4f7' },
-
+  iconWrapGray: { backgroundColor: '#f0f0f0' },
   cardTextBlock: { flex: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  cardName: { fontSize: 14, fontWeight: '700', color: '#101828', maxWidth: '65%' },
-  partnerBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: '#1D9E75', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6,
-  },
-  partnerBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
-  cardAddr: { fontSize: 11, color: '#667085', marginTop: 3 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  stars: { fontSize: 11, color: '#EA9F27' },
-  ratingNum: { fontSize: 11, color: '#667085', fontWeight: '500' },
-  hiringBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: '#E1F5EE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
-  },
-  hiringText: { fontSize: 9, color: '#085041', fontWeight: '600' },
-
-  distBlock: { alignItems: 'center', paddingTop: 2 },
-  distText: { fontSize: 15, fontWeight: '700', color: '#185FA5', lineHeight: 18 },
-  distUnit: { fontSize: 9, color: '#185FA5', fontWeight: '500' },
-
-  chipsRow: { flexDirection: 'row', gap: 6, marginTop: 10, flexWrap: 'wrap' },
-  chip: {
-    backgroundColor: '#EBF5FF', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6,
-    borderWidth: 0.5, borderColor: '#b3d4f4',
-  },
-  chipText: { fontSize: 10, color: '#185FA5', fontWeight: '500' },
-
-  cardFooter: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginTop: 12, paddingTop: 10,
-    borderTopWidth: 0.5, borderTopColor: '#f2f4f7',
-  },
-  webBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderWidth: 1, borderColor: '#b3d4f4',
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9,
-    backgroundColor: '#EBF5FF',
-  },
-  webBtnText: { color: '#185FA5', fontSize: 12, fontWeight: '600' },
-  noWebsite: { paddingVertical: 7 },
-  noWebsiteText: { fontSize: 11, color: '#b0b7c3', fontStyle: 'italic' },
-  internBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#193648', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9,
-  },
-  internBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  notRegWrap: { paddingVertical: 8 },
-  notRegText: { fontSize: 11, color: '#b0b7c3', fontStyle: 'italic' },
-
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 40 },
-  loadingText: { color: '#667085', marginTop: 12, fontSize: 14 },
-  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 60 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#344054', marginTop: 14 },
-  emptySub: { fontSize: 13, color: '#667085', marginTop: 6, textAlign: 'center', paddingHorizontal: 40 },
+  cardName: { fontSize: 15, fontWeight: 'bold' },
+  cardAddr: { fontSize: 11, color: '#888' },
+  metaRow: { flexDirection: 'row', gap: 5, marginTop: 4 },
+  stars: { color: '#EA9F27', fontSize: 12 },
+  ratingNum: { color: '#888', fontSize: 11 },
+  distBlock: { alignItems: 'center' },
+  distText: { color: '#185FA5', fontWeight: 'bold', fontSize: 16 },
+  distUnit: { color: '#185FA5', fontSize: 10 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#eee', marginTop: 12, paddingTop: 10 },
+  webBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: '#185FA5', paddingHorizontal: 10, borderRadius: 5 },
+  webBtnText: { color: '#185FA5', fontSize: 12 },
+  internBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#193648', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 },
+  internBtnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  notRegWrap: { paddingVertical: 5 },
+  notRegText: { color: '#aaa', fontStyle: 'italic', fontSize: 11 },
 });
 
 export default NearbyIndustriesScreen;

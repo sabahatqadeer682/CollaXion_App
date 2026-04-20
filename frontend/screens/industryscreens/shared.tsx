@@ -12,6 +12,11 @@ import {
 } from "react-native";
 import axios from "axios";
 
+import { CONSTANT } from "@/constants/constant";
+
+
+
+
 export const { width, height } = Dimensions.get("window");
 
 // ─── THEME ──────────────────────────────────────────────────────
@@ -38,10 +43,10 @@ export const C = {
 };
 
 // ─── API ────────────────────────────────────────────────────────
-export const BASE = "http://192.168.0.245:5000";
-export const API_MOU  = `${BASE}/api/industry/mous`;
-export const API_INT  = `${BASE}/api/industry/internships`;
-export const API_PROJ = `${BASE}/api/industry/projects`;
+// export const BASE = "http://192.168.0.245:5000";
+export const API_MOU  = `$${CONSTANT.API_BASE_URL}/api/industry/mous`;
+export const API_INT  = `$${CONSTANT.API_BASE_URL}/api/industry/internships`;
+export const API_PROJ = `$${CONSTANT.API_BASE_URL}/api/industry/projects`;
 
 // ─── STATUS CONFIG ───────────────────────────────────────────────
 export const SC: Record<string, { c: string; bg: string; lbl: string }> = {
@@ -132,7 +137,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   
   const ax = useCallback(() =>
     axios.create({
-      baseURL: BASE,
+      baseURL: CONSTANT.API_BASE_URL,
       headers: {
         "x-industry-id":  user._id,
         "x-company-name": user.name,

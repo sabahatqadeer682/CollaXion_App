@@ -460,7 +460,15 @@ import {
   View,
 } from "react-native";
 
-const CXBOT_API = "http://192.168.0.245:5000";
+// const CXBOT_API = "http://192.168.0.245:5000";
+
+
+
+
+
+import { CONSTANT } from "@/constants/constant";
+
+
 
 const { width } = Dimensions.get("window");
 
@@ -612,7 +620,7 @@ export function AIChatbotScreen() {
     setTyping(true);
 
     try {
-      const res   = await fetch(`${CXBOT_API}/api/cxbot/chat`, {
+      const res   = await fetch(`${CONSTANT.API_BASE_URL}/api/cxbot/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: historyRef.current }),

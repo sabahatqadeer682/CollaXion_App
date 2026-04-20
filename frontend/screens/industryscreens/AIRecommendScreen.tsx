@@ -6,6 +6,9 @@
  * Keyboard fix: TextInputs live in a stable ScrollView, never inside FlatList header.
  * Gemini fix: Updated to gemini-2.0-flash model with better error logging.
  */
+import { CONSTANT } from "@/constants/constant";
+
+
 
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -47,7 +50,11 @@ const { width, height } = Dimensions.get("window");
 // }
 
 async function callGemini(prompt: string) {
-  const res = await fetch("http://192.168.0.245:5000/api/ai/recommend", {
+  // const res = await fetch("http://192.168.0.245:5000/api/ai/recommend", 
+
+  const res = await fetch(
+  `${CONSTANT.API_BASE_URL}/api/ai/recommend`,
+    {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt }),

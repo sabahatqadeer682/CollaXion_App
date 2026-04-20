@@ -66,7 +66,7 @@ const ProfileScreen = ({ navigation, setGlobalProfileImage }) => {
 
             const res = await axios.get(`${CONSTANT.API_BASE_URL}/api/student/getStudent/${email}`);
             const studentData = res.data;
-
+console.log("CV URL:", studentData.cvUrl);
             setStudent(studentData);
 
             if (studentData.profileImage) {
@@ -197,8 +197,8 @@ const ProfileScreen = ({ navigation, setGlobalProfileImage }) => {
                 type: file.mimeType || "application/pdf",
             } as any);
 
-            const response = await fetch(
-               `http://192.168.0.245:5000/api/student/upload-cv/${student.email}`,
+           const response = await fetch(
+   `${CONSTANT.API_BASE_URL}/api/student/upload-cv/${student.email}`,
                 {
                     method: "POST",
                     body: formData,
@@ -377,7 +377,7 @@ const ProfileScreen = ({ navigation, setGlobalProfileImage }) => {
                                 <Text style={styles.cvUploadedText}>CV Uploaded Successfully</Text>
                             </View>
                             <View style={styles.cvActions}>
-                                <TouchableOpacity
+                                {/* <TouchableOpacity
                                     onPress={() => Linking.openURL(`${CONSTANT.API_BASE_URL}${student.cvUrl}`)}
                                     style={styles.viewCvButton}
                                 >
@@ -388,7 +388,7 @@ const ProfileScreen = ({ navigation, setGlobalProfileImage }) => {
                                 <TouchableOpacity onPress={uploadCV} style={styles.replaceCvButton}>
                                     <Ionicons name="refresh-outline" size={18} color="#F39C12" />
                                     <Text style={styles.replaceCvText}>Replace</Text>
-                                </TouchableOpacity>
+                                </TouchableOpacity> */}
                                 <TouchableOpacity onPress={deleteCV} style={styles.deleteCvButton}>
                                     <Ionicons name="trash-outline" size={18} color="#E74C3C" />
                                     <Text style={styles.deleteCvText}>Delete</Text>
