@@ -5,7 +5,11 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import Student from "../models/Student.js";
-import { Internship, Application } from "../models/Internship.js";
+// import { Internship, Application } from "../models/Internship.js";
+import { updatePassword } from "../controllers/updatePasswordController.js";
+
+import Internship from "../models/Internship.js";
+import Application from "../models/Application.js";
 import { extractSkillsFromCV, recommendInternships, generateCVFeedback } from "../services/aiService.js";
 
 
@@ -74,6 +78,18 @@ router.post("/register", async (req, res) => {
         res.status(500).json({ success: false, message: "Server error during registration" });
     }
 });
+
+
+//update pswrd
+router.put("/update-password", updatePassword);
+
+
+
+
+
+
+
+
 
 // ============================
 // VERIFY STUDENT
@@ -150,11 +166,17 @@ router.put("/updateProfile", async (req, res) => {
             updateData.profileImage = profileImage;
         }
 
-        const student = await Student.findOneAndUpdate(
-            { email },
-            updateData,
-            { new: true, runValidators: true }
-        );
+        // const student = await Student.findOne(
+        //     { email },
+        //     updateData,
+        //     { new: true, runValidators: true }
+        // );
+        // ✅ NAYA - findOneAndUpdate use karo
+const student = await Student.findOneAndUpdate(
+    { email },
+    { $set: updateData },
+    { new: true, runValidators: true }
+);
 
         if (!student) return res.status(404).json({ message: "Student not found" });
 
@@ -164,7 +186,66 @@ router.put("/updateProfile", async (req, res) => {
         res.status(500).json({ message: "Server error updating profile" });
     }
 });
+// ============================
+// PROFILE IMAGE UPLOAD
+// ============================
+const profileStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const dir = "uploads/profile";
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + "-" + file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, ""));
+    },
+});
 
+const uploadProfile = multer({
+    storage: profileStorage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowed = [".jpg", ".jpeg", ".png"];
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (!allowed.includes(ext)) return cb(new Error("Only JPG, JPEG, PNG allowed"));
+        cb(null, true);
+    },
+});
+
+router.post("/upload-profile-image/:email", uploadProfile.single("profileImage"), async (req, res) => {
+    try {
+        const { email } = req.params;
+
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: "No file uploaded" });
+        }
+
+        const student = await Student.findOne({ email });
+        if (!student) {
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({ success: false, message: "Student not found" });
+        }
+
+        // Delete old profile image
+        if (student.profileImage && student.profileImage.includes("/uploads/profile")) {
+            const oldPath = path.join(__dirname, '..', '..', student.profileImage);
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+
+        const imageUrl = `/uploads/profile/${req.file.filename}`;
+        student.profileImage = imageUrl;
+        await student.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Profile image updated!",
+            profileImage: imageUrl
+        });
+
+    } catch (err) {
+        console.error("Profile image upload error:", err);
+        res.status(500).json({ success: false, message: "Error uploading image" });
+    }
+});
 // ============================
 // CV UPLOAD SETUP
 // ============================
@@ -213,7 +294,10 @@ router.post("/upload-cv/:email", upload.single("cv"), async (req, res) => {
 
         console.log("CV file received:", uploadedFilePath);
 
-        const student = await Student.findOneAndUpdate({ email });
+        // const student = await Student.findOneAndUpdate({ email });
+
+        const student = await Student.findOne({ email });
+
         if (!student) {
             fs.unlinkSync(uploadedFilePath);
             return res.status(404).json({
@@ -329,13 +413,153 @@ router.post("/upload-cv/:email", upload.single("cv"), async (req, res) => {
 // Recommendation
 // ============================
 
+// router.get("/recommendations/:email", async (req, res) => {
+//     try {
+//         const student = await Student.findOne({ email: req.params.email });
+//         if (!student) {
+//             return res.status(404).json({ success: false, message: "Student not found" });
+//         }
+
+//         if (!student.extractedSkills || student.extractedSkills.length === 0) {
+//             return res.status(200).json({
+//                 success: true,
+//                 recommendations: [],
+//                 studentSkills: [],
+//                 message: "Please upload your CV to get recommendations"
+//             });
+//         }
+
+//         const activeInternships = await Internship.find({ isActive: true });
+
+//         if (!activeInternships || activeInternships.length === 0) {
+//             return res.status(200).json({
+//                 success: true,
+//                 recommendations: [],
+//                 studentSkills: student.extractedSkills,
+//                 message: "No active internships available at the moment"
+//             });
+//         }
+
+//         const appliedApplications = await Application.find({
+//             studentId: student._id
+//         }).select('internshipId');
+
+//         const appliedInternshipIds = appliedApplications.map(app => app.internshipId.toString());
+
+//         const availableInternships = activeInternships.filter(
+//             internship => !appliedInternshipIds.includes(internship._id.toString())
+//         );
+
+//         if (availableInternships.length === 0) {
+//             return res.status(200).json({
+//                 success: true,
+//                 recommendations: [],
+//                 studentSkills: student.extractedSkills,
+//                 message: "You have applied to all available internships"
+//             });
+//         }
+
+//         const studentSkills = student.extractedSkills.map(s => s.toLowerCase().trim());
+
+//         const recommendations = availableInternships
+//             .map(internship => {
+//                 const requiredSkills = (internship.requiredSkills || [])
+//                     .map(s => s.toLowerCase().trim())
+//                     .filter(s => s.length > 0);
+
+//                 if (requiredSkills.length === 0) {
+//                     return null;
+//                 }
+
+//                 const matchingSkills = requiredSkills.filter(reqSkill =>
+//                     studentSkills.some(stuSkill => {
+//                         // Exact match
+//                         if (stuSkill === reqSkill) return true;
+//                         // Partial match
+//                         if (stuSkill.includes(reqSkill) || reqSkill.includes(stuSkill)) return true;
+//                         // Word match
+//                         const reqWords = reqSkill.split(/\s+/);
+//                         const stuWords = stuSkill.split(/\s+/);
+//                         return reqWords.some(rw => stuWords.some(sw => sw === rw || sw.includes(rw) || rw.includes(sw)));
+//                     })
+//                 );
+
+//                 // Find missing skills
+//                 const missingSkills = requiredSkills.filter(reqSkill =>
+//                     !matchingSkills.includes(reqSkill)
+//                 );
+// // 👉 YAHAN DEBUG LOG ADD KARO
+// console.log("====== INTERNSHIP DEBUG ======");
+// console.log("Student Skills:", studentSkills);
+// console.log("Internship Skills:", requiredSkills);
+// console.log("Matching:", matchingSkills);
+//                 // Calculate match score
+//                 const matchScore = Math.round((matchingSkills.length / requiredSkills.length) * 100);
+
+
+//                 if (matchScore === 0) {
+//                     return null;
+//                 }
+
+
+//                 return {
+//                     internshipId: {
+//                         _id: internship._id,
+//                         title: internship.title,
+//                         company: internship.company,
+//                         image: internship.image || null,
+//                         requiredSkills: internship.requiredSkills
+//                     },
+//                     matchScore,
+//                     matchingSkills: internship.requiredSkills.filter(skill =>
+//                         matchingSkills.includes(skill.toLowerCase().trim())
+//                     ),
+//                     missingSkills: internship.requiredSkills.filter(skill =>
+//                         missingSkills.includes(skill.toLowerCase().trim())
+//                     )
+//                 };
+//             })
+//             .filter(rec => rec !== null)
+//             .sort((a, b) => b.matchScore - a.matchScore)
+//             .slice(0, 8);
+
+//         // Response
+//         res.status(200).json({
+//             success: true,
+//             recommendations: recommendations,
+//             studentSkills: student.extractedSkills,
+//             message: recommendations.length === 0
+//                 ? "Your skills are saved. We'll notify you when new internships match your profile."
+//                 : `Found ${recommendations.length} matching internship(s)`
+//         });
+
+//     } catch (err) {
+//         console.error("Error fetching recommendations:", err);
+//         res.status(500).json({
+//             success: false,
+//             message: "Error fetching recommendations",
+//             error: err.message
+//         });
+//     }
+// });
+
+
+// ============================
+// Recommendation Route (UPDATED)
+// ============================
+
 router.get("/recommendations/:email", async (req, res) => {
     try {
         const student = await Student.findOne({ email: req.params.email });
+
         if (!student) {
-            return res.status(404).json({ success: false, message: "Student not found" });
+            return res.status(404).json({
+                success: false,
+                message: "Student not found"
+            });
         }
 
+        // CV skills check
         if (!student.extractedSkills || student.extractedSkills.length === 0) {
             return res.status(200).json({
                 success: true,
@@ -345,82 +569,67 @@ router.get("/recommendations/:email", async (req, res) => {
             });
         }
 
-        const activeInternships = await Internship.find({ isActive: true });
+        // 🔥 NEW: no isActive filter (schema removed it)
+        const internships = await Internship.find();
 
-        if (!activeInternships || activeInternships.length === 0) {
+        if (!internships.length) {
             return res.status(200).json({
                 success: true,
                 recommendations: [],
                 studentSkills: student.extractedSkills,
-                message: "No active internships available at the moment"
+                message: "No internships available"
             });
         }
 
-        const appliedApplications = await Application.find({
-            studentId: student._id
-        }).select('internshipId');
-
-        const appliedInternshipIds = appliedApplications.map(app => app.internshipId.toString());
-
-        const availableInternships = activeInternships.filter(
-            internship => !appliedInternshipIds.includes(internship._id.toString())
+        const studentSkills = student.extractedSkills.map(s =>
+            s.toLowerCase().trim()
         );
 
-        if (availableInternships.length === 0) {
-            return res.status(200).json({
-                success: true,
-                recommendations: [],
-                studentSkills: student.extractedSkills,
-                message: "You have applied to all available internships"
-            });
-        }
+        const recommendations = internships
+            .map((internship) => {
 
-        const studentSkills = student.extractedSkills.map(s => s.toLowerCase().trim());
-
-        const recommendations = availableInternships
-            .map(internship => {
                 const requiredSkills = (internship.requiredSkills || [])
                     .map(s => s.toLowerCase().trim())
-                    .filter(s => s.length > 0);
+                    .filter(Boolean);
 
-                if (requiredSkills.length === 0) {
-                    return null;
-                }
+                if (requiredSkills.length === 0) return null;
 
+                // Matching skills
                 const matchingSkills = requiredSkills.filter(reqSkill =>
                     studentSkills.some(stuSkill => {
-                        // Exact match
-                        if (stuSkill === reqSkill) return true;
-                        // Partial match
-                        if (stuSkill.includes(reqSkill) || reqSkill.includes(stuSkill)) return true;
-                        // Word match
-                        const reqWords = reqSkill.split(/\s+/);
-                        const stuWords = stuSkill.split(/\s+/);
-                        return reqWords.some(rw => stuWords.some(sw => sw === rw || sw.includes(rw) || rw.includes(sw)));
+                        return (
+                            stuSkill === reqSkill ||
+                            stuSkill.includes(reqSkill) ||
+                            reqSkill.includes(stuSkill)
+                        );
                     })
                 );
 
-                // Find missing skills
-                const missingSkills = requiredSkills.filter(reqSkill =>
-                    !matchingSkills.includes(reqSkill)
+                const missingSkills = requiredSkills.filter(
+                    skill => !matchingSkills.includes(skill)
                 );
 
-                // Calculate match score
-                const matchScore = Math.round((matchingSkills.length / requiredSkills.length) * 100);
+                const matchScore = Math.round(
+                    (matchingSkills.length / requiredSkills.length) * 100
+                );
 
-
-                if (matchScore === 0) {
-                    return null;
-                }
-
+                // skip only totally irrelevant ones
+                if (matchScore === 0) return null;
 
                 return {
                     internshipId: {
                         _id: internship._id,
                         title: internship.title,
                         company: internship.company,
-                        image: internship.image || null,
-                        requiredSkills: internship.requiredSkills
+
+                        // 🔥 NEW FIELD NAME FIX
+                        logo: internship.logo || null,
+
+                        requiredSkills: internship.requiredSkills,
+                        location: internship.location,
+                        duration: internship.duration,
+                        stipend: internship.stipend,
+                        domain: internship.domain
                     },
                     matchScore,
                     matchingSkills: internship.requiredSkills.filter(skill =>
@@ -431,23 +640,23 @@ router.get("/recommendations/:email", async (req, res) => {
                     )
                 };
             })
-            .filter(rec => rec !== null)
+            .filter(Boolean)
             .sort((a, b) => b.matchScore - a.matchScore)
             .slice(0, 8);
 
-        // Response
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
-            recommendations: recommendations,
+            recommendations,
             studentSkills: student.extractedSkills,
-            message: recommendations.length === 0
-                ? "Your skills are saved. We'll notify you when new internships match your profile."
-                : `Found ${recommendations.length} matching internship(s)`
+            message: recommendations.length
+                ? `Found ${recommendations.length} matching internships`
+                : "No strong matches found yet. Update your CV for better results."
         });
 
     } catch (err) {
-        console.error("Error fetching recommendations:", err);
-        res.status(500).json({
+        console.error("Recommendation error:", err);
+
+        return res.status(500).json({
             success: false,
             message: "Error fetching recommendations",
             error: err.message
@@ -567,12 +776,15 @@ router.post("/apply-internship", async (req, res) => {
         res.status(500).json({ success: false, message: "Error applying for internship" });
     }
 });
-// ============================
+// ============================ 
 // VIEW MY APPLICATIONS
 // ============================
 router.get("/my-applications/:email", async (req, res) => {
     try {
         const student = await Student.findOne({ email: req.params.email });
+        console.log("====== STUDENT DEBUG ======");
+console.log("Student Found:", student);
+console.log("Extracted Skills:", student.extractedSkills);
         if (!student)
             return res.status(404).json({ success: false, message: "Student not found" });
 
@@ -586,5 +798,76 @@ router.get("/my-applications/:email", async (req, res) => {
         res.status(500).json({ success: false, message: "Error fetching applications" });
     }
 });
+
+
+
+router.post("/send-rating", async (req, res) => {
+    try {
+        const { stars, feedback, studentEmail } = req.body;
+
+        if (!stars || stars < 1 || stars > 5) {
+            return res.status(400).json({ success: false, message: "Invalid rating." });
+        }
+
+        const starEmojis = ["","⭐","⭐⭐","⭐⭐⭐","⭐⭐⭐⭐","⭐⭐⭐⭐⭐"];
+        const labels = ["","Poor","Fair","Good","Great","Excellent"];
+
+        await transporter.sendMail({
+            from: `"CollaXion App" <${process.env.EMAIL_USER}>`,
+            to: process.env.TEAM_EMAIL || "collaxionteam@gmail.com",
+            subject: `${starEmojis[stars]} New Rating: ${labels[stars]} (${stars}/5) — CollaXion`,
+            html: `
+            <!DOCTYPE html><html><body style="margin:0;padding:0;background:#f0f4f7;font-family:Arial,sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="padding:30px 0;">
+              <tr><td align="center">
+                <table width="480" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+                  <tr><td style="background:#193648;padding:24px 32px;text-align:center;">
+                    <h1 style="color:#fff;margin:0;font-size:20px;">CollaXion</h1>
+                    <p style="color:rgba(255,255,255,0.5);margin:4px 0 0;font-size:12px;">New App Rating Received</p>
+                  </td></tr>
+                  <tr><td style="padding:28px 32px 0;text-align:center;">
+                    <div style="font-size:40px;margin-bottom:8px;">${starEmojis[stars]}</div>
+                    <h2 style="color:#1A2E3B;margin:0;font-size:22px;">${labels[stars]}</h2>
+                    <p style="color:#6B8A9A;font-size:14px;margin:4px 0 0;">${stars} out of 5 stars</p>
+                  </td></tr>
+                  <tr><td style="padding:20px 32px 28px;">
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background:#F0F4F7;border-radius:12px;margin-bottom:16px;">
+                      <tr><td style="padding:16px 20px;">
+                        <p style="margin:0 0 6px;font-size:12px;color:#6B8A9A;">👤 Student Email</p>
+                        <p style="margin:0 0 14px;font-size:14px;color:#1A2E3B;font-weight:600;">${studentEmail}</p>
+                        <p style="margin:0 0 6px;font-size:12px;color:#6B8A9A;">🕐 Submitted At</p>
+                        <p style="margin:0;font-size:14px;color:#1A2E3B;font-weight:600;">
+                          ${new Date().toLocaleString("en-PK", { timeZone: "Asia/Karachi", dateStyle: "full", timeStyle: "short" })}
+                        </p>
+                      </td></tr>
+                    </table>
+                    ${feedback ? `
+                    <table width="100%" cellpadding="0" cellspacing="0" style="background:#EBF5FB;border-radius:12px;border-left:4px solid #2E86AB;">
+                      <tr><td style="padding:14px 18px;">
+                        <p style="margin:0 0 6px;font-size:12px;color:#6B8A9A;font-weight:700;">💬 Student Feedback</p>
+                        <p style="margin:0;font-size:14px;color:#1A2E3B;line-height:1.6;">${feedback}</p>
+                      </td></tr>
+                    </table>` : `<p style="color:#6B8A9A;font-size:13px;text-align:center;">No written feedback provided.</p>`}
+                  </td></tr>
+                  <tr><td style="background:#F0F4F7;padding:14px 32px;text-align:center;border-top:1px solid #E2ECF1;">
+                    <p style="margin:0;font-size:11px;color:#9AADB8;">© 2025 CollaXion • collaxionteam@gmail.com</p>
+                  </td></tr>
+                </table>
+              </td></tr>
+            </table>
+            </body></html>`,
+        });
+
+        return res.status(200).json({ success: true, message: "Rating submitted!" });
+    } catch (err) {
+        console.error("Rating email error:", err);
+        return res.status(500).json({ success: false, message: "Rating can't send" });
+    }
+});
+
+
+
+
+
 
 export default router;

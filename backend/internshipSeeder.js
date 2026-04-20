@@ -2,7 +2,7 @@
 
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import { Internship } from "./student/models/Internship.js";
+import  Internship  from "./student/models/Internship.js";
 
 dotenv.config();
 
@@ -132,7 +132,150 @@ const mockInternships = [
         ],
         image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800",
         isActive: true
-    }
+    },
+
+{
+        title: "Junior Web Developer (HTML/CSS)",
+        company: "Rawal Tech Solutions",
+        description: "Develop and maintain static websites using HTML5 and CSS3, ensuring pixel-perfect designs.",
+        requiredSkills: ["HTML", "CSS", "Responsive Design", "Basic JavaScript"],
+        domain: "Web Development",
+        difficulty: "Beginner",
+        duration: "3 months",
+        stipend: "$300/month",
+        location: "Rawalpindi",
+        startDate: "December 20, 2025",
+        responsibilities: [
+            "Convert PSD designs into responsive HTML/CSS code",
+            "Maintain existing food and e-commerce websites",
+            "Optimize websites for mobile and tablet views",
+            "Assist senior developers in styling tasks"
+        ],
+        image: "https://images.unsplash.com/photo-1547658719-da2b51169166?w=800",
+        isActive: true
+    },
+    {
+        title: "Graphic Design Intern",
+        company: "Creative Edge Agency",
+        description: "Create visual assets and marketing materials using Adobe Photoshop and Illustrator.",
+        requiredSkills: ["Adobe Photoshop", "Adobe Illustrator", "Visual Design", "Branding"],
+        domain: "Design",
+        difficulty: "Beginner",
+        duration: "4 months",
+        stipend: "$350/month",
+        location: "Islamabad",
+        startDate: "January 10, 2026",
+        responsibilities: [
+            "Design social media graphics and banners",
+            "Create logos and brand identity elements",
+            "Edit and enhance photos for client projects",
+            "Collaborate with the marketing team for visual storytelling"
+        ],
+        image: "https://images.unsplash.com/photo-1572044162444-ad60f128bdea?w=800",
+        isActive: true
+    },
+    {
+        title: "Java Developer Intern",
+        company: "Systems Ltd (Blue Area)",
+        description: "Work on enterprise-level management systems using Java and Object-Oriented Programming.",
+        requiredSkills: ["Java", "OOP", "Basic SQL", "Problem Solving"],
+        domain: "Software Engineering",
+        difficulty: "Intermediate",
+        duration: "6 months",
+        stipend: "$450/month",
+        location: "Islamabad",
+        startDate: "February 1, 2026",
+        responsibilities: [
+            "Develop modules for hospital and school management systems",
+            "Debug and troubleshoot Java-based applications",
+            "Write clean and efficient backend logic",
+            "Participate in daily scrum meetings"
+        ],
+        image: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800",
+        isActive: true
+    },
+    {
+        title: "C++ Software Intern",
+        company: "Embedded Core",
+        description: "Focus on algorithmic development and system-level programming using C++.",
+        requiredSkills: ["C++", "Data Structures", "Algorithms", "Logic Design"],
+        domain: "Software Development",
+        difficulty: "Intermediate",
+        duration: "3 months",
+        stipend: "$400/month",
+        location: "Rawalpindi",
+        startDate: "December 25, 2025",
+        responsibilities: [
+            "Implement efficient algorithms in C++",
+            "Assist in developing inventory management software",
+            "Optimize code performance for resource-constrained systems",
+            "Conduct unit testing for new software modules"
+        ],
+        image: "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=800",
+        isActive: true
+    },
+    {
+        title: "UI Designer & Frontend Trainee",
+        company: "Digital Pulse",
+        description: "Bridge the gap between design and code by creating UI mockups and implementing them in CSS.",
+        requiredSkills: ["Adobe Illustrator", "HTML", "CSS", "Figma Basics"],
+        domain: "Design & Web",
+        difficulty: "Beginner",
+        duration: "3 months",
+        stipend: "$300/month",
+        location: "Remote",
+        startDate: "January 15, 2026",
+        responsibilities: [
+            "Create high-fidelity UI mockups for web apps",
+            "Translate designs into CSS and HTML frameworks",
+            "Ensure consistency across different browser platforms",
+            "Conduct UI testing and provide feedback"
+        ],
+        image: "https://images.unsplash.com/photo-1586717791821-3f44a563eb4c?w=800",
+        isActive: true
+    },
+    {
+        title: "Technical Writing & Presentation Intern",
+        company: "EduTech Global",
+        description: "Utilize your English proficiency and presentation skills to document software processes.",
+        requiredSkills: ["English (IELTS level)", "Effective Communication", "Technical Documentation", "MS Office"],
+        domain: "Software Support",
+        difficulty: "Beginner",
+        duration: "2 months",
+        stipend: "$250/month",
+        location: "Islamabad",
+        startDate: "January 5, 2026",
+        responsibilities: [
+            "Write user manuals for software products",
+            "Prepare presentation decks for client meetings",
+            "Proofread technical reports and blogs",
+            "Assist in creating training materials for new developers"
+        ],
+        image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=800",
+        isActive: true
+    },
+    {
+        title: "Associate Software Engineer (Internee)",
+        company: "NextGen Software House",
+        description: "A generalist role for 3rdrd-semester students to explore different SE domains.",
+        requiredSkills: ["C++", "Java", "Basic Software Engineering Concepts", "HTML"],
+        domain: "Software Engineering",
+        difficulty: "Beginner",
+        duration: "6 months",
+        stipend: "$400/month",
+        location: "Rawalpindi",
+        startDate: "February 15, 2026",
+        responsibilities: [
+            "Rotate through different departments (Web, Mobile, Desktop)",
+            "Collaborate on internal software projects",
+            "Learn industry-standard software development lifecycles",
+            "Contribute to documentation and testing phases"
+        ],
+        image: "https://images.unsplash.com/photo-1522071823991-b5ae7264040e?w=800",
+        isActive: true
+    },
+
+
 ];
 
 async function seedInternships() {

@@ -6,7 +6,10 @@ import { PDFParse } from "pdf-parse";
 
 
 dotenv.config();
-const genAI = new GoogleGenerativeAI('AIzaSyAntuRm7cNgAHGVvgDe7ZUAGlDkIVhAhXA');
+const genAI = new GoogleGenerativeAI('AIzaSyDXpGVA8OIopIr0kMGPLTwoUhh22eKuXwU');
+
+
+// AIzaSyAntuRm7cNgAHGVvgDe7ZUAGlDkIVhAhXA
 
 let pdfParse;
 const getPdfParse = async () => {

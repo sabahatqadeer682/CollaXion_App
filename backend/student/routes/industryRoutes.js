@@ -138,7 +138,8 @@ const key = process.env.GOOGLE_MAPS_API_KEY;
         },
         isRegistered,
         // Website: prefer DB entry, fallback to Google Places website field
-        website: dbEntry?.website || place.website || null,
+        // website: dbEntry?.website || place.website || null,
+        website: isRegistered ? dbEntry?.website : null,
         distanceKm: dist.toFixed(2),
         rating: place.rating || 0,
         // Internships only available for registered companies
