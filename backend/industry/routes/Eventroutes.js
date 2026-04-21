@@ -1,3 +1,4 @@
+// eventRoutes.js
 import express from "express";
 import {
   createEvent,
@@ -15,29 +16,34 @@ import {
 const router = express.Router();
 
 // ── Event CRUD ────────────────────────────────────────────────────────────────
-// POST   /api/industry/events              → create event
+// POST   /api/industry/events              → create event (multipart/form-data — banner upload handled inside controller via multer)
 // GET    /api/industry/events/mine         → my events (manage screen)
-// GET    /api/industry/events/dashboard    → published only (dashboard feed)
+// GET    /api/industry/events/dashboard    → all published events (dashboard feed)
 // GET    /api/industry/events/:id          → single event
-// PUT    /api/industry/events/:id          → full update/edit
+// PUT    /api/industry/events/:id          → full update/edit (JSON)
 // PATCH  /api/industry/events/:id/hide     → toggle hide/show
 // DELETE /api/industry/events/:id          → permanent delete
 
-router.post("/",                  createEvent);
-router.get("/mine",               getMyEvents);
-router.get("/dashboard",          getDashboardEvents);
-router.get("/:id",                getEventById);
-router.put("/:id",                updateEvent);
-router.patch("/:id/hide",         toggleHideEvent);
-router.delete("/:id",             deleteEvent);
+router.post("/",               createEvent);          // multer runs inside createEvent
+router.get("/mine",            getMyEvents);
+router.get("/dashboard",       getDashboardEvents);
+router.get("/:id",             getEventById);
+router.put("/:id",             updateEvent);
+router.patch("/:id/hide",      toggleHideEvent);
+router.delete("/:id",          deleteEvent);
 
 // ── Notification routes ───────────────────────────────────────────────────────
-// GET    /api/industry/events/notifications/:industryId
-// PATCH  /api/industry/events/notifications/:id/read
-// PATCH  /api/industry/events/notifications/mark-all-read
-
+// NOTE: these must be defined BEFORE /:id so Express doesn't swallow "notifications" as an id param
 router.get("/notifications/:industryId",          getNotifications);
 router.patch("/notifications/:id/read",           markNotificationRead);
 router.patch("/notifications/mark-all-read",      markAllNotificationsRead);
 
 export default router;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADD THIS TO YOUR MAIN app.js / server.js so uploaded banners are served:
+//
+//   import express from "express";
+//   app.use("/uploads", express.static("uploads"));   // serves /uploads/banners/xxx.jpg
+//
+// ─────────────────────────────────────────────────────────────────────────────

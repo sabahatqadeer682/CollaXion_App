@@ -1,16 +1,39 @@
+// Eventcontroller.js
 import Event        from "../models/Event.js";
 import Notification from "../models/Notification.js";
+import multer       from "multer";
+import path         from "path";
+import fs           from "fs";
+
+// ── Multer setup for banner upload ───────────────────────────────────────────
+const uploadDir = "uploads/banners/";
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_, __, cb) => cb(null, uploadDir),
+  filename:    (_, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+});
+
+export const uploadBanner = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (_, file, cb) => {
+    const allowed = [".jpg", ".jpeg", ".png", ".webp"];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) cb(null, true);
+    else cb(new Error("Only image files are allowed"));
+  },
+}).single("banner");
 
 // ── Helper: create a notification ────────────────────────────────────────────
-async function createNotification({ recipientId, recipientType = "industry", type, title, message, relatedEventId, relatedEventTitle, meta = {} }) {
+async function createNotification({
+  recipientId, recipientType = "industry",
+  type, title, message, relatedEventId, relatedEventTitle, meta = {},
+}) {
   try {
     await Notification.create({
-      recipientId,
-      recipientType,
-      type,
-      title,
-      message,
-      relatedEventId: relatedEventId || null,
+      recipientId, recipientType, type, title, message,
+      relatedEventId:    relatedEventId    || null,
       relatedEventTitle: relatedEventTitle || "",
       meta,
     });
@@ -21,83 +44,99 @@ async function createNotification({ recipientId, recipientType = "industry", typ
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  POST /api/industry/events
-//  Create a new event (called from EventCreationScreen Step 3 publish)
+//  Create a new event — single-page form (multipart/form-data)
 // ═══════════════════════════════════════════════════════════════════════════════
 export async function createEvent(req, res) {
-  try {
-    const industryId  = req.headers["x-industry-id"]  || req.body.industryId;
-    const companyName = req.headers["x-company-name"] || req.body.companyName || "Industry Partner";
-
-    if (!industryId) {
-      return res.status(400).json({ success: false, message: "industryId is required (header or body)" });
+  // Run multer first
+  uploadBanner(req, res, async (uploadErr) => {
+    if (uploadErr) {
+      return res.status(400).json({ success: false, message: uploadErr.message });
     }
 
-    const {
-      eventType, title, description, date, time,
-      location, mode, capacity, deadline,
-      banner, tags,
-      invitedUniversities, inviteMessage,
-    } = req.body;
+    try {
+      const industryId  = req.headers["x-industry-id"]  || req.body.industryId;
+      const companyName = req.headers["x-company-name"] || req.body.companyName || "Industry Partner";
 
-    if (!title?.trim())       return res.status(400).json({ success: false, message: "Title is required" });
-    if (!description?.trim()) return res.status(400).json({ success: false, message: "Description is required" });
-    if (!date?.trim())        return res.status(400).json({ success: false, message: "Date is required" });
+      if (!industryId) {
+        return res.status(400).json({ success: false, message: "industryId is required" });
+      }
 
-    const event = await Event.create({
-      industryId,
-      companyName,
-      eventType: eventType || "Seminar",
-      title:       title.trim(),
-      description: description.trim(),
-      date,
-      time:     time     || "",
-      location: location || "",
-      mode:     mode     || "Physical",
-      capacity: capacity ? Number(capacity) : null,
-      deadline: deadline || "",
-      banner:   banner   || null,
-      tags:     Array.isArray(tags) ? tags : [],
-      invitedUniversities: Array.isArray(invitedUniversities) ? invitedUniversities : [],
-      inviteMessage: inviteMessage || "",
-      status: "published",
-    });
+      const {
+        eventType, title, description, date, time,
+        location, mode, capacity, deadline, inviteMessage,
+      } = req.body;
 
-    // ── Notification: for the industry partner (event_created) ──────────────
-    await createNotification({
-      recipientId:        industryId.toString(),
-      recipientType:      "industry",
-      type:               "event_created",
-      title:              "Event Published 🎉",
-      message:            `Your event "${event.title}" has been published successfully.`,
-      relatedEventId:     event._id,
-      relatedEventTitle:  event.title,
-    });
+      // Parse JSON strings sent from FormData
+      let tags = [];
+      let invitedUniversities = [];
+      try { tags               = JSON.parse(req.body.tags               || "[]"); } catch (_) {}
+      try { invitedUniversities= JSON.parse(req.body.invitedUniversities|| "[]"); } catch (_) {}
 
-    // ── Notifications: for each invited university ──────────────────────────
-    if (event.invitedUniversities.length > 0) {
-      const uniNotifications = event.invitedUniversities.map((uni) => ({
-        recipientId:        uni,
-        recipientType:      "university",
-        type:               "event_invitation",
-        title:              "New Event Invitation 📩",
-        message:            `${companyName} has invited you to "${event.title}" (${event.eventType}) on ${event.date}.`,
-        relatedEventId:     event._id,
-        relatedEventTitle:  event.title,
-        meta:               { companyName, eventType: event.eventType, date: event.date },
-      }));
-      await Notification.insertMany(uniNotifications);
+      // Validation
+      if (!title?.trim())       return res.status(400).json({ success: false, message: "Title is required" });
+      if (!description?.trim()) return res.status(400).json({ success: false, message: "Description is required" });
+      if (!date?.trim())        return res.status(400).json({ success: false, message: "Date is required" });
+
+      // Banner URL (if uploaded)
+      const bannerUrl = req.file
+        ? `${req.protocol}://${req.get("host")}/uploads/banners/${req.file.filename}`
+        : (req.body.banner || null);
+
+      const event = await Event.create({
+        industryId,
+        companyName,
+        eventType:   eventType || "Seminar",
+        title:       title.trim(),
+        description: description.trim(),
+        date,
+        time:     time     || "",
+        location: location || "",
+        mode:     mode     || "Physical",
+        capacity: capacity ? Number(capacity) : null,
+        deadline: deadline || "",
+        banner:   bannerUrl,
+        tags,
+        invitedUniversities,
+        inviteMessage: inviteMessage || "",
+        status: "published",
+      });
+
+      // ── Notification: event_created ─────────────────────────────
+      await createNotification({
+        recipientId:       industryId.toString(),
+        recipientType:     "industry",
+        type:              "event_created",
+        title:             "Event Published 🎉",
+        message:           `Your event "${event.title}" has been published successfully.`,
+        relatedEventId:    event._id,
+        relatedEventTitle: event.title,
+      });
+
+      // ── Notifications: invited universities ─────────────────────
+      if (event.invitedUniversities.length > 0) {
+        const uniNotifs = event.invitedUniversities.map((uni) => ({
+          recipientId:       uni,
+          recipientType:     "university",
+          type:              "event_invitation",
+          title:             "New Event Invitation 📩",
+          message:           `${companyName} invited you to "${event.title}" (${event.eventType}) on ${event.date}.`,
+          relatedEventId:    event._id,
+          relatedEventTitle: event.title,
+          meta:              { companyName, eventType: event.eventType, date: event.date },
+        }));
+        await Notification.insertMany(uniNotifs);
+      }
+
+      return res.status(201).json({ success: true, message: "Event created successfully", event });
+    } catch (err) {
+      console.error("createEvent error:", err);
+      return res.status(500).json({ success: false, message: err.message });
     }
-
-    return res.status(201).json({ success: true, message: "Event created successfully", event });
-  } catch (err) {
-    console.error("createEvent error:", err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  GET /api/industry/events/mine
-//  Get all events for an industry (published + hidden, NOT deleted)
 // ═══════════════════════════════════════════════════════════════════════════════
 export async function getMyEvents(req, res) {
   try {
@@ -106,7 +145,7 @@ export async function getMyEvents(req, res) {
 
     const events = await Event.find({
       industryId,
-      status: { $in: ["published", "hidden"] },   // exclude permanently deleted
+      status: { $in: ["published", "hidden"] },
     }).sort({ createdAt: -1 });
 
     return res.status(200).json({ success: true, events });
@@ -118,17 +157,14 @@ export async function getMyEvents(req, res) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  GET /api/industry/events/dashboard
-//  Get PUBLISHED events for dashboard feed (for all users / universities)
+//  Published events for dashboard feed (all users / universities)
 // ═══════════════════════════════════════════════════════════════════════════════
 export async function getDashboardEvents(req, res) {
   try {
-    const industryId = req.headers["x-industry-id"] || req.query.industryId;
-    if (!industryId) return res.status(400).json({ success: false, message: "industryId required" });
-
-    const events = await Event.find({
-      industryId,
-      status: "published",
-    }).sort({ createdAt: -1 });
+    // No industryId filter — returns ALL published events from every industry
+    const events = await Event.find({ status: "published" })
+      .sort({ createdAt: -1 })
+      .limit(50);
 
     return res.status(200).json({ success: true, events });
   } catch (err) {
@@ -139,7 +175,6 @@ export async function getDashboardEvents(req, res) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  GET /api/industry/events/:id
-//  Get single event by ID
 // ═══════════════════════════════════════════════════════════════════════════════
 export async function getEventById(req, res) {
   try {
@@ -154,7 +189,7 @@ export async function getEventById(req, res) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  PUT /api/industry/events/:id
-//  Edit/update an event
+//  Edit / update an event (JSON body — no file upload in edit mode)
 // ═══════════════════════════════════════════════════════════════════════════════
 export async function updateEvent(req, res) {
   try {
@@ -172,36 +207,33 @@ export async function updateEvent(req, res) {
       "banner","tags","invitedUniversities","inviteMessage","status",
     ];
 
-    // Track what changed (simple field-level diff)
     const changedFields = [];
     allowed.forEach((field) => {
       if (req.body[field] !== undefined) {
-        const oldVal = JSON.stringify(event[field]);
-        const newVal = JSON.stringify(req.body[field]);
-        if (oldVal !== newVal) changedFields.push(field);
+        if (JSON.stringify(event[field]) !== JSON.stringify(req.body[field])) {
+          changedFields.push(field);
+        }
         event[field] = req.body[field];
       }
     });
 
-    // Mark edit time
     const now = new Date();
     event.lastEditedAt = now;
     event.editHistory.push({
       editedAt: now,
-      changes: changedFields.length > 0 ? changedFields.join(", ") : "minor update",
+      changes:  changedFields.length > 0 ? changedFields.join(", ") : "minor update",
     });
 
     await event.save();
 
-    // Notification for edit
     await createNotification({
-      recipientId:        industryId.toString(),
-      recipientType:      "industry",
-      type:               "event_edited",
-      title:              "Event Updated ✏️",
-      message:            `Your event "${event.title}" was updated (${changedFields.join(", ") || "details changed"}).`,
-      relatedEventId:     event._id,
-      relatedEventTitle:  event.title,
+      recipientId:       industryId.toString(),
+      recipientType:     "industry",
+      type:              "event_edited",
+      title:             "Event Updated ✏️",
+      message:           `Your event "${event.title}" was updated (${changedFields.join(", ") || "details changed"}).`,
+      relatedEventId:    event._id,
+      relatedEventTitle: event.title,
     });
 
     return res.status(200).json({ success: true, message: "Event updated successfully", event });
@@ -213,7 +245,6 @@ export async function updateEvent(req, res) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  PATCH /api/industry/events/:id/hide
-//  Toggle visibility (published ↔ hidden)
 // ═══════════════════════════════════════════════════════════════════════════════
 export async function toggleHideEvent(req, res) {
   try {
@@ -231,21 +262,16 @@ export async function toggleHideEvent(req, res) {
     await event.save();
 
     await createNotification({
-      recipientId:        industryId.toString(),
-      recipientType:      "industry",
-      type:               "event_hidden",
-      title:              newStatus === "hidden" ? "Event Hidden 🙈" : "Event Visible Again 👁️",
-      message:            `"${event.title}" is now ${newStatus}.`,
-      relatedEventId:     event._id,
-      relatedEventTitle:  event.title,
+      recipientId:       industryId.toString(),
+      recipientType:     "industry",
+      type:              "event_hidden",
+      title:             newStatus === "hidden" ? "Event Hidden 🙈" : "Event Visible Again 👁️",
+      message:           `"${event.title}" is now ${newStatus}.`,
+      relatedEventId:    event._id,
+      relatedEventTitle: event.title,
     });
 
-    return res.status(200).json({
-      success: true,
-      message: `Event is now ${newStatus}`,
-      status: newStatus,
-      event,
-    });
+    return res.status(200).json({ success: true, message: `Event is now ${newStatus}`, status: newStatus, event });
   } catch (err) {
     console.error("toggleHideEvent error:", err);
     return res.status(500).json({ success: false, message: err.message });
@@ -254,7 +280,6 @@ export async function toggleHideEvent(req, res) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  DELETE /api/industry/events/:id
-//  Permanently delete an event
 // ═══════════════════════════════════════════════════════════════════════════════
 export async function deleteEvent(req, res) {
   try {
@@ -270,11 +295,11 @@ export async function deleteEvent(req, res) {
     await Event.findByIdAndDelete(req.params.id);
 
     await createNotification({
-      recipientId:        industryId.toString(),
-      recipientType:      "industry",
-      type:               "event_deleted",
-      title:              "Event Removed 🗑️",
-      message:            `Event "${eventTitle}" has been permanently deleted.`,
+      recipientId:   industryId.toString(),
+      recipientType: "industry",
+      type:          "event_deleted",
+      title:         "Event Removed 🗑️",
+      message:       `Event "${eventTitle}" has been permanently deleted.`,
     });
 
     return res.status(200).json({ success: true, message: "Event deleted successfully" });
@@ -285,28 +310,20 @@ export async function deleteEvent(req, res) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  GET  /api/industry/events/notifications/:industryId
-//  Get all notifications for an industry partner
+//  Notifications
 // ═══════════════════════════════════════════════════════════════════════════════
 export async function getNotifications(req, res) {
   try {
     const { industryId } = req.params;
     const notifications = await Notification.find({ recipientId: industryId })
-      .sort({ createdAt: -1 })
-      .limit(50);
-
+      .sort({ createdAt: -1 }).limit(50);
     const unreadCount = await Notification.countDocuments({ recipientId: industryId, read: false });
     return res.status(200).json({ success: true, notifications, unreadCount });
   } catch (err) {
-    console.error("getNotifications error:", err);
     return res.status(500).json({ success: false, message: err.message });
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PATCH /api/industry/events/notifications/:id/read
-//  Mark a single notification as read
-// ═══════════════════════════════════════════════════════════════════════════════
 export async function markNotificationRead(req, res) {
   try {
     await Notification.findByIdAndUpdate(req.params.id, { read: true });
@@ -316,10 +333,6 @@ export async function markNotificationRead(req, res) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PATCH /api/industry/events/notifications/mark-all-read
-//  Mark ALL notifications as read for an industry
-// ═══════════════════════════════════════════════════════════════════════════════
 export async function markAllNotificationsRead(req, res) {
   try {
     const industryId = req.headers["x-industry-id"] || req.body.industryId;

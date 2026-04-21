@@ -6,7 +6,7 @@ import { PDFParse } from "pdf-parse";
 
 
 dotenv.config();
-const genAI = new GoogleGenerativeAI('AIzaSyDXpGVA8OIopIr0kMGPLTwoUhh22eKuXwU');
+const genAI = new GoogleGenerativeAI('AIzaSyBa_i7gosdyuzREuPg2Qz0YqSP9xAdAgxQ');
 
 
 // AIzaSyAntuRm7cNgAHGVvgDe7ZUAGlDkIVhAhXA
