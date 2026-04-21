@@ -1,19 +1,10 @@
-/**
- * EventCreationScreen.tsx  — COMPLETE + UPDATED VERSION
- * ✅ Real API integration (POST create / PUT edit)
- * ✅ Edit mode support (prefill all fields)
- * ✅ Notifications
- * ✅ Color theme #193648
- */
-
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
-  Animated,
   Dimensions,
   Image,
   KeyboardAvoidingView,
@@ -31,750 +22,540 @@ import { useUser } from "./shared";
 
 const { width } = Dimensions.get("window");
 
+// ── CollaXion Color Theme ─────────────────────────────────────────
+const THEME = {
+  headerBg:   "#0D1F2D",
+  headerMid:  "#132D40",
+  headerEnd:  "#193648",
+  bg:         "#F0F4F8",
+  card:       "#FFFFFF",
+  border:     "#E2E8F0",
+  accent:     "#0D1F2D",
+  accentBlue: "#1B3A52",
+  text:       "#0D1F2D",
+  sub:        "#64748B",
+  muted:      "#94A3B8",
+  required:   "#EF4444",
+};
+
 type EventType = "Seminar" | "Job Fair" | "Workshop" | "Tech Talk" | "Hackathon" | "Networking";
 type EventMode = "Physical" | "Virtual" | "Hybrid";
 
-const EVENT_TYPES: {
-  label: EventType;
-  icon: string;
-  grad: readonly [string, string];
-  desc: string;
-}[] = [
-  { label: "Seminar",    icon: "mic",           grad: ["#0066CC", "#004999"], desc: "Expert talk" },
-  { label: "Job Fair",   icon: "briefcase",     grad: ["#059669", "#047857"], desc: "Recruitment" },
-  { label: "Workshop",   icon: "build",         grad: ["#D97706", "#B45309"], desc: "Hands-on" },
-  { label: "Tech Talk",  icon: "code-slash",    grad: ["#7C3AED", "#5B21B6"], desc: "Tech session" },
-  { label: "Hackathon",  icon: "trophy",        grad: ["#DC2626", "#B91C1C"], desc: "Competitive" },
-  { label: "Networking", icon: "people-circle", grad: ["#0891B2", "#0E7490"], desc: "Connect" },
+const EVENT_TYPES: { label: EventType; icon: string }[] = [
+  { label: "Seminar",    icon: "mic" },
+  { label: "Job Fair",   icon: "briefcase" },
+  { label: "Workshop",   icon: "build" },
+  { label: "Tech Talk",  icon: "code-slash" },
+  { label: "Hackathon",  icon: "trophy" },
+  { label: "Networking", icon: "people-circle" },
 ];
 
-const UNIVERSITIES = [
-  "Riphah International University",
-];
+const UNIVERSITIES = ["Riphah International University"];
 
 const SUGGESTED_TAGS = [
   "AI/ML", "Web Dev", "Mobile", "Cloud", "Cybersecurity",
   "Data Science", "Internship", "Research", "Networking", "Design",
 ];
 
-const STEPS = ["Event Details", "Media & Tags", "Invite Unis"];
-
+// ─────────────────────────────────────────────────────────────────
 export function EventCreationScreen() {
   const nav    = useNavigation<any>();
   const route  = useRoute<any>();
   const { user, ax } = useUser();
   const insets = useSafeAreaInsets();
 
-  // ── Edit mode check ─────────────────────────────────────────────
   const editMode  = route.params?.editMode  || false;
   const eventData = route.params?.eventData || null;
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-
-  /* ── Step 1 fields ── */
-  const [eventType, setEventType] = useState<EventType>("Seminar");
-  const [title,       setTitle]   = useState("");
-  const [description, setDesc]    = useState("");
-  const [date,        setDate]    = useState("");
-  const [time,        setTime]    = useState("");
-  const [location,    setLocation]= useState("");
-  const [mode,        setMode]    = useState<EventMode>("Physical");
-  const [capacity,    setCapacity]= useState("");
-  const [deadline,    setDeadline]= useState("");
-
-  /* ── Step 2 fields ── */
-  const [banner,    setBanner]   = useState<string | null>(null);
-  const [tags,      setTags]     = useState<string[]>([]);
-  const [customTag, setCustomTag]= useState("");
-
-  /* ── Step 3 fields ── */
+  // ── Form state ──────────────────────────────────────────────────
+  const [eventType,    setEventType]    = useState<EventType>("Seminar");
+  const [title,        setTitle]        = useState("");
+  const [description,  setDesc]         = useState("");
+  const [date,         setDate]         = useState("");
+  const [time,         setTime]         = useState("");
+  const [location,     setLocation]     = useState("");
+  const [mode,         setMode]         = useState<EventMode>("Physical");
+  const [capacity,     setCapacity]     = useState("");
+  const [deadline,     setDeadline]     = useState("");
+  const [banner,       setBanner]       = useState<string | null>(null);
+  const [tags,         setTags]         = useState<string[]>([]);
+  const [customTag,    setCustomTag]    = useState("");
   const [selectedUnis, setSelectedUnis] = useState<string[]>(["Riphah International University"]);
   const [inviteMsg,    setInviteMsg]    = useState("");
   const [loading,      setLoading]      = useState(false);
 
-  // ── Prefill fields when editing ─────────────────────────────────
+  // ── Prefill when editing ────────────────────────────────────────
   useEffect(() => {
     if (editMode && eventData) {
-      setEventType(eventData.eventType   || "Seminar");
-      setTitle(eventData.title           || "");
-      setDesc(eventData.description      || "");
-      setDate(eventData.date             || "");
-      setTime(eventData.time             || "");
-      setLocation(eventData.location     || "");
-      setMode(eventData.mode             || "Physical");
+      setEventType(eventData.eventType || "Seminar");
+      setTitle(eventData.title || "");
+      setDesc(eventData.description || "");
+      setDate(eventData.date || "");
+      setTime(eventData.time || "");
+      setLocation(eventData.location || "");
+      setMode(eventData.mode || "Physical");
       setCapacity(eventData.capacity ? String(eventData.capacity) : "");
-      setDeadline(eventData.deadline     || "");
-      setBanner(eventData.banner         || null);
-      setTags(eventData.tags             || []);
+      setDeadline(eventData.deadline || "");
+      setBanner(eventData.banner || null);
+      setTags(eventData.tags || []);
       setSelectedUnis(eventData.invitedUniversities || []);
-      setInviteMsg(eventData.inviteMessage           || "");
+      setInviteMsg(eventData.inviteMessage || "");
     }
   }, [editMode, eventData]);
 
-  /* ────────────────────────── helpers ─────────────────────────── */
-  const animateStep = (next: 1 | 2 | 3) => {
-    Animated.sequence([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-    ]).start();
-    setStep(next);
-  };
-
+  // ── Helpers ─────────────────────────────────────────────────────
   const pickBanner = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.85,
       aspect: [16, 9],
     });
-    if (!res.canceled) {
-  const uri = res.assets[0].uri;
-  setBanner(uri);
-}
+    if (!res.canceled) setBanner(res.assets[0].uri);
   };
 
   const toggleTag = (t: string) =>
-    setTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+    setTags((p) => (p.includes(t) ? p.filter((x) => x !== t) : [...p, t]));
 
   const addCustomTag = () => {
-    const trimmed = customTag.trim();
-    if (trimmed && !tags.includes(trimmed)) { setTags((p) => [...p, trimmed]); }
+    const tr = customTag.trim();
+    if (tr && !tags.includes(tr)) setTags((p) => [...p, tr]);
     setCustomTag("");
   };
 
   const toggleUni = (u: string) =>
-    setSelectedUnis((prev) => (prev.includes(u) ? prev.filter((x) => x !== u) : [...prev, u]));
+    setSelectedUnis((p) => (p.includes(u) ? p.filter((x) => x !== u) : [...p, u]));
 
-  const validateStep1 = () => {
-    if (!title.trim())       { Alert.alert("Required", "Event title is required.");   return false; }
-    if (!description.trim()) { Alert.alert("Required", "Description is required.");   return false; }
-    if (!date.trim())        { Alert.alert("Required", "Event date is required.");    return false; }
+  // ── Validate ─────────────────────────────────────────────────────
+  const validate = () => {
+    if (!title.trim())       { Alert.alert("Required", "Event title is required.");       return false; }
+    if (!description.trim()) { Alert.alert("Required", "Description is required.");       return false; }
+    if (!date.trim())        { Alert.alert("Required", "Event date is required.");        return false; }
     if (!location.trim() && mode !== "Virtual") {
-      Alert.alert("Required", "Location is required for physical/hybrid events."); return false;
+      Alert.alert("Required", "Location is required for physical/hybrid events.");        return false;
+    }
+    if (selectedUnis.length === 0) {
+      Alert.alert("Required", "Select at least one university to invite.");               return false;
     }
     return true;
   };
 
-  // ── REAL API CALL ──────────────────────────────────────────────
-  const handlePublish = async () => {
-    if (selectedUnis.length === 0) {
-      Alert.alert("No Universities", "Select at least one university to invite.");
-      return;
-    }
+  // ── Submit ──────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (!validate()) return;
     setLoading(true);
 
-    const payload = {
-      industryId:          user?._id,
-      companyName:         user?.name,
-      eventType,
-      title,
-      description,
-      date,
-      time,
-      location,
-      mode,
-      capacity: capacity ? Number(capacity) : null,
-      deadline,
-      banner,
-      tags,
-      invitedUniversities: selectedUnis,
-      inviteMessage:       inviteMsg,
+    const headers = {
+      "x-industry-id":  user?._id,
+      "x-company-name": user?.name || "Partner",
     };
 
     try {
-       const a = ax();
-     
-      const headers = {
-        "x-industry-id":  user?._id,
-        "x-company-name": user?.name || "Partner",
-      };
+      const a = ax();
 
       if (editMode && eventData?._id) {
-        // ── Edit mode: PUT request ──────────────────────────────
+        const payload = {
+          industryId: user?._id, companyName: user?.name,
+          eventType, title, description, date, time, location, mode,
+          capacity: capacity ? Number(capacity) : null, deadline,
+          banner, tags, invitedUniversities: selectedUnis, inviteMessage: inviteMsg,
+        };
         await a.put(`/api/industry/events/${eventData._id}`, payload, { headers });
         setLoading(false);
-        Alert.alert(
-          "Updated ✏️",
-          "Event update ho gaya!",
-          [{ text: "OK", onPress: () => nav.goBack() }]
-        );
+        Alert.alert("Updated ✏️", "Event successfully updated!", [
+          { text: "OK", onPress: () => nav.goBack() },
+        ]);
       } else {
-        // ── Create mode: POST request ───────────────────────────
-        // await a.post("/api/industry/events", payload, { headers });
         const formData = new FormData();
-
-formData.append("industryId", user?._id);
-formData.append("companyName", user?.name);
-formData.append("eventType", eventType);
-formData.append("title", title);
-formData.append("description", description);
-formData.append("date", date);
-formData.append("time", time);
-formData.append("location", location);
-formData.append("mode", mode);
-formData.append("capacity", capacity);
-formData.append("deadline", deadline);
-formData.append("tags", JSON.stringify(tags));
-formData.append("invitedUniversities", JSON.stringify(selectedUnis));
-formData.append("inviteMessage", inviteMsg);
-
-if (banner) {
-  formData.append("banner", {
-    uri: banner,
-    name: "event.jpg",
-    type: "image/jpeg",
-  } as any);
-}
-
-await a.post("/api/industry/events", formData, {
-  headers: {
-    ...headers,
-    "Content-Type": "multipart/form-data",
-  },
-});
+        formData.append("industryId",   user?._id);
+        formData.append("companyName",  user?.name);
+        formData.append("eventType",    eventType);
+        formData.append("title",        title);
+        formData.append("description",  description);
+        formData.append("date",         date);
+        formData.append("time",         time);
+        formData.append("location",     location);
+        formData.append("mode",         mode);
+        formData.append("capacity",     capacity);
+        formData.append("deadline",     deadline);
+        formData.append("tags",              JSON.stringify(tags));
+        formData.append("invitedUniversities", JSON.stringify(selectedUnis));
+        formData.append("inviteMessage", inviteMsg);
+        if (banner) {
+          formData.append("banner", { uri: banner, name: "event.jpg", type: "image/jpeg" } as any);
+        }
+        await a.post("/api/industry/events", formData, {
+          headers: { ...headers, "Content-Type": "multipart/form-data" },
+        });
         setLoading(false);
-        Alert.alert(
-          "Event Published 🎉",
-          `Event publish ho gaya aur ${selectedUnis.length} university(s) ko invite bhej diya!`,
-          [{ text: "OK", onPress: () => nav.goBack() }]
-        );
+        Alert.alert("Published 🎉", "Event created and invitations sent!", [
+          { text: "OK", onPress: () => nav.goBack() },
+        ]);
       }
-    // } catch (err: any) {
-    //   setLoading(false);
-    //   Alert.alert("Error", err?.response?.data?.message || "Publish failed. Dobara try karein.");
-    // }
     } catch (err: any) {
-  console.log("FULL ERROR:", err);
-  console.log("RESPONSE:", err?.response);
-  console.log("DATA:", err?.response?.data);
-
-  Alert.alert(
-    "Error",
-    err?.response?.data?.message ||
-    err?.message ||
-    "Publish failed"
-  );
-}
+      setLoading(false);
+      Alert.alert("Error", err?.response?.data?.message || err?.message || "Submit failed");
+    }
   };
 
-  const typeConfig = EVENT_TYPES.find((e) => e.label === eventType)!;
-
-  /* ────────────────────────── sub-renders ─────────────────────── */
-  const renderStepIndicator = () => (
-    <View style={s.stepIndicator}>
-      {STEPS.map((lbl, i) => {
-        const n    = i + 1;
-        const done = step > n;
-        const active = step === n;
-        return (
-          <React.Fragment key={n}>
-            <View style={s.stepItem}>
-              <View style={[s.stepCircle, active && s.stepCircleActive, done && s.stepCircleDone]}>
-                {done
-                  ? <Ionicons name="checkmark" size={13} color="#fff" />
-                  : <Text style={[s.stepCircleTxt, active && { color: "#fff" }]}>{n}</Text>
-                }
-              </View>
-              <Text style={[s.stepLbl, active && s.stepLblActive]}>{lbl}</Text>
-            </View>
-            {i < STEPS.length - 1 && (
-              <View style={[s.stepLine, done && s.stepLineDone]} />
-            )}
-          </React.Fragment>
-        );
-      })}
-    </View>
-  );
-
-  /* ── STEP 1 ── */
-  const renderStep1 = () => (
-    <Animated.View style={{ opacity: fadeAnim }}>
-      {/* Event type */}
-      <View style={s.sec}>
-        <Text style={s.secLabel}>Event Type <Text style={s.required}>*</Text></Text>
-        <View style={s.typeGrid}>
-          {EVENT_TYPES.map((et) => {
-            const active = eventType === et.label;
-            return (
-              <TouchableOpacity
-                key={et.label}
-                style={[s.typeTile, { width: (width - 56) / 3 }, active && s.typeTileActive]}
-                onPress={() => setEventType(et.label)}
-                activeOpacity={0.8}
-              >
-                <LinearGradient colors={et.grad} style={s.typeTileIcon}>
-                  <Ionicons name={et.icon as any} size={20} color="#fff" />
-                </LinearGradient>
-                <Text style={[s.typeTileLbl, active && { color: "#0066CC" }]}>{et.label}</Text>
-                <Text style={s.typeTileDesc}>{et.desc}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Title */}
-      <View style={s.sec}>
-        <Text style={s.secLabel}>Event Title <Text style={s.required}>*</Text></Text>
-        <TextInput
-          style={s.input}
-          placeholder="e.g. Flutter Development Workshop 2025"
-          placeholderTextColor="#94A3B8"
-          value={title}
-          onChangeText={setTitle}
-        />
-      </View>
-
-      {/* Description */}
-      <View style={s.sec}>
-        <Text style={s.secLabel}>Description <Text style={s.required}>*</Text></Text>
-        <TextInput
-          style={[s.input, s.textarea]}
-          placeholder="Describe the event, agenda, and what attendees will gain..."
-          placeholderTextColor="#94A3B8"
-          value={description}
-          onChangeText={setDesc}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-        />
-      </View>
-
-      {/* Date & Time */}
-      <View style={[s.sec, { flexDirection: "row", gap: 12 }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.secLabel}>Date <Text style={s.required}>*</Text></Text>
-          <View style={s.inputIcon}>
-            <Ionicons name="calendar-outline" size={16} color="#64748B" style={s.inputIconImg} />
-            <TextInput
-              style={s.inputWithIcon}
-              placeholder="DD MMM YYYY"
-              placeholderTextColor="#94A3B8"
-              value={date}
-              onChangeText={setDate}
-            />
-          </View>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={s.secLabel}>Time</Text>
-          <View style={s.inputIcon}>
-            <Ionicons name="time-outline" size={16} color="#64748B" style={s.inputIconImg} />
-            <TextInput
-              style={s.inputWithIcon}
-              placeholder="e.g. 10:00 AM"
-              placeholderTextColor="#94A3B8"
-              value={time}
-              onChangeText={setTime}
-            />
-          </View>
-        </View>
-      </View>
-
-      {/* Mode */}
-      <View style={s.sec}>
-        <Text style={s.secLabel}>Event Mode</Text>
-        <View style={s.modeRow}>
-          {(["Physical", "Virtual", "Hybrid"] as EventMode[]).map((m) => (
-            <TouchableOpacity
-              key={m}
-              style={[s.modeBtn, mode === m && s.modeBtnActive]}
-              onPress={() => setMode(m)}
-            >
-              <Ionicons
-                name={m === "Physical" ? "location" : m === "Virtual" ? "videocam" : "git-merge"}
-                size={14}
-                color={mode === m ? "#fff" : "#64748B"}
-              />
-              <Text style={[s.modeBtnTxt, mode === m && { color: "#fff" }]}>{m}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Location */}
-      {mode !== "Virtual" && (
-        <View style={s.sec}>
-          <Text style={s.secLabel}>Location <Text style={s.required}>*</Text></Text>
-          <View style={s.inputIcon}>
-            <Ionicons name="location-outline" size={16} color="#64748B" style={s.inputIconImg} />
-            <TextInput
-              style={s.inputWithIcon}
-              placeholder="Venue name, city"
-              placeholderTextColor="#94A3B8"
-              value={location}
-              onChangeText={setLocation}
-            />
-          </View>
-        </View>
-      )}
-      {mode === "Virtual" && (
-        <View style={s.sec}>
-          <Text style={s.secLabel}>Meeting Link</Text>
-          <View style={s.inputIcon}>
-            <Ionicons name="link-outline" size={16} color="#64748B" style={s.inputIconImg} />
-            <TextInput
-              style={s.inputWithIcon}
-              placeholder="https://zoom.us/j/..."
-              placeholderTextColor="#94A3B8"
-              value={location}
-              onChangeText={setLocation}
-            />
-          </View>
-        </View>
-      )}
-
-      {/* Capacity & Deadline */}
-      <View style={[s.sec, { flexDirection: "row", gap: 12 }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.secLabel}>Capacity</Text>
-          <View style={s.inputIcon}>
-            <Ionicons name="people-outline" size={16} color="#64748B" style={s.inputIconImg} />
-            <TextInput
-              style={s.inputWithIcon}
-              placeholder="e.g. 100"
-              placeholderTextColor="#94A3B8"
-              value={capacity}
-              onChangeText={setCapacity}
-              keyboardType="number-pad"
-            />
-          </View>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={s.secLabel}>RSVP Deadline</Text>
-          <View style={s.inputIcon}>
-            <Ionicons name="hourglass-outline" size={16} color="#64748B" style={s.inputIconImg} />
-            <TextInput
-              style={s.inputWithIcon}
-              placeholder="DD MMM YYYY"
-              placeholderTextColor="#94A3B8"
-              value={deadline}
-              onChangeText={setDeadline}
-            />
-          </View>
-        </View>
-      </View>
-    </Animated.View>
-  );
-
-  /* ── STEP 2 ── */
-  const renderStep2 = () => (
-    <Animated.View style={{ opacity: fadeAnim }}>
-      {/* Banner */}
-      <View style={s.sec}>
-        <Text style={s.secLabel}>Event Banner</Text>
-        <TouchableOpacity style={s.bannerPicker} onPress={pickBanner} activeOpacity={0.8}>
-          {banner ? (
-            <Image source={{ uri: banner }} style={s.bannerImg} />
-          ) : (
-            <View style={s.bannerPlaceholder}>
-              <View style={s.bannerIconBox}>
-                <Ionicons name="image-outline" size={28} color="#94A3B8" />
-              </View>
-              <Text style={s.bannerPlaceholderTxt}>Tap to upload banner</Text>
-              <Text style={s.bannerPlaceholderSub}>Recommended: 1200 × 675 px (16:9)</Text>
-            </View>
-          )}
-          {banner && (
-            <View style={s.bannerOverlay}>
-              <Ionicons name="camera-outline" size={20} color="#fff" />
-              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600", marginTop: 4 }}>Change</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        {banner && (
-          <TouchableOpacity onPress={() => setBanner(null)} style={s.removeBannerBtn}>
-            <Ionicons name="trash-outline" size={14} color="#DC2626" />
-            <Text style={{ fontSize: 12, color: "#DC2626", fontWeight: "600" }}>Remove</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Tags */}
-      <View style={s.sec}>
-        <Text style={s.secLabel}>Tags</Text>
-        <Text style={s.secHint}>Help universities find your event</Text>
-        <View style={s.tagGrid}>
-          {SUGGESTED_TAGS.map((tag) => {
-            const active = tags.includes(tag);
-            return (
-              <TouchableOpacity
-                key={tag}
-                style={[s.tagChip, active && s.tagChipActive]}
-                onPress={() => toggleTag(tag)}
-              >
-                {active && <Ionicons name="checkmark" size={11} color="#0066CC" />}
-                <Text style={[s.tagChipTxt, active && s.tagChipTxtActive]}>{tag}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Custom tag */}
-        <View style={s.customTagRow}>
-          <TextInput
-            style={[s.input, { flex: 1, marginBottom: 0 }]}
-            placeholder="Add custom tag..."
-            placeholderTextColor="#94A3B8"
-            value={customTag}
-            onChangeText={setCustomTag}
-            onSubmitEditing={addCustomTag}
-            returnKeyType="done"
-          />
-          <TouchableOpacity style={s.addTagBtn} onPress={addCustomTag}>
-            <Ionicons name="add" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Custom tags list */}
-        {tags.filter((t) => !SUGGESTED_TAGS.includes(t)).length > 0 && (
-          <View style={[s.tagGrid, { marginTop: 10 }]}>
-            {tags
-              .filter((t) => !SUGGESTED_TAGS.includes(t))
-              .map((t) => (
-                <TouchableOpacity
-                  key={t}
-                  style={[s.tagChip, s.tagChipActive]}
-                  onPress={() => toggleTag(t)}
-                >
-                  <Ionicons name="close" size={11} color="#0066CC" />
-                  <Text style={[s.tagChipTxt, s.tagChipTxtActive]}>{t}</Text>
-                </TouchableOpacity>
-              ))}
-          </View>
-        )}
-      </View>
-
-      {/* Preview */}
-      <View style={s.sec}>
-        <Text style={s.secLabel}>Preview</Text>
-        <View style={s.previewCard}>
-          <LinearGradient colors={typeConfig.grad} style={s.previewStripe} />
-          <View style={{ padding: 14 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <LinearGradient colors={typeConfig.grad} style={s.previewTypeIcon}>
-                <Ionicons name={typeConfig.icon as any} size={14} color="#fff" />
-              </LinearGradient>
-              <View style={[s.typeBadge, { backgroundColor: typeConfig.grad[0] + "20" }]}>
-                <Text style={[s.typeBadgeTxt, { color: typeConfig.grad[0] }]}>{eventType}</Text>
-              </View>
-            </View>
-            <Text style={s.previewTitle} numberOfLines={1}>{title || "Event Title"}</Text>
-            {date ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 6 }}>
-                <Ionicons name="calendar-outline" size={12} color="#64748B" />
-                <Text style={s.previewMeta}>{date}{time ? ` · ${time}` : ""}</Text>
-              </View>
-            ) : null}
-            {location ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 }}>
-                <Ionicons name="location-outline" size={12} color="#64748B" />
-                <Text style={s.previewMeta}>{location}</Text>
-              </View>
-            ) : null}
-            {tags.length > 0 && (
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-                {tags.slice(0, 4).map((t) => (
-                  <View key={t} style={s.previewTag}>
-                    <Text style={s.previewTagTxt}>{t}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        </View>
-      </View>
-    </Animated.View>
-  );
-
-  /* ── STEP 3 ── */
-  const renderStep3 = () => (
-    <Animated.View style={{ opacity: fadeAnim }}>
-      <View style={s.sec}>
-        <Text style={s.secLabel}>Select Universities</Text>
-        <Text style={s.secHint}>
-          {selectedUnis.length === 0
-            ? "Tap to select universities to invite"
-            : `${selectedUnis.length} university(s) selected`}
-        </Text>
-
-        <View style={s.uniActions}>
-          <TouchableOpacity
-            style={s.uniActionBtn}
-            onPress={() => setSelectedUnis([...UNIVERSITIES])}
-          >
-            <Ionicons name="checkmark-done-outline" size={14} color="#0066CC" />
-            <Text style={s.uniActionTxt}>Select All</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.uniActionBtn}
-            onPress={() => setSelectedUnis([])}
-          >
-            <Ionicons name="close-circle-outline" size={14} color="#DC2626" />
-            <Text style={[s.uniActionTxt, { color: "#DC2626" }]}>Clear</Text>
-          </TouchableOpacity>
-        </View>
-
-        {UNIVERSITIES.map((u) => {
-          const sel = selectedUnis.includes(u);
-          return (
-            <TouchableOpacity
-              key={u}
-              style={[s.uniRow, sel && s.uniRowActive]}
-              onPress={() => toggleUni(u)}
-              activeOpacity={0.8}
-            >
-              <View style={[s.uniCheckBox, sel && s.uniCheckBoxActive]}>
-                {sel && <Ionicons name="checkmark" size={13} color="#fff" />}
-              </View>
-              <View style={s.uniAvatarBox}>
-                <Ionicons name="school" size={16} color={sel ? "#0066CC" : "#64748B"} />
-              </View>
-              <Text style={[s.uniName, sel && { color: "#0A1628", fontWeight: "700" }]}>{u}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Invite message */}
-      <View style={s.sec}>
-        <Text style={s.secLabel}>Invitation Message</Text>
-        <Text style={s.secHint}>Personalise the message sent to universities</Text>
-        <TextInput
-          style={[s.input, s.textarea]}
-          placeholder={`Dear [University Name],\n\nWe would like to invite your students to our event...`}
-          placeholderTextColor="#94A3B8"
-          value={inviteMsg}
-          onChangeText={setInviteMsg}
-          multiline
-          numberOfLines={5}
-          textAlignVertical="top"
-        />
-      </View>
-
-      {/* Summary */}
-      {selectedUnis.length > 0 && (
-        <View style={s.sec}>
-          <View style={s.summaryCard}>
-            <Text style={s.summaryTitle}>
-              {editMode ? "Ready to Update" : "Ready to Publish"}
-            </Text>
-            <View style={s.summaryRow}>
-              <Ionicons name="calendar" size={14} color="#0066CC" />
-              <Text style={s.summaryTxt}>{title || "Untitled Event"}</Text>
-            </View>
-            <View style={s.summaryRow}>
-              <Ionicons name="school" size={14} color="#0066CC" />
-              <Text style={s.summaryTxt}>
-                {selectedUnis.length} universit{selectedUnis.length > 1 ? "ies" : "y"} will receive invitations
-              </Text>
-            </View>
-            {tags.length > 0 && (
-              <View style={s.summaryRow}>
-                <Ionicons name="pricetag" size={14} color="#0066CC" />
-                <Text style={s.summaryTxt}>{tags.join(", ")}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      )}
-    </Animated.View>
-  );
-
-  /* ─────────────────────────── main render ─────────────────────── */
+  // ═══════════════════════════════════════════════════════════════
   return (
-    <View style={{ flex: 1, backgroundColor: "#F0F4F8" }}>
-      <StatusBar barStyle="light-content" backgroundColor="#193648" />
+    <View style={{ flex: 1, backgroundColor: THEME.bg }}>
+      <StatusBar barStyle="light-content" backgroundColor={THEME.headerBg} />
 
       {/* ── Header ── */}
       <LinearGradient
-        colors={["#0A1929", "#132D40", "#193648"]}
-        style={s.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={[THEME.headerBg, THEME.headerMid, THEME.headerEnd]}
+        style={[s.header, { paddingTop: Platform.OS === "ios" ? 56 : 44 }]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
       >
         <View style={s.headerRow}>
           <TouchableOpacity onPress={() => nav.goBack()} style={s.backBtn}>
             <Ionicons name="arrow-back" size={21} color="#fff" />
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 14 }}>
-            <Text style={s.headerTitle}>
-              {editMode ? "Edit Event" : "Create Event"}
-            </Text>
-            <Text style={s.headerSub}>Step {step} of {STEPS.length} — {STEPS[step - 1]}</Text>
+            <Text style={s.headerTitle}>{editMode ? "Edit Event" : "Create Event"}</Text>
+            <Text style={s.headerSub}>Fill in the details below</Text>
           </View>
-          <LinearGradient colors={typeConfig.grad} style={s.headerTypeBadge}>
-            <Ionicons name={typeConfig.icon as any} size={14} color="#fff" />
-            <Text style={s.headerTypeTxt}>{eventType}</Text>
-          </LinearGradient>
+          <View style={s.headerBadge}>
+            <Ionicons name="calendar" size={15} color="#fff" />
+          </View>
         </View>
-        {renderStepIndicator()}
       </LinearGradient>
 
-      {/* ── Content ── */}
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      {/* ── Form ── */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView
-          contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+          contentContainerStyle={{ paddingBottom: 110 + insets.bottom }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {step === 1 && renderStep1()}
-          {step === 2 && renderStep2()}
-          {step === 3 && renderStep3()}
+
+          {/* ── Section: Event Type ── */}
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Event Type</Text>
+            <View style={s.typeGrid}>
+              {EVENT_TYPES.map((et) => {
+                const active = eventType === et.label;
+                return (
+                  <TouchableOpacity
+                    key={et.label}
+                    style={[s.typeTile, { width: (width - 56) / 3 }, active && s.typeTileActive]}
+                    onPress={() => setEventType(et.label)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[s.typeTileIcon, active && s.typeTileIconActive]}>
+                      <Ionicons name={et.icon as any} size={20} color={active ? "#fff" : THEME.sub} />
+                    </View>
+                    <Text style={[s.typeTileLabel, active && { color: THEME.accent, fontWeight: "700" }]}>
+                      {et.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* ── Section: Basic Details ── */}
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Event Details</Text>
+            <View style={s.card}>
+
+              {/* Title */}
+              <View style={s.fieldWrap}>
+                <Text style={s.label}>Event Title <Text style={s.req}>*</Text></Text>
+                <View style={s.inputRow}>
+                  <Ionicons name="text-outline" size={16} color={THEME.sub} style={s.inputIcon} />
+                  <TextInput
+                    style={s.inputField}
+                    placeholder="e.g. Flutter Workshop 2025"
+                    placeholderTextColor={THEME.muted}
+                    value={title}
+                    onChangeText={setTitle}
+                  />
+                </View>
+              </View>
+
+              <View style={s.divider} />
+
+              {/* Description */}
+              <View style={s.fieldWrap}>
+                <Text style={s.label}>Description <Text style={s.req}>*</Text></Text>
+                <TextInput
+                  style={[s.inputField, s.textarea]}
+                  placeholder="Describe the event, agenda, what attendees will gain..."
+                  placeholderTextColor={THEME.muted}
+                  value={description}
+                  onChangeText={setDesc}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={s.divider} />
+
+              {/* Date & Time */}
+              <View style={s.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.label}>Date <Text style={s.req}>*</Text></Text>
+                  <View style={s.inputRow}>
+                    <Ionicons name="calendar-outline" size={15} color={THEME.sub} style={s.inputIcon} />
+                    <TextInput
+                      style={[s.inputField, { flex: 1 }]}
+                      placeholder="DD MMM YYYY"
+                      placeholderTextColor={THEME.muted}
+                      value={date}
+                      onChangeText={setDate}
+                    />
+                  </View>
+                </View>
+                <View style={{ width: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.label}>Time</Text>
+                  <View style={s.inputRow}>
+                    <Ionicons name="time-outline" size={15} color={THEME.sub} style={s.inputIcon} />
+                    <TextInput
+                      style={[s.inputField, { flex: 1 }]}
+                      placeholder="10:00 AM"
+                      placeholderTextColor={THEME.muted}
+                      value={time}
+                      onChangeText={setTime}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <View style={s.divider} />
+
+              {/* Mode */}
+              <View style={s.fieldWrap}>
+                <Text style={s.label}>Event Mode</Text>
+                <View style={s.modeRow}>
+                  {(["Physical", "Virtual", "Hybrid"] as EventMode[]).map((m) => (
+                    <TouchableOpacity
+                      key={m}
+                      style={[s.modeBtn, mode === m && s.modeBtnActive]}
+                      onPress={() => setMode(m)}
+                    >
+                      <Ionicons
+                        name={m === "Physical" ? "location" : m === "Virtual" ? "videocam" : "git-merge"}
+                        size={13}
+                        color={mode === m ? "#fff" : THEME.sub}
+                      />
+                      <Text style={[s.modeBtnTxt, mode === m && { color: "#fff" }]}>{m}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={s.divider} />
+
+              {/* Location */}
+              <View style={s.fieldWrap}>
+                <Text style={s.label}>
+                  {mode === "Virtual" ? "Meeting Link" : "Location"}
+                  {mode !== "Virtual" && <Text style={s.req}> *</Text>}
+                </Text>
+                <View style={s.inputRow}>
+                  <Ionicons
+                    name={mode === "Virtual" ? "link-outline" : "location-outline"}
+                    size={15}
+                    color={THEME.sub}
+                    style={s.inputIcon}
+                  />
+                  <TextInput
+                    style={[s.inputField, { flex: 1 }]}
+                    placeholder={mode === "Virtual" ? "https://zoom.us/j/..." : "Venue name, city"}
+                    placeholderTextColor={THEME.muted}
+                    value={location}
+                    onChangeText={setLocation}
+                  />
+                </View>
+              </View>
+
+              <View style={s.divider} />
+
+              {/* Capacity & Deadline */}
+              <View style={s.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.label}>Capacity</Text>
+                  <View style={s.inputRow}>
+                    <Ionicons name="people-outline" size={15} color={THEME.sub} style={s.inputIcon} />
+                    <TextInput
+                      style={[s.inputField, { flex: 1 }]}
+                      placeholder="e.g. 100"
+                      placeholderTextColor={THEME.muted}
+                      value={capacity}
+                      onChangeText={setCapacity}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                </View>
+                <View style={{ width: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.label}>RSVP Deadline</Text>
+                  <View style={s.inputRow}>
+                    <Ionicons name="hourglass-outline" size={15} color={THEME.sub} style={s.inputIcon} />
+                    <TextInput
+                      style={[s.inputField, { flex: 1 }]}
+                      placeholder="DD MMM YYYY"
+                      placeholderTextColor={THEME.muted}
+                      value={deadline}
+                      onChangeText={setDeadline}
+                    />
+                  </View>
+                </View>
+              </View>
+
+            </View>
+          </View>
+
+          {/* ── Section: Banner ── */}
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Event Banner</Text>
+            <TouchableOpacity style={s.bannerPicker} onPress={pickBanner} activeOpacity={0.85}>
+              {banner ? (
+                <>
+                  <Image source={{ uri: banner }} style={s.bannerImg} />
+                  <View style={s.bannerOverlay}>
+                    <Ionicons name="camera-outline" size={20} color="#fff" />
+                    <Text style={s.bannerOverlayTxt}>Change</Text>
+                  </View>
+                </>
+              ) : (
+                <View style={s.bannerPlaceholder}>
+                  <View style={s.bannerIconBox}>
+                    <Ionicons name="image-outline" size={28} color={THEME.sub} />
+                  </View>
+                  <Text style={s.bannerPlaceholderTxt}>Tap to upload banner</Text>
+                  <Text style={s.bannerPlaceholderSub}>Recommended: 1200 × 675 px</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {banner && (
+              <TouchableOpacity onPress={() => setBanner(null)} style={s.removeBtn}>
+                <Ionicons name="trash-outline" size={13} color={THEME.required} />
+                <Text style={{ fontSize: 12, color: THEME.required, fontWeight: "600" }}>Remove Banner</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* ── Section: Tags ── */}
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Tags</Text>
+            <View style={s.card}>
+              <View style={s.tagGrid}>
+                {SUGGESTED_TAGS.map((tag) => {
+                  const active = tags.includes(tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[s.tagChip, active && s.tagChipActive]}
+                      onPress={() => toggleTag(tag)}
+                    >
+                      {active && <Ionicons name="checkmark" size={11} color="#fff" />}
+                      <Text style={[s.tagChipTxt, active && { color: "#fff" }]}>{tag}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={[s.divider, { marginTop: 12 }]} />
+              <View style={s.customTagRow}>
+                <TextInput
+                  style={[s.inputField, { flex: 1 }]}
+                  placeholder="Add custom tag..."
+                  placeholderTextColor={THEME.muted}
+                  value={customTag}
+                  onChangeText={setCustomTag}
+                  onSubmitEditing={addCustomTag}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity style={s.addTagBtn} onPress={addCustomTag}>
+                  <Ionicons name="add" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          {/* ── Section: Invite Universities ── */}
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>
+              Invite Universities <Text style={s.req}>*</Text>
+            </Text>
+            <View style={s.card}>
+              <View style={s.uniActions}>
+                <TouchableOpacity
+                  style={s.uniActionBtn}
+                  onPress={() => setSelectedUnis([...UNIVERSITIES])}
+                >
+                  <Ionicons name="checkmark-done-outline" size={13} color={THEME.accentBlue} />
+                  <Text style={[s.uniActionTxt, { color: THEME.accentBlue }]}>Select All</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.uniActionBtn}
+                  onPress={() => setSelectedUnis([])}
+                >
+                  <Ionicons name="close-circle-outline" size={13} color={THEME.required} />
+                  <Text style={[s.uniActionTxt, { color: THEME.required }]}>Clear</Text>
+                </TouchableOpacity>
+              </View>
+              {UNIVERSITIES.map((u) => {
+                const sel = selectedUnis.includes(u);
+                return (
+                  <TouchableOpacity
+                    key={u}
+                    style={[s.uniRow, sel && s.uniRowActive]}
+                    onPress={() => toggleUni(u)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[s.checkbox, sel && s.checkboxActive]}>
+                      {sel && <Ionicons name="checkmark" size={12} color="#fff" />}
+                    </View>
+                    <Ionicons name="school-outline" size={16} color={sel ? THEME.accent : THEME.sub} />
+                    <Text style={[s.uniName, sel && { color: THEME.accent, fontWeight: "700" }]}>{u}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              <View style={s.divider} />
+              <View style={s.fieldWrap}>
+                <Text style={s.label}>Invitation Message</Text>
+                <TextInput
+                  style={[s.inputField, s.textarea]}
+                  placeholder={`Dear [University],\n\nWe would like to invite your students...`}
+                  placeholderTextColor={THEME.muted}
+                  value={inviteMsg}
+                  onChangeText={setInviteMsg}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
+          </View>
+
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* ── Bottom nav ── */}
+      {/* ── Submit Button ── */}
       <View style={[s.bottomBar, { paddingBottom: insets.bottom > 0 ? insets.bottom + 8 : 16 }]}>
-        {step > 1 && (
-          <TouchableOpacity
-            style={s.backStepBtn}
-            onPress={() => animateStep((step - 1) as 1 | 2 | 3)}
-          >
-            <Ionicons name="chevron-back" size={18} color="#334155" />
-            <Text style={s.backStepTxt}>Back</Text>
-          </TouchableOpacity>
-        )}
-
         <TouchableOpacity
-          style={[
-            s.nextBtn,
-            { flex: step > 1 ? 1 : undefined, width: step === 1 ? "100%" : undefined },
-          ]}
-          activeOpacity={0.88}
-          onPress={() => {
-            if (step === 1) {
-              if (validateStep1()) animateStep(2);
-            } else if (step === 2) {
-              animateStep(3);
-            } else {
-              handlePublish();
-            }
-          }}
+          style={s.submitBtn}
+          onPress={handleSubmit}
           disabled={loading}
+          activeOpacity={0.88}
         >
           <LinearGradient
-            colors={loading ? ["#94A3B8", "#94A3B8"] : typeConfig.grad}
-            style={s.nextBtnGrad}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
+            colors={loading ? ["#94A3B8", "#94A3B8"] : [THEME.headerBg, THEME.headerEnd]}
+            style={s.submitBtnGrad}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           >
             {loading ? (
-              <Text style={s.nextBtnTxt}>
-                {editMode ? "Updating..." : "Publishing..."}
-              </Text>
-            ) : step < 3 ? (
-              <>
-                <Text style={s.nextBtnTxt}>Continue</Text>
-                <Ionicons name="chevron-forward" size={18} color="#fff" />
-              </>
+              <Text style={s.submitBtnTxt}>{editMode ? "Updating..." : "Publishing..."}</Text>
             ) : (
               <>
-                <Ionicons name="send" size={16} color="#fff" />
-                <Text style={s.nextBtnTxt}>
-                  {editMode ? "Save Changes" : "Publish & Send Invites"}
+                <Ionicons name={editMode ? "save-outline" : "send-outline"} size={17} color="#fff" />
+                <Text style={s.submitBtnTxt}>
+                  {editMode ? "Save Changes" : "Publish Event"}
                 </Text>
               </>
             )}
@@ -785,205 +566,134 @@ await a.post("/api/industry/events", formData, {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════ */
-/*  STYLES                                                             */
-/* ═══════════════════════════════════════════════════════════════════ */
+// ════════════════════════════════════════════════════════════════
 const s = StyleSheet.create({
-  header: {
-    paddingTop: Platform.OS === "ios" ? 56 : 44,
-    paddingHorizontal: 18,
-    paddingBottom: 20,
-  },
-  headerRow: { flexDirection: "row", alignItems: "center", marginBottom: 18 },
+  header: { paddingHorizontal: 18, paddingBottom: 20 },
+  headerRow: { flexDirection: "row", alignItems: "center" },
   backBtn: {
     width: 38, height: 38, borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.09)",
+    backgroundColor: "rgba(255,255,255,0.1)",
     justifyContent: "center", alignItems: "center",
   },
   headerTitle: { fontSize: 19, fontWeight: "900", color: "#fff" },
-  headerSub:   { fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 2 },
-  headerTypeBadge: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
-  },
-  headerTypeTxt: { fontSize: 12, fontWeight: "700", color: "#fff" },
-
-  /* Step indicator */
-  stepIndicator: {
-    flexDirection: "row", alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 14, padding: 12,
-  },
-  stepItem:        { alignItems: "center", gap: 5 },
-  stepCircle:      {
-    width: 28, height: 28, borderRadius: 14,
+  headerSub:   { fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 2 },
+  headerBadge: {
+    width: 38, height: 38, borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.12)",
     justifyContent: "center", alignItems: "center",
   },
-  stepCircleActive:{ backgroundColor: "#0066CC" },
-  stepCircleDone:  { backgroundColor: "#059669" },
-  stepCircleTxt:   { fontSize: 12, fontWeight: "700", color: "rgba(255,255,255,0.5)" },
-  stepLbl:         { fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: "600" },
-  stepLblActive:   { color: "#fff" },
-  stepLine:        {
-    flex: 1, height: 2, backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: 2, marginHorizontal: 4, marginBottom: 14,
+  section: { paddingHorizontal: 16, paddingTop: 20 },
+  sectionTitle: {
+    fontSize: 13, fontWeight: "800", color: THEME.text,
+    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10,
   },
-  stepLineDone:    { backgroundColor: "#059669" },
-
-  /* Sections */
-  sec:      { paddingHorizontal: 16, paddingTop: 18 },
-  secLabel: { fontSize: 13, fontWeight: "700", color: "#0A1628", marginBottom: 8 },
-  secHint:  { fontSize: 12, color: "#64748B", marginBottom: 10, marginTop: -4 },
-  required: { color: "#DC2626" },
-
-  /* Type grid */
-  typeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  typeTile: {
-    backgroundColor: "#fff", borderRadius: 16, padding: 12,
-    alignItems: "center", borderWidth: 2, borderColor: "#E2E8F0",
-  },
-  typeTileActive:  { borderColor: "#0066CC", backgroundColor: "#EFF6FF" },
-  typeTileIcon:    {
-    width: 46, height: 46, borderRadius: 13,
-    justifyContent: "center", alignItems: "center", marginBottom: 8,
-  },
-  typeTileLbl:     { fontSize: 11, fontWeight: "700", color: "#334155" },
-  typeTileDesc:    { fontSize: 9, color: "#94A3B8", textAlign: "center", marginTop: 2 },
-  typeBadge:       { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
-  typeBadgeTxt:    { fontSize: 11, fontWeight: "700" },
-
-  /* Inputs */
-  input: {
-    backgroundColor: "#fff", borderRadius: 12, borderWidth: 1.5,
-    borderColor: "#E2E8F0", paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 14, color: "#0A1628",
-  },
-  textarea:     { minHeight: 100, paddingTop: 12 },
-  inputIcon:    {
-    flexDirection: "row", alignItems: "center",
-    backgroundColor: "#fff", borderRadius: 12,
-    borderWidth: 1.5, borderColor: "#E2E8F0", overflow: "hidden",
-  },
-  inputIconImg:  { paddingLeft: 14 },
-  inputWithIcon: { flex: 1, paddingHorizontal: 10, paddingVertical: 12, fontSize: 14, color: "#0A1628" },
-
-  /* Mode */
-  modeRow: { flexDirection: "row", gap: 10 },
-  modeBtn: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 6, paddingVertical: 10, borderRadius: 12,
-    backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0",
-  },
-  modeBtnActive: { backgroundColor: "#193648", borderColor: "#193648" },
-  modeBtnTxt:    { fontSize: 12, fontWeight: "700", color: "#64748B" },
-
-  /* Banner */
-  bannerPicker: {
-    height: 180, borderRadius: 16, backgroundColor: "#F8FAFC",
-    borderWidth: 2, borderColor: "#E2E8F0", borderStyle: "dashed",
-    overflow: "hidden", justifyContent: "center",
-  },
-  bannerImg:            { width: "100%", height: "100%", resizeMode: "cover" },
-  bannerPlaceholder:    { alignItems: "center", justifyContent: "center", padding: 20 },
-  bannerIconBox:        {
-    width: 56, height: 56, borderRadius: 28, backgroundColor: "#EFF6FF",
-    justifyContent: "center", alignItems: "center", marginBottom: 10,
-  },
-  bannerPlaceholderTxt: { fontSize: 14, fontWeight: "700", color: "#334155" },
-  bannerPlaceholderSub: { fontSize: 12, color: "#94A3B8", marginTop: 4 },
-  bannerOverlay:        {
-    position: "absolute", bottom: 0, left: 0, right: 0,
-    backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center",
-    justifyContent: "center", paddingVertical: 10,
-  },
-  removeBannerBtn: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    marginTop: 8, alignSelf: "flex-end",
-  },
-
-  /* Tags */
-  tagGrid:        { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  tagChip:        {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-    backgroundColor: "#F1F5F9", borderWidth: 1.5, borderColor: "#E2E8F0",
-  },
-  tagChipActive:    { backgroundColor: "#EFF6FF", borderColor: "#0066CC" },
-  tagChipTxt:       { fontSize: 12, fontWeight: "600", color: "#64748B" },
-  tagChipTxtActive: { color: "#0066CC" },
-  customTagRow:     { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12 },
-  addTagBtn:        {
-    width: 44, height: 44, borderRadius: 12, backgroundColor: "#193648",
-    justifyContent: "center", alignItems: "center",
-  },
-
-  /* Preview */
-  previewCard: {
-    backgroundColor: "#fff", borderRadius: 16, overflow: "hidden",
-    borderWidth: 1, borderColor: "#E2E8F0",
-    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8,
+  card: {
+    backgroundColor: THEME.card, borderRadius: 16,
+    borderWidth: 1, borderColor: THEME.border,
+    paddingHorizontal: 14, paddingVertical: 10,
+    shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
-  previewStripe:   { height: 4, width: "100%" },
-  previewTypeIcon: { width: 30, height: 30, borderRadius: 8, justifyContent: "center", alignItems: "center" },
-  previewTitle:    { fontSize: 15, fontWeight: "800", color: "#0A1628" },
-  previewMeta:     { fontSize: 12, color: "#64748B" },
-  previewTag:      { backgroundColor: "#F1F5F9", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  previewTagTxt:   { fontSize: 11, fontWeight: "600", color: "#475569" },
-
-  /* Universities */
-  uniActions:    { flexDirection: "row", gap: 10, marginBottom: 12 },
-  uniActionBtn:  {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
-    backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0",
+  divider: { height: 1, backgroundColor: THEME.border, marginVertical: 10 },
+  fieldWrap: { paddingVertical: 4 },
+  label: { fontSize: 12, fontWeight: "700", color: THEME.sub, marginBottom: 7 },
+  req:   { color: THEME.required },
+  row:   { flexDirection: "row", paddingVertical: 4 },
+  inputRow: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: THEME.bg, borderRadius: 10,
+    borderWidth: 1.5, borderColor: THEME.border,
   },
-  uniActionTxt:  { fontSize: 12, fontWeight: "600", color: "#0066CC" },
-  uniRow:        {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    paddingHorizontal: 14, paddingVertical: 12,
-    backgroundColor: "#fff", borderRadius: 13, marginBottom: 8,
-    borderWidth: 1.5, borderColor: "#E2E8F0",
+  inputIcon:  { paddingLeft: 12 },
+  inputField: {
+    flex: 1, paddingHorizontal: 10, paddingVertical: 11,
+    fontSize: 14, color: THEME.text,
   },
-  uniRowActive:     { borderColor: "#0066CC", backgroundColor: "#EFF6FF" },
-  uniCheckBox:      {
-    width: 22, height: 22, borderRadius: 6, borderWidth: 2,
-    borderColor: "#CBD5E1", justifyContent: "center", alignItems: "center",
+  textarea: { minHeight: 90, paddingTop: 10, paddingHorizontal: 12 },
+  typeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  typeTile: {
+    backgroundColor: THEME.card, borderRadius: 14, paddingVertical: 12,
+    alignItems: "center", borderWidth: 1.5, borderColor: THEME.border,
   },
-  uniCheckBoxActive:{ backgroundColor: "#0066CC", borderColor: "#0066CC" },
-  uniAvatarBox:     {
-    width: 34, height: 34, borderRadius: 10, backgroundColor: "#F1F5F9",
+  typeTileActive: { borderColor: THEME.accent, backgroundColor: "#EEF2F7" },
+  typeTileIcon: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: THEME.bg,
+    justifyContent: "center", alignItems: "center", marginBottom: 7,
+  },
+  typeTileIconActive: { backgroundColor: THEME.accent },
+  typeTileLabel: { fontSize: 10, fontWeight: "600", color: THEME.sub, textAlign: "center" },
+  modeRow: { flexDirection: "row", gap: 8 },
+  modeBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 5, paddingVertical: 9, borderRadius: 10,
+    backgroundColor: THEME.bg, borderWidth: 1.5, borderColor: THEME.border,
+  },
+  modeBtnActive: { backgroundColor: THEME.accent, borderColor: THEME.accent },
+  modeBtnTxt:    { fontSize: 12, fontWeight: "700", color: THEME.sub },
+  bannerPicker: {
+    height: 170, borderRadius: 16, backgroundColor: THEME.bg,
+    borderWidth: 2, borderColor: THEME.border, borderStyle: "dashed",
+    overflow: "hidden", justifyContent: "center",
+  },
+  bannerImg:  { width: "100%", height: "100%", resizeMode: "cover" },
+  bannerPlaceholder: { alignItems: "center", justifyContent: "center", padding: 20 },
+  bannerIconBox: {
+    width: 52, height: 52, borderRadius: 26, backgroundColor: "#EEF2F7",
+    justifyContent: "center", alignItems: "center", marginBottom: 10,
+  },
+  bannerPlaceholderTxt: { fontSize: 14, fontWeight: "700", color: THEME.text },
+  bannerPlaceholderSub: { fontSize: 12, color: THEME.muted, marginTop: 4 },
+  bannerOverlay: {
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    backgroundColor: "rgba(0,0,0,0.42)",
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, paddingVertical: 9,
+  },
+  bannerOverlayTxt: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  removeBtn: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8, alignSelf: "flex-end" },
+  tagGrid:      { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingVertical: 4 },
+  tagChip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+    backgroundColor: THEME.bg, borderWidth: 1.5, borderColor: THEME.border,
+  },
+  tagChipActive: { backgroundColor: THEME.accent, borderColor: THEME.accent },
+  tagChipTxt:    { fontSize: 12, fontWeight: "600", color: THEME.sub },
+  customTagRow:  { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 4 },
+  addTagBtn:     {
+    width: 42, height: 42, borderRadius: 10, backgroundColor: THEME.accent,
     justifyContent: "center", alignItems: "center",
   },
-  uniName: { flex: 1, fontSize: 13, fontWeight: "600", color: "#475569" },
-
-  /* Summary */
-  summaryCard:  {
-    backgroundColor: "#EFF6FF", borderRadius: 14,
-    padding: 16, borderWidth: 1.5, borderColor: "#BFDBFE",
+  uniActions: { flexDirection: "row", gap: 10, marginBottom: 12 },
+  uniActionBtn: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
+    backgroundColor: THEME.bg, borderWidth: 1, borderColor: THEME.border,
   },
-  summaryTitle: { fontSize: 13, fontWeight: "800", color: "#0A1628", marginBottom: 10 },
-  summaryRow:   { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
-  summaryTxt:   { fontSize: 13, color: "#334155", flex: 1 },
-
-  /* Bottom bar */
+  uniActionTxt: { fontSize: 12, fontWeight: "600" },
+  uniRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingVertical: 12, paddingHorizontal: 4,
+    borderRadius: 10, marginBottom: 6,
+    borderWidth: 1.5, borderColor: "transparent",
+  },
+  uniRowActive: { backgroundColor: "#EEF2F7", borderColor: THEME.accent, borderRadius: 10 },
+  checkbox: {
+    width: 20, height: 20, borderRadius: 5, borderWidth: 2,
+    borderColor: THEME.border, justifyContent: "center", alignItems: "center",
+  },
+  checkboxActive: { backgroundColor: THEME.accent, borderColor: THEME.accent },
+  uniName: { flex: 1, fontSize: 13, fontWeight: "600", color: THEME.sub },
   bottomBar: {
     position: "absolute", bottom: 0, left: 0, right: 0,
-    backgroundColor: "#fff", paddingHorizontal: 16, paddingTop: 12,
-    borderTopWidth: 1, borderColor: "#F1F5F9",
-    flexDirection: "row", gap: 10,
+    backgroundColor: THEME.card, paddingHorizontal: 16, paddingTop: 12,
+    borderTopWidth: 1, borderColor: THEME.border,
   },
-  backStepBtn: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderRadius: 14, backgroundColor: "#F1F5F9", borderWidth: 1.5, borderColor: "#E2E8F0",
-  },
-  backStepTxt:  { fontSize: 14, fontWeight: "700", color: "#334155" },
-  nextBtn:      { borderRadius: 14, overflow: "hidden" },
-  nextBtnGrad:  {
+  submitBtn:     { borderRadius: 14, overflow: "hidden" },
+  submitBtnGrad: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 8, paddingVertical: 14, paddingHorizontal: 24,
+    gap: 8, paddingVertical: 15,
   },
-  nextBtnTxt:   { fontSize: 15, fontWeight: "800", color: "#fff" },
+  submitBtnTxt: { fontSize: 15, fontWeight: "800", color: "#fff" },
 });

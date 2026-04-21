@@ -1,187 +1,104 @@
-/**
- * InvitationsScreen.tsx
- * Shows all incoming MOU invitations, event invites, and collaboration requests.
- * Tapping a card opens a full-detail bottom sheet / modal.
- */
-
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  Animated,
-  Dimensions,
-  FlatList,
-  Modal,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+  Alert, Animated, Dimensions, FlatList, Modal,
+  Platform, RefreshControl, ScrollView, StatusBar,
+  StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { useUser } from "./shared";
 
 const { width, height } = Dimensions.get("window");
 
+// ─── COLOR THEME ──────────────────────────────────────────────────
+const THEME = {
+  headerDark:   "#1B2F3E",
+  headerMid:    "#1E3448",
+  headerLight:  "#22384F",
+  bg:           "#F2F4F6",
+  cardBg:       "#FFFFFF",
+  primary:      "#1B2F3E",
+  primaryLight: "#2A4560",
+  textDark:     "#0D1B2A",
+  textMid:      "#3D5166",
+  textLight:    "#7A90A4",
+  border:       "#E4EAF0",
+};
+
 type InviteType = "MOU" | "Event" | "Collaboration" | "Workshop";
 type InviteStatus = "Pending" | "Accepted" | "Declined";
 
 interface Invitation {
-  _id: string;
-  type: InviteType;
-  title: string;
-  fromName: string;
-  fromRole: string;
-  fromEmail?: string;
-  fromPhone?: string;
-  description: string;
-  date?: string;
-  endDate?: string;
-  time?: string;
-  location?: string;
-  deadline: string;
-  status: InviteStatus;
-  receivedAt: string;
-  tags: string[];
-  benefits?: string[];
-  agenda?: string[];
-  capacity?: number;
-  mode?: "Physical" | "Virtual" | "Hybrid";
+  _id: string; type: InviteType; title: string; fromName: string; fromRole: string;
+  fromEmail?: string; fromPhone?: string; description: string; date?: string;
+  endDate?: string; time?: string; location?: string; deadline: string;
+  status: InviteStatus; receivedAt: string; tags: string[]; benefits?: string[];
+  agenda?: string[]; capacity?: number; mode?: "Physical" | "Virtual" | "Hybrid";
 }
 
 const MOCK_INVITATIONS: Invitation[] = [
   {
-    _id: "i1",
-    type: "MOU",
-    title: "Academic Partnership MOU",
-    fromName: "NUCES Islamabad",
-    fromRole: "University – Industry Liaison",
-    fromEmail: "liaison@nuces.edu.pk",
-    fromPhone: "+92-51-111-128-128",
-    description:
-      "NUCES invites you to formalize a Memorandum of Understanding covering student internships, joint research collaboration, and faculty development workshops for the academic year 2025-26. This partnership will create a structured pathway for your organization to access top computing talent and collaborate on cutting-edge research.",
-    deadline: "30 Apr 2025",
-    status: "Pending",
+    _id: "i1", type: "MOU", title: "Academic Partnership MOU",
+    fromName: "NUCES Islamabad", fromRole: "University – Industry Liaison",
+    fromEmail: "liaison@nuces.edu.pk", fromPhone: "+92-51-111-128-128",
+    description: "NUCES invites you to formalize a Memorandum of Understanding covering student internships, joint research collaboration, and faculty development workshops for the academic year 2025-26.",
+    deadline: "30 Apr 2025", status: "Pending",
     receivedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
     tags: ["Partnership", "Internship", "Research"],
-    benefits: [
-      "Access to 2000+ CS/SE graduates annually",
-      "Co-branding on university publications",
-      "Priority booth at annual career fair",
-      "Joint research paper opportunities",
-    ],
-    agenda: [
-      "MOU signing ceremony",
-      "Campus tour for HR team",
-      "Meet-and-greet with department heads",
-    ],
+    benefits: ["Access to 2000+ CS/SE graduates annually","Co-branding on university publications","Priority booth at annual career fair","Joint research paper opportunities"],
+    agenda: ["MOU signing ceremony","Campus tour for HR team","Meet-and-greet with department heads"],
   },
   {
-    _id: "i2",
-    type: "Event",
-    title: "Tech Expo 2025 – Industry Showcase",
-    fromName: "COMSATS University",
-    fromRole: "Event Organizing Committee",
+    _id: "i2", type: "Event", title: "Tech Expo 2025 – Industry Showcase",
+    fromName: "COMSATS University", fromRole: "Event Organizing Committee",
     fromEmail: "techexpo@comsats.edu.pk",
-    description:
-      "You are invited to showcase your company at the annual Tech Expo 2025. Set up a branded booth, interact with 500+ students, and recruit top talent directly. The expo will feature live product demonstrations, panel discussions, and networking sessions.",
-    date: "15 May 2025",
-    endDate: "16 May 2025",
-    time: "09:00 AM – 05:00 PM",
-    location: "COMSATS Auditorium, Islamabad",
-    mode: "Physical",
-    deadline: "05 May 2025",
-    capacity: 500,
-    status: "Pending",
+    description: "You are invited to showcase your company at the annual Tech Expo 2025. Set up a branded booth, interact with 500+ students, and recruit top talent directly.",
+    date: "15 May 2025", endDate: "16 May 2025", time: "09:00 AM – 05:00 PM",
+    location: "COMSATS Auditorium, Islamabad", mode: "Physical", deadline: "05 May 2025",
+    capacity: 500, status: "Pending",
     receivedAt: new Date(Date.now() - 86400000).toISOString(),
     tags: ["Expo", "Networking", "Recruitment"],
-    benefits: [
-      "Branded booth space (10×10 ft)",
-      "Logo placement on all event materials",
-      "Access to student CV database",
-      "Slot in panel discussion",
-    ],
-    agenda: [
-      "Day 1: Company booth setup & student interactions",
-      "Day 2: Panel discussions & live demos",
-      "Evening: Networking dinner with faculty",
-    ],
+    benefits: ["Branded booth space (10×10 ft)","Logo placement on all event materials","Access to student CV database","Slot in panel discussion"],
+    agenda: ["Day 1: Company booth setup & student interactions","Day 2: Panel discussions & live demos","Evening: Networking dinner with faculty"],
   },
   {
-    _id: "i3",
-    type: "Collaboration",
-    title: "AI Research Collaboration",
-    fromName: "Quaid-i-Azam University",
-    fromRole: "Department of Computer Science",
+    _id: "i3", type: "Collaboration", title: "AI Research Collaboration",
+    fromName: "Quaid-i-Azam University", fromRole: "Department of Computer Science",
     fromEmail: "cs@qau.edu.pk",
-    description:
-      "QAU's CS department invites industry partners to co-supervise 3 final-year AI research projects and potentially co-author and publish joint research papers in reputed international journals. Your industry mentors will guide students on real-world AI problems while benefiting from novel academic research outputs.",
-    deadline: "20 Apr 2025",
-    status: "Accepted",
+    description: "QAU's CS department invites industry partners to co-supervise 3 final-year AI research projects and potentially co-author and publish joint research papers.",
+    deadline: "20 Apr 2025", status: "Accepted",
     receivedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
     tags: ["AI", "Research", "Joint Project"],
-    benefits: [
-      "Access to AI research outputs and IP",
-      "3 dedicated student researchers",
-      "Co-authorship on published papers",
-      "University lab access for your team",
-    ],
-    agenda: [
-      "Kickoff meeting with project supervisors",
-      "Monthly progress reviews",
-      "Final presentation and publication submission",
-    ],
+    benefits: ["Access to AI research outputs and IP","3 dedicated student researchers","Co-authorship on published papers","University lab access for your team"],
+    agenda: ["Kickoff meeting with project supervisors","Monthly progress reviews","Final presentation and publication submission"],
   },
   {
-    _id: "i4",
-    type: "Workshop",
-    title: "Industry-Led Flutter Workshop",
-    fromName: "UET Lahore",
-    fromRole: "Industry Liaison Office",
-    fromEmail: "industry@uet.edu.pk",
-    fromPhone: "+92-42-9029431",
-    description:
-      "UET Lahore requests your development team to conduct a 1-day Flutter development workshop for 60 final-year CS students. This is a great opportunity to build brand awareness, identify potential recruits, and give back to the community. All logistics will be handled by the university.",
-    date: "22 Apr 2025",
-    time: "10:00 AM – 04:00 PM",
-    location: "UET Lahore, Dept. of CS, Room 301",
-    mode: "Physical",
-    capacity: 60,
-    deadline: "18 Apr 2025",
-    status: "Declined",
+    _id: "i4", type: "Workshop", title: "Industry-Led Flutter Workshop",
+    fromName: "UET Lahore", fromRole: "Industry Liaison Office",
+    fromEmail: "industry@uet.edu.pk", fromPhone: "+92-42-9029431",
+    description: "UET Lahore requests your development team to conduct a 1-day Flutter development workshop for 60 final-year CS students.",
+    date: "22 Apr 2025", time: "10:00 AM – 04:00 PM",
+    location: "UET Lahore, Dept. of CS, Room 301", mode: "Physical",
+    capacity: 60, deadline: "18 Apr 2025", status: "Declined",
     receivedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
     tags: ["Flutter", "Workshop", "Mentorship"],
-    benefits: [
-      "Brand visibility with 60 final-year students",
-      "Lunch and hospitality provided by UET",
-      "Certificate of appreciation",
-    ],
-    agenda: [
-      "Morning: Flutter fundamentals & architecture",
-      "Afternoon: Hands-on project building",
-      "Wrap-up: Q&A and career talk",
-    ],
+    benefits: ["Brand visibility with 60 final-year students","Lunch and hospitality provided by UET","Certificate of appreciation"],
+    agenda: ["Morning: Flutter fundamentals & architecture","Afternoon: Hands-on project building","Wrap-up: Q&A and career talk"],
   },
 ];
 
-const TYPE_CONFIG: Record<
-  InviteType,
-  { color: string; bg: string; icon: string; grad: readonly [string, string] }
-> = {
-  MOU:           { color: "#0066CC", bg: "#E8F4FF", icon: "document-text",  grad: ["#0066CC", "#004999"] },
-  Event:         { color: "#059669", bg: "#D1FAE5", icon: "calendar",        grad: ["#059669", "#047857"] },
-  Collaboration: { color: "#7C3AED", bg: "#EDE9FE", icon: "people",          grad: ["#7C3AED", "#5B21B6"] },
-  Workshop:      { color: "#D97706", bg: "#FEF3C7", icon: "school",           grad: ["#D97706", "#B45309"] },
+const TYPE_CONFIG: Record<InviteType, { color: string; bg: string; icon: string; grad: readonly [string, string] }> = {
+  MOU:           { color: THEME.primary,      bg: "#E8EEF3", icon: "document-text", grad: [THEME.headerDark, THEME.headerLight] },
+  Event:         { color: "#1A5276",          bg: "#D6EAF8", icon: "calendar",      grad: ["#1A5276", "#154360"] },
+  Collaboration: { color: "#1B4F72",          bg: "#D4E6F1", icon: "people",        grad: ["#1B4F72", "#1A3A52"] },
+  Workshop:      { color: "#1F618D",          bg: "#D6EAF8", icon: "school",        grad: ["#1F618D", "#1A5276"] },
 };
 
 const STATUS_CONFIG: Record<InviteStatus, { color: string; bg: string; icon: string }> = {
-  Pending:  { color: "#0066CC", bg: "#EFF6FF", icon: "time-outline"       },
-  Accepted: { color: "#059669", bg: "#D1FAE5", icon: "checkmark-circle"   },
-  Declined: { color: "#DC2626", bg: "#FEE2E2", icon: "close-circle"       },
+  Pending:  { color: THEME.primary,  bg: "#E8EEF3", icon: "time-outline"     },
+  Accepted: { color: "#059669",      bg: "#D1FAE5", icon: "checkmark-circle" },
+  Declined: { color: "#DC2626",      bg: "#FEE2E2", icon: "close-circle"     },
 };
 
 function timeAgo(iso: string) {
@@ -191,67 +108,31 @@ function timeAgo(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-/* ══════════════════════════════════════════════════════════════════════ */
-/*  DETAIL MODAL                                                          */
-/* ══════════════════════════════════════════════════════════════════════ */
 function InvitationDetailModal({
-  invite,
-  visible,
-  onClose,
-  onAccept,
-  onDecline,
+  invite, visible, onClose, onAccept, onDecline,
 }: {
-  invite: Invitation | null;
-  visible: boolean;
-  onClose: () => void;
-  onAccept: (id: string) => void;
-  onDecline: (id: string) => void;
+  invite: Invitation | null; visible: boolean; onClose: () => void;
+  onAccept: (id: string) => void; onDecline: (id: string) => void;
 }) {
   if (!invite) return null;
   const tc = TYPE_CONFIG[invite.type];
   const sc = STATUS_CONFIG[invite.status];
-
   const slideAnim = useRef(new Animated.Value(height)).current;
 
   useEffect(() => {
     if (visible) {
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 65,
-        friction: 11,
-        useNativeDriver: true,
-      }).start();
+      Animated.spring(slideAnim, { toValue: 0, tension: 65, friction: 11, useNativeDriver: true }).start();
     } else {
-      Animated.timing(slideAnim, {
-        toValue: height,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
+      Animated.timing(slideAnim, { toValue: height, duration: 250, useNativeDriver: true }).start();
     }
   }, [visible]);
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
-      {/* Backdrop */}
-      <TouchableOpacity
-        style={ms.backdrop}
-        activeOpacity={1}
-        onPress={onClose}
-      />
-
-      <Animated.View
-        style={[ms.sheet, { transform: [{ translateY: slideAnim }] }]}
-      >
-        {/* Drag handle */}
+      <TouchableOpacity style={ms.backdrop} activeOpacity={1} onPress={onClose} />
+      <Animated.View style={[ms.sheet, { transform: [{ translateY: slideAnim }] }]}>
         <View style={ms.dragHandle} />
-
-        {/* Gradient header */}
-        <LinearGradient
-          colors={tc.grad}
-          style={ms.sheetHeader}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
+        <LinearGradient colors={tc.grad} style={ms.sheetHeader} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <View style={ms.sheetHeaderDecor} />
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 }}>
             <View style={ms.sheetTypeIcon}>
@@ -274,20 +155,13 @@ function InvitationDetailModal({
             <Text style={ms.sheetFromName}>{invite.fromName}</Text>
             <Text style={ms.sheetFromRole}>· {invite.fromRole}</Text>
           </View>
-          {/* Status in header */}
           <View style={[ms.statusPill, { backgroundColor: sc.bg }]}>
             <Ionicons name={sc.icon as any} size={12} color={sc.color} />
             <Text style={[ms.statusPillTxt, { color: sc.color }]}>{invite.status}</Text>
           </View>
         </LinearGradient>
 
-        {/* Scrollable body */}
-        <ScrollView
-          style={ms.sheetBody}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 120 }}
-        >
-          {/* Contact info */}
+        <ScrollView style={ms.sheetBody} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
           {(invite.fromEmail || invite.fromPhone) && (
             <View style={ms.section}>
               <Text style={ms.sectionTitle}>Contact</Text>
@@ -310,7 +184,6 @@ function InvitationDetailModal({
             </View>
           )}
 
-          {/* Event details */}
           {(invite.date || invite.location || invite.mode || invite.capacity) && (
             <View style={ms.section}>
               <Text style={ms.sectionTitle}>Event Details</Text>
@@ -338,11 +211,7 @@ function InvitationDetailModal({
                 )}
                 {invite.mode && (
                   <View style={ms.detailItem}>
-                    <Ionicons
-                      name={invite.mode === "Virtual" ? "videocam-outline" : invite.mode === "Hybrid" ? "git-merge-outline" : "location-outline"}
-                      size={16}
-                      color={tc.color}
-                    />
+                    <Ionicons name={invite.mode === "Virtual" ? "videocam-outline" : "location-outline"} size={16} color={tc.color} />
                     <Text style={ms.detailItemLbl}>Mode</Text>
                     <Text style={ms.detailItemVal}>{invite.mode}</Text>
                   </View>
@@ -358,13 +227,11 @@ function InvitationDetailModal({
             </View>
           )}
 
-          {/* Description */}
           <View style={ms.section}>
             <Text style={ms.sectionTitle}>About This Invitation</Text>
             <Text style={ms.descTxt}>{invite.description}</Text>
           </View>
 
-          {/* Benefits */}
           {invite.benefits && invite.benefits.length > 0 && (
             <View style={ms.section}>
               <Text style={ms.sectionTitle}>What You Get</Text>
@@ -377,7 +244,6 @@ function InvitationDetailModal({
             </View>
           )}
 
-          {/* Agenda */}
           {invite.agenda && invite.agenda.length > 0 && (
             <View style={ms.section}>
               <Text style={ms.sectionTitle}>Agenda</Text>
@@ -392,7 +258,6 @@ function InvitationDetailModal({
             </View>
           )}
 
-          {/* Tags */}
           {invite.tags.length > 0 && (
             <View style={ms.section}>
               <Text style={ms.sectionTitle}>Tags</Text>
@@ -406,7 +271,6 @@ function InvitationDetailModal({
             </View>
           )}
 
-          {/* Deadline */}
           <View style={[ms.section, { marginBottom: 0 }]}>
             <View style={ms.deadlineBox}>
               <Ionicons name="hourglass-outline" size={16} color="#DC2626" />
@@ -418,33 +282,15 @@ function InvitationDetailModal({
           </View>
         </ScrollView>
 
-        {/* Action footer */}
         <View style={ms.footer}>
           {invite.status === "Pending" ? (
             <>
-              <TouchableOpacity
-                style={ms.declineBtn}
-                onPress={() => {
-                  onClose();
-                  setTimeout(() => onDecline(invite._id), 300);
-                }}
-              >
+              <TouchableOpacity style={ms.declineBtn} onPress={() => { onClose(); setTimeout(() => onDecline(invite._id), 300); }}>
                 <Ionicons name="close-circle-outline" size={17} color="#DC2626" />
                 <Text style={ms.declineTxt}>Decline</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={ms.acceptBtnWrap}
-                onPress={() => {
-                  onClose();
-                  setTimeout(() => onAccept(invite._id), 300);
-                }}
-              >
-                <LinearGradient
-                  colors={tc.grad}
-                  style={ms.acceptBtn}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
+              <TouchableOpacity style={ms.acceptBtnWrap} onPress={() => { onClose(); setTimeout(() => onAccept(invite._id), 300); }}>
+                <LinearGradient colors={tc.grad} style={ms.acceptBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                   <Ionicons name="checkmark-circle-outline" size={17} color="#fff" />
                   <Text style={ms.acceptTxt}>Accept Invitation</Text>
                 </LinearGradient>
@@ -464,9 +310,6 @@ function InvitationDetailModal({
   );
 }
 
-/* ══════════════════════════════════════════════════════════════════════ */
-/*  MAIN SCREEN                                                           */
-/* ══════════════════════════════════════════════════════════════════════ */
 export function InvitationsScreen() {
   const nav = useNavigation<any>();
   const { user } = useUser();
@@ -495,27 +338,14 @@ export function InvitationsScreen() {
   const handleAccept = (id: string) => {
     Alert.alert("Accept Invitation", "Are you sure you want to accept this invitation?", [
       { text: "Cancel", style: "cancel" },
-      {
-        text: "Accept",
-        onPress: () =>
-          setInvites((prev) =>
-            prev.map((x) => (x._id === id ? { ...x, status: "Accepted" } : x))
-          ),
-      },
+      { text: "Accept", onPress: () => setInvites((prev) => prev.map((x) => (x._id === id ? { ...x, status: "Accepted" } : x))) },
     ]);
   };
 
   const handleDecline = (id: string) => {
     Alert.alert("Decline Invitation", "Are you sure you want to decline?", [
       { text: "Cancel", style: "cancel" },
-      {
-        text: "Decline",
-        style: "destructive",
-        onPress: () =>
-          setInvites((prev) =>
-            prev.map((x) => (x._id === id ? { ...x, status: "Declined" } : x))
-          ),
-      },
+      { text: "Decline", style: "destructive", onPress: () => setInvites((prev) => prev.map((x) => (x._id === id ? { ...x, status: "Declined" } : x))) },
     ]);
   };
 
@@ -527,21 +357,14 @@ export function InvitationsScreen() {
 
   const pending = invites.filter((i) => i.status === "Pending").length;
 
-  /* ── Card ── */
   const renderCard = ({ item }: { item: Invitation }) => {
     const tc = TYPE_CONFIG[item.type];
     const sc = STATUS_CONFIG[item.status];
     return (
       <Animated.View style={{ opacity: fadeAnim }}>
-        <TouchableOpacity
-          style={s.card}
-          onPress={() => openDetail(item)}
-          activeOpacity={0.88}
-        >
+        <TouchableOpacity style={s.card} onPress={() => openDetail(item)} activeOpacity={0.88}>
           <LinearGradient colors={tc.grad} style={s.cardStripe} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
-
           <View style={s.cardBody}>
-            {/* Header */}
             <View style={s.cardHead}>
               <View style={[s.typeIconBox, { backgroundColor: tc.bg }]}>
                 <Ionicons name={tc.icon as any} size={20} color={tc.color} />
@@ -558,22 +381,17 @@ export function InvitationsScreen() {
                   <Text style={[s.statusBadgeTxt, { color: sc.color }]}>{item.status}</Text>
                 </View>
               </View>
-              {/* Chevron hint */}
               <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
             </View>
 
-            {/* Title & From */}
             <Text style={s.cardTitle}>{item.title}</Text>
             <View style={s.fromRow}>
-              <Ionicons name="business-outline" size={13} color="#64748B" />
+              <Ionicons name="business-outline" size={13} color={THEME.textMid} />
               <Text style={s.fromTxt}>{item.fromName}</Text>
               <Text style={s.fromRole}>· {item.fromRole}</Text>
             </View>
-
-            {/* Description */}
             <Text style={s.cardDesc} numberOfLines={2}>{item.description}</Text>
 
-            {/* Event meta chips */}
             {(item.date || item.location) && (
               <View style={s.detailRow}>
                 {item.date && (
@@ -591,7 +409,6 @@ export function InvitationsScreen() {
               </View>
             )}
 
-            {/* Tags */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
               {item.tags.map((tag) => (
                 <View key={tag} style={s.tagChip}>
@@ -600,7 +417,6 @@ export function InvitationsScreen() {
               ))}
             </ScrollView>
 
-            {/* Deadline + Tap hint */}
             <View style={s.cardFooterRow}>
               <View style={s.deadlineRow}>
                 <Ionicons name="time-outline" size={13} color="#DC2626" />
@@ -609,26 +425,14 @@ export function InvitationsScreen() {
               <Text style={s.tapDetailTxt}>Tap for details →</Text>
             </View>
 
-            {/* Quick action buttons (Pending only) */}
             {item.status === "Pending" && (
               <View style={s.actionRow}>
-                <TouchableOpacity
-                  style={s.declineBtn}
-                  onPress={() => handleDecline(item._id)}
-                >
+                <TouchableOpacity style={s.declineBtn} onPress={() => handleDecline(item._id)}>
                   <Ionicons name="close-circle-outline" size={15} color="#DC2626" />
                   <Text style={s.declineBtnTxt}>Decline</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={s.acceptBtnWrap}
-                  onPress={() => handleAccept(item._id)}
-                >
-                  <LinearGradient
-                    colors={tc.grad}
-                    style={s.acceptBtn}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                  >
+                <TouchableOpacity style={s.acceptBtnWrap} onPress={() => handleAccept(item._id)}>
+                  <LinearGradient colors={tc.grad} style={s.acceptBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                     <Ionicons name="checkmark-circle-outline" size={15} color="#fff" />
                     <Text style={s.acceptBtnTxt}>Accept</Text>
                   </LinearGradient>
@@ -650,18 +454,12 @@ export function InvitationsScreen() {
     );
   };
 
-  /* ── Main render ── */
   return (
-    <View style={{ flex: 1, backgroundColor: "#F0F4F8" }}>
-      <StatusBar barStyle="light-content" backgroundColor="#050D1A" />
+    <View style={{ flex: 1, backgroundColor: THEME.bg }}>
+      <StatusBar barStyle="light-content" backgroundColor={THEME.headerDark} />
 
-      {/* Header */}
-      <LinearGradient
-        colors={["#050D1A", "#0A1628", "#0D2137"]}
-        style={s.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
+      <LinearGradient colors={[THEME.headerDark, THEME.headerMid, THEME.headerLight]} style={s.header}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
         <View style={s.headerDecor} />
         <View style={s.headerRow}>
           <TouchableOpacity onPress={() => nav.goBack()} style={s.backBtn}>
@@ -680,13 +478,12 @@ export function InvitationsScreen() {
           )}
         </View>
 
-        {/* Stats */}
         <View style={s.statsRow}>
           {[
-            { lbl: "Total",    n: invites.length,                                  c: "#90CAF9" },
-            { lbl: "Pending",  n: invites.filter((i) => i.status === "Pending").length,  c: "#CE93D8" },
-            { lbl: "Accepted", n: invites.filter((i) => i.status === "Accepted").length, c: "#A5D6A7" },
-            { lbl: "Declined", n: invites.filter((i) => i.status === "Declined").length, c: "#EF9A9A" },
+            { lbl: "Total",    n: invites.length,                                   c: "#A8C8E8" },
+            { lbl: "Pending",  n: invites.filter((i) => i.status === "Pending").length,   c: "#BCD4E8" },
+            { lbl: "Accepted", n: invites.filter((i) => i.status === "Accepted").length,  c: "#A5D6A7" },
+            { lbl: "Declined", n: invites.filter((i) => i.status === "Declined").length,  c: "#EF9A9A" },
           ].map((s2, i) => (
             <View key={i} style={s.statCard}>
               <Text style={[s.statN, { color: s2.c }]}>{s2.n}</Text>
@@ -696,25 +493,12 @@ export function InvitationsScreen() {
         </View>
       </LinearGradient>
 
-      {/* Type filter */}
       <View style={s.filterBar}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}>
           {(["All", "MOU", "Event", "Collaboration", "Workshop"] as const).map((f) => (
-            <TouchableOpacity
-              key={f}
-              style={[s.filterChip, filter === f && s.filterChipActive]}
-              onPress={() => setFilter(f)}
-            >
+            <TouchableOpacity key={f} style={[s.filterChip, filter === f && s.filterChipActive]} onPress={() => setFilter(f)}>
               {f !== "All" && (
-                <Ionicons
-                  name={TYPE_CONFIG[f as InviteType]?.icon as any}
-                  size={12}
-                  color={filter === f ? "#fff" : "#64748B"}
-                />
+                <Ionicons name={TYPE_CONFIG[f as InviteType]?.icon as any} size={12} color={filter === f ? "#fff" : THEME.textMid} />
               )}
               <Text style={[s.filterChipTxt, filter === f && s.filterChipTxtActive]}>{f}</Text>
             </TouchableOpacity>
@@ -722,14 +506,9 @@ export function InvitationsScreen() {
         </ScrollView>
       </View>
 
-      {/* Status filter */}
       <View style={s.statusFilterRow}>
         {(["All", "Pending", "Accepted", "Declined"] as const).map((sf) => (
-          <TouchableOpacity
-            key={sf}
-            style={[s.statusTab, statusF === sf && s.statusTabActive]}
-            onPress={() => setStatusF(sf)}
-          >
+          <TouchableOpacity key={sf} style={[s.statusTab, statusF === sf && s.statusTabActive]} onPress={() => setStatusF(sf)}>
             <Text style={[s.statusTabTxt, statusF === sf && s.statusTabTxtActive]}>{sf}</Text>
           </TouchableOpacity>
         ))}
@@ -738,275 +517,135 @@ export function InvitationsScreen() {
       {filtered.length === 0 ? (
         <View style={s.empty}>
           <View style={s.emptyIcon}>
-            <Ionicons name="mail-open-outline" size={38} color="#94A3B8" />
+            <Ionicons name="mail-open-outline" size={38} color={THEME.textLight} />
           </View>
           <Text style={s.emptyTxt}>No invitations found</Text>
           <Text style={s.emptySub}>Adjust your filters or check back later</Text>
         </View>
       ) : (
         <FlatList
-          data={filtered}
-          keyExtractor={(item) => item._id}
-          renderItem={renderCard}
-          contentContainerStyle={{ padding: 16, paddingBottom: 50 }}
-          showsVerticalScrollIndicator={false}
+          data={filtered} keyExtractor={(item) => item._id} renderItem={renderCard}
+          contentContainerStyle={{ padding: 16, paddingBottom: 50 }} showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0066CC" />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.primary} />}
         />
       )}
 
-      {/* Detail Modal */}
       <InvitationDetailModal
-        invite={selectedInvite}
-        visible={detailVisible}
+        invite={selectedInvite} visible={detailVisible}
         onClose={() => setDetailVisible(false)}
-        onAccept={handleAccept}
-        onDecline={handleDecline}
+        onAccept={handleAccept} onDecline={handleDecline}
       />
     </View>
   );
 }
 
-/* ═══════════════════════════ LIST SCREEN STYLES ═══════════════════════ */
 const s = StyleSheet.create({
-  header: {
-    paddingTop: Platform.OS === "ios" ? 56 : 44,
-    paddingHorizontal: 18,
-    paddingBottom: 22,
-    overflow: "hidden",
-  },
-  headerDecor: {
-    position: "absolute", width: 200, height: 200, borderRadius: 100,
-    backgroundColor: "rgba(255,255,255,0.03)", top: -70, right: -60,
-  },
+  header:      { paddingTop: Platform.OS === "ios" ? 56 : 44, paddingHorizontal: 18, paddingBottom: 22, overflow: "hidden" },
+  headerDecor: { position: "absolute", width: 200, height: 200, borderRadius: 100, backgroundColor: "rgba(255,255,255,0.03)", top: -70, right: -60 },
   headerRow:   { flexDirection: "row", alignItems: "center", marginBottom: 18 },
-  backBtn:     {
-    width: 38, height: 38, borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.09)", justifyContent: "center", alignItems: "center",
-  },
+  backBtn:     { width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.1)", justifyContent: "center", alignItems: "center" },
   headerTitle: { fontSize: 19, fontWeight: "900", color: "#fff" },
-  headerSub:   { fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 2 },
-  pendingBadge: { backgroundColor: "#EF4444", paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20 },
+  headerSub:   { fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 2 },
+  pendingBadge:    { backgroundColor: "#EF4444", paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20 },
   pendingBadgeTxt: { fontSize: 12, fontWeight: "900", color: "#fff" },
-
   statsRow: { flexDirection: "row", gap: 8 },
-  statCard: {
-    flex: 1, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 13,
-    paddingVertical: 11, alignItems: "center",
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.06)",
-  },
-  statN:   { fontSize: 18, fontWeight: "900" },
-  statLbl: { fontSize: 9, color: "rgba(255,255,255,0.4)", marginTop: 2, fontWeight: "600" },
-
-  filterBar:        { backgroundColor: "#fff", paddingVertical: 10, borderBottomWidth: 1, borderColor: "#F1F5F9" },
-  filterChip:       {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-    backgroundColor: "#F1F5F9", borderWidth: 1.5, borderColor: "#E2E8F0",
-  },
-  filterChipActive: { backgroundColor: "#0A1628", borderColor: "#0A1628" },
-  filterChipTxt:    { fontSize: 12, fontWeight: "600", color: "#64748B" },
+  statCard: { flex: 1, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 13, paddingVertical: 11, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)" },
+  statN:    { fontSize: 18, fontWeight: "900" },
+  statLbl:  { fontSize: 9, color: "rgba(255,255,255,0.45)", marginTop: 2, fontWeight: "600" },
+  filterBar:        { backgroundColor: "#fff", paddingVertical: 10, borderBottomWidth: 1, borderColor: THEME.border },
+  filterChip:       { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#EBF0F5", borderWidth: 1.5, borderColor: THEME.border },
+  filterChipActive: { backgroundColor: THEME.primary, borderColor: THEME.primary },
+  filterChipTxt:    { fontSize: 12, fontWeight: "600", color: THEME.textMid },
   filterChipTxtActive: { color: "#fff", fontWeight: "700" },
-
-  statusFilterRow: {
-    flexDirection: "row", backgroundColor: "#fff",
-    paddingHorizontal: 14, paddingBottom: 10, gap: 8,
-    borderBottomWidth: 1, borderColor: "#F1F5F9",
-  },
-  statusTab:       { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 10, backgroundColor: "#F8FAFC" },
-  statusTabActive: { backgroundColor: "#0A1628" },
-  statusTabTxt:    { fontSize: 12, fontWeight: "600", color: "#64748B" },
+  statusFilterRow: { flexDirection: "row", backgroundColor: "#fff", paddingHorizontal: 14, paddingBottom: 10, gap: 8, borderBottomWidth: 1, borderColor: THEME.border },
+  statusTab:       { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 10, backgroundColor: "#F5F8FB" },
+  statusTabActive: { backgroundColor: THEME.primary },
+  statusTabTxt:    { fontSize: 12, fontWeight: "600", color: THEME.textMid },
   statusTabTxtActive: { color: "#fff", fontWeight: "700" },
-
-  card: {
-    backgroundColor: "#fff", borderRadius: 18, overflow: "hidden",
-    shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 }, elevation: 3,
-  },
-  cardStripe: { height: 4, width: "100%" },
-  cardBody:   { padding: 16 },
-
-  cardHead: { flexDirection: "row", alignItems: "flex-start", marginBottom: 12 },
-  typeIconBox: {
-    width: 44, height: 44, borderRadius: 13,
-    justifyContent: "center", alignItems: "center",
-  },
-  typeBadge:    { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
-  typeBadgeTxt: { fontSize: 11, fontWeight: "700" },
-  timeAgoTxt:   { fontSize: 11, color: "#94A3B8", fontWeight: "500" },
-  statusBadgePill: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 9, paddingVertical: 3,
-    borderRadius: 20, alignSelf: "flex-start", marginTop: 5,
-  },
-  statusBadgeTxt: { fontSize: 11, fontWeight: "700" },
-
-  cardTitle: { fontSize: 16, fontWeight: "800", color: "#0A1628", marginBottom: 6 },
-  fromRow:   { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 10 },
-  fromTxt:   { fontSize: 12, fontWeight: "700", color: "#334155" },
-  fromRole:  { fontSize: 12, color: "#64748B" },
-  cardDesc:  { fontSize: 13, color: "#475569", lineHeight: 20 },
-
-  detailRow:     { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
-  detailChip:    {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "#F8FAFC", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
-    borderWidth: 1, borderColor: "#E2E8F0", maxWidth: (width - 80) / 2,
-  },
+  card:        { backgroundColor: "#fff", borderRadius: 18, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+  cardStripe:  { height: 4, width: "100%" },
+  cardBody:    { padding: 16 },
+  cardHead:    { flexDirection: "row", alignItems: "flex-start", marginBottom: 12 },
+  typeIconBox: { width: 44, height: 44, borderRadius: 13, justifyContent: "center", alignItems: "center" },
+  typeBadge:   { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
+  typeBadgeTxt:{ fontSize: 11, fontWeight: "700" },
+  timeAgoTxt:  { fontSize: 11, color: THEME.textLight, fontWeight: "500" },
+  statusBadgePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20, alignSelf: "flex-start", marginTop: 5 },
+  statusBadgeTxt:  { fontSize: 11, fontWeight: "700" },
+  cardTitle:   { fontSize: 16, fontWeight: "800", color: THEME.textDark, marginBottom: 6 },
+  fromRow:     { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 10 },
+  fromTxt:     { fontSize: 12, fontWeight: "700", color: THEME.textMid },
+  fromRole:    { fontSize: 12, color: THEME.textLight },
+  cardDesc:    { fontSize: 13, color: THEME.textMid, lineHeight: 20 },
+  detailRow:   { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+  detailChip:  { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F5F8FB", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: THEME.border, maxWidth: (width - 80) / 2 },
   detailChipTxt: { fontSize: 11, fontWeight: "600" },
-
-  tagChip:    { backgroundColor: "#F1F5F9", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginRight: 7 },
-  tagChipTxt: { fontSize: 11, fontWeight: "600", color: "#475569" },
-
-  cardFooterRow:  { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12 },
-  deadlineRow:    { flexDirection: "row", alignItems: "center", gap: 5 },
-  deadlineTxt:    { fontSize: 12, fontWeight: "700", color: "#DC2626" },
-  tapDetailTxt:   { fontSize: 11, fontWeight: "600", color: "#94A3B8" },
-
-  actionRow:    { flexDirection: "row", gap: 10, marginTop: 14 },
-  declineBtn:   {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 16, paddingVertical: 11,
-    backgroundColor: "#FEE2E2", borderRadius: 13, borderWidth: 1.5, borderColor: "#FECACA",
-  },
+  tagChip:     { backgroundColor: "#EBF0F5", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginRight: 7 },
+  tagChipTxt:  { fontSize: 11, fontWeight: "600", color: THEME.textMid },
+  cardFooterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12 },
+  deadlineRow:   { flexDirection: "row", alignItems: "center", gap: 5 },
+  deadlineTxt:   { fontSize: 12, fontWeight: "700", color: "#DC2626" },
+  tapDetailTxt:  { fontSize: 11, fontWeight: "600", color: THEME.textLight },
+  actionRow:     { flexDirection: "row", gap: 10, marginTop: 14 },
+  declineBtn:    { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 11, backgroundColor: "#FEE2E2", borderRadius: 13, borderWidth: 1.5, borderColor: "#FECACA" },
   declineBtnTxt: { fontSize: 13, fontWeight: "700", color: "#DC2626" },
   acceptBtnWrap: { flex: 1, borderRadius: 13, overflow: "hidden" },
-  acceptBtn:     {
-    flexDirection: "row", alignItems: "center",
-    justifyContent: "center", gap: 6, paddingVertical: 11,
-  },
+  acceptBtn:     { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 11 },
   acceptBtnTxt:  { fontSize: 13, fontWeight: "700", color: "#fff" },
-
-  resolvedRow: {
-    flexDirection: "row", alignItems: "center", gap: 7, marginTop: 12,
-    paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12,
-  },
-  resolvedTxt: { fontSize: 12, fontWeight: "700" },
-
+  resolvedRow:   { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 12, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12 },
+  resolvedTxt:   { fontSize: 12, fontWeight: "700" },
   empty:     { flex: 1, justifyContent: "center", alignItems: "center", paddingBottom: 80 },
-  emptyIcon: {
-    width: 76, height: 76, borderRadius: 38, backgroundColor: "#F1F5F9",
-    justifyContent: "center", alignItems: "center", marginBottom: 14,
-  },
-  emptyTxt: { fontSize: 15, fontWeight: "700", color: "#334155" },
-  emptySub: { fontSize: 13, color: "#94A3B8", marginTop: 4 },
+  emptyIcon: { width: 76, height: 76, borderRadius: 38, backgroundColor: "#EBF0F5", justifyContent: "center", alignItems: "center", marginBottom: 14 },
+  emptyTxt:  { fontSize: 15, fontWeight: "700", color: THEME.textDark },
+  emptySub:  { fontSize: 13, color: THEME.textLight, marginTop: 4 },
 });
 
-/* ═══════════════════════════ MODAL STYLES ══════════════════════════ */
 const ms = StyleSheet.create({
-  backdrop: {
-    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  sheet: {
-    position: "absolute", bottom: 0, left: 0, right: 0,
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    maxHeight: height * 0.92,
-    overflow: "hidden",
-  },
-  dragHandle: {
-    width: 40, height: 4, borderRadius: 2,
-    backgroundColor: "#CBD5E1", alignSelf: "center", marginTop: 12, marginBottom: 4,
-  },
-
-  sheetHeader: { padding: 20, paddingBottom: 24, overflow: "hidden" },
-  sheetHeaderDecor: {
-    position: "absolute", width: 200, height: 200, borderRadius: 100,
-    backgroundColor: "rgba(255,255,255,0.06)", top: -80, right: -60,
-  },
-  sheetTypeIcon: {
-    width: 46, height: 46, borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    justifyContent: "center", alignItems: "center",
-  },
-  sheetTypeBadge: {
-    backgroundColor: "rgba(255,255,255,0.25)",
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-  },
+  backdrop:   { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)" },
+  sheet:      { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: height * 0.92, overflow: "hidden" },
+  dragHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#D0DCE8", alignSelf: "center", marginTop: 12, marginBottom: 4 },
+  sheetHeader:     { padding: 20, paddingBottom: 24, overflow: "hidden" },
+  sheetHeaderDecor:{ position: "absolute", width: 200, height: 200, borderRadius: 100, backgroundColor: "rgba(255,255,255,0.06)", top: -80, right: -60 },
+  sheetTypeIcon:   { width: 46, height: 46, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.18)", justifyContent: "center", alignItems: "center" },
+  sheetTypeBadge:  { backgroundColor: "rgba(255,255,255,0.25)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   sheetTypeBadgeTxt: { fontSize: 11, fontWeight: "700", color: "#fff" },
-  sheetTimeAgo:      { fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 2 },
-  closeBtn: {
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    justifyContent: "center", alignItems: "center",
-  },
-  sheetTitle: { fontSize: 20, fontWeight: "900", color: "#fff", lineHeight: 26 },
-  sheetFromName: { fontSize: 12, fontWeight: "700", color: "rgba(255,255,255,0.85)" },
-  sheetFromRole: { fontSize: 12, color: "rgba(255,255,255,0.55)" },
-  statusPill: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20,
-    alignSelf: "flex-start", marginTop: 12,
-  },
-  statusPillTxt: { fontSize: 12, fontWeight: "700" },
-
-  sheetBody:  { flex: 1 },
-  section:    { paddingHorizontal: 20, paddingTop: 20, marginBottom: 4 },
-  sectionTitle: { fontSize: 13, fontWeight: "800", color: "#0A1628", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
-
-  infoRow: {
-    flexDirection: "row", alignItems: "center", gap: 10,
-    marginBottom: 10, padding: 12, backgroundColor: "#F8FAFC",
-    borderRadius: 12, borderWidth: 1, borderColor: "#F1F5F9",
-  },
-  infoIconBox: { width: 32, height: 32, borderRadius: 8, justifyContent: "center", alignItems: "center" },
-  infoTxt:     { fontSize: 13, color: "#334155", fontWeight: "600" },
-
+  sheetTimeAgo:    { fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 2 },
+  closeBtn:        { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.18)", justifyContent: "center", alignItems: "center" },
+  sheetTitle:      { fontSize: 20, fontWeight: "900", color: "#fff", lineHeight: 26 },
+  sheetFromName:   { fontSize: 12, fontWeight: "700", color: "rgba(255,255,255,0.85)" },
+  sheetFromRole:   { fontSize: 12, color: "rgba(255,255,255,0.55)" },
+  statusPill:      { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, alignSelf: "flex-start", marginTop: 12 },
+  statusPillTxt:   { fontSize: 12, fontWeight: "700" },
+  sheetBody:    { flex: 1 },
+  section:      { paddingHorizontal: 20, paddingTop: 20, marginBottom: 4 },
+  sectionTitle: { fontSize: 13, fontWeight: "800", color: THEME.textDark, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
+  infoRow:    { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10, padding: 12, backgroundColor: "#F5F8FB", borderRadius: 12, borderWidth: 1, borderColor: THEME.border },
+  infoIconBox:{ width: 32, height: 32, borderRadius: 8, justifyContent: "center", alignItems: "center" },
+  infoTxt:    { fontSize: 13, color: THEME.textMid, fontWeight: "600" },
   detailGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  detailItem: {
-    width: "46%", backgroundColor: "#F8FAFC", borderRadius: 12, padding: 12,
-    borderWidth: 1, borderColor: "#F1F5F9", gap: 4,
-  },
-  detailItemLbl: { fontSize: 10, fontWeight: "700", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 4 },
-  detailItemVal: { fontSize: 13, fontWeight: "700", color: "#0A1628" },
-
-  descTxt: { fontSize: 14, color: "#475569", lineHeight: 22 },
-
-  bulletRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 10 },
-  bulletDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
-  bulletTxt: { flex: 1, fontSize: 13, color: "#334155", lineHeight: 20 },
-
-  agendaRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 10 },
-  agendaNum: { width: 26, height: 26, borderRadius: 8, justifyContent: "center", alignItems: "center" },
+  detailItem: { width: "46%", backgroundColor: "#F5F8FB", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: THEME.border, gap: 4 },
+  detailItemLbl: { fontSize: 10, fontWeight: "700", color: THEME.textLight, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 4 },
+  detailItemVal: { fontSize: 13, fontWeight: "700", color: THEME.textDark },
+  descTxt:    { fontSize: 14, color: THEME.textMid, lineHeight: 22 },
+  bulletRow:  { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 10 },
+  bulletDot:  { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
+  bulletTxt:  { flex: 1, fontSize: 13, color: THEME.textMid, lineHeight: 20 },
+  agendaRow:  { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 10 },
+  agendaNum:  { width: 26, height: 26, borderRadius: 8, justifyContent: "center", alignItems: "center" },
   agendaNumTxt: { fontSize: 12, fontWeight: "800" },
-  agendaTxt: { flex: 1, fontSize: 13, color: "#334155", lineHeight: 20, paddingTop: 4 },
-
-  tag:    { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
-  tagTxt: { fontSize: 12, fontWeight: "700" },
-
-  deadlineBox: {
-    flexDirection: "row", alignItems: "center",
-    backgroundColor: "#FEF2F2", padding: 14, borderRadius: 14,
-    borderWidth: 1.5, borderColor: "#FECACA",
-  },
+  agendaTxt:  { flex: 1, fontSize: 13, color: THEME.textMid, lineHeight: 20, paddingTop: 4 },
+  tag:     { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  tagTxt:  { fontSize: 12, fontWeight: "700" },
+  deadlineBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#FEF2F2", padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: "#FECACA" },
   deadlineLbl: { fontSize: 11, color: "#DC2626", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   deadlineVal: { fontSize: 15, fontWeight: "900", color: "#DC2626" },
-
-  footer: {
-    flexDirection: "row", gap: 10,
-    paddingHorizontal: 20, paddingVertical: 16,
-    borderTopWidth: 1, borderColor: "#F1F5F9",
-    paddingBottom: Platform.OS === "ios" ? 32 : 16,
-    backgroundColor: "#fff",
-  },
-  declineBtn: {
-    flexDirection: "row", alignItems: "center", gap: 7,
-    paddingHorizontal: 20, paddingVertical: 14,
-    backgroundColor: "#FEE2E2", borderRadius: 14, borderWidth: 1.5, borderColor: "#FECACA",
-  },
-  declineTxt: { fontSize: 14, fontWeight: "700", color: "#DC2626" },
+  footer:      { flexDirection: "row", gap: 10, paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1, borderColor: THEME.border, paddingBottom: Platform.OS === "ios" ? 32 : 16, backgroundColor: "#fff" },
+  declineBtn:  { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 20, paddingVertical: 14, backgroundColor: "#FEE2E2", borderRadius: 14, borderWidth: 1.5, borderColor: "#FECACA" },
+  declineTxt:  { fontSize: 14, fontWeight: "700", color: "#DC2626" },
   acceptBtnWrap: { flex: 1, borderRadius: 14, overflow: "hidden" },
-  acceptBtn: {
-    flexDirection: "row", alignItems: "center",
-    justifyContent: "center", gap: 8, paddingVertical: 14,
-  },
-  acceptTxt: { fontSize: 14, fontWeight: "800", color: "#fff" },
-  resolvedBanner: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 8, paddingVertical: 14, borderRadius: 14,
-  },
+  acceptBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14 },
+  acceptTxt:   { fontSize: 14, fontWeight: "800", color: "#fff" },
+  resolvedBanner:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14 },
   resolvedBannerTxt: { fontSize: 14, fontWeight: "700" },
 });

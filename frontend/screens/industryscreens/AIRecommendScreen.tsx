@@ -1,15 +1,9 @@
 /**
  * AIRecommendScreen.tsx
  * Gemini AI-powered student recommendation engine.
- * - Tab 1: Search mode — rank students for a custom post
- * - Tab 2: Posts view — all posts with AI-matched students listed under each
- * Keyboard fix: TextInputs live in a stable ScrollView, never inside FlatList header.
- * Gemini fix: Updated to gemini-2.0-flash model with better error logging.
+ * COLOR THEME: CollaXion — dark navy #0D1F2D / #193648, bg #F0F4F8, white cards
  */
 import { CONSTANT } from "@/constants/constant";
-
-
-
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -22,48 +16,33 @@ import {
 
 const { width, height } = Dimensions.get("window");
 
+// ─── THEME ────────────────────────────────────────────────────────
+const THEME = {
+  headerDark:  "#0D1F2D",
+  headerMid:   "#132D40",
+  headerLight: "#193648",
+  bg:          "#F0F4F8",
+  card:        "#FFFFFF",
+  border:      "#E2E8F0",
+  accent:      "#0D1F2D",
+  accentLight: "#1B3A52",
+  text:        "#0D1F2D",
+  sub:         "#64748B",
+  muted:       "#94A3B8",
+};
+
 // ─── GEMINI ───────────────────────────────────────────────────────
-// const GEMINI_API_KEY = "AIzaSyAEet8v2U-HhJx0gAOIGM_wwowM0M0EHSM";
-// // ✅ FIXED: Updated from gemini-1.5-flash to gemini-2.0-flash
-// const GEMINI_URL =
-//   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
-
-
-
-// async function callGemini(prompt: string): Promise<string> {
-//   const res = await fetch("http://192.168.0.245:5000/api/ai/recommend", {
-//     method: "POST",
-//     headers: {
-//       "Content-Type": "application/json",
-//     },
-//     body: JSON.stringify({ prompt }),
-//   });
-
-//   const data = await res.json();
-
-//   if (!res.ok) {
-//     throw new Error(data?.error || "AI error");
-//   }
-
-//   // return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-//   return data.text;
-// }
-
 async function callGemini(prompt: string) {
-  // const res = await fetch("http://192.168.0.245:5000/api/ai/recommend", 
-
   const res = await fetch(
-  `${CONSTANT.API_BASE_URL}/api/ai/recommend`,
+    `${CONSTANT.API_BASE_URL}/api/ai/recommend`,
     {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
-  });
-
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
   const data = await res.json();
   return data.text;
 }
-
 
 function parseJSON(raw: string): any[] {
   try { return JSON.parse(raw.replace(/```json|```/g, "").trim()); }
@@ -120,16 +99,16 @@ interface PostResult { post: Post; recs: Rec[]; loading: boolean; error: string;
 
 // ─── COLOR MAPS ───────────────────────────────────────────────────
 const TYPE_COLOR: Record<string, { color: string; bg: string; grad: [string, string] }> = {
-  Internship: { color:"#0066CC", bg:"#E8F4FF", grad:["#0066CC","#004999"] },
-  Project:    { color:"#6A1B9A", bg:"#F3E5F5", grad:["#6A1B9A","#4A148C"] },
-  Workshop:   { color:"#E65100", bg:"#FFF3E0", grad:["#E65100","#BF360C"] },
+  Internship: { color: THEME.accent,    bg: "#E8EEF3", grad: ["#4a6658", "#154360"] },
+  Project:    { color: "#1B4F72",       bg: "#D4E6F1", grad: ["#4b1b72", "#154360"] },
+  Workshop:   { color: "#7e928c",       bg: "#D6EAF8", grad: ["#4b1b72", "#1A5276"] },
 };
 
 const STATUS_COLOR: Record<string,{color:string;bg:string}> = {
   "Approved":     {color:"#059669", bg:"#D1FAE5"},
   "Rejected":     {color:"#DC2626", bg:"#FEE2E2"},
   "Under Review": {color:"#D97706", bg:"#FEF3C7"},
-  "Pending":      {color:"#6366F1", bg:"#EEF2FF"},
+  "Pending":      {color:THEME.accent, bg:"#E8EEF3"},
 };
 
 const initials = (n: string) =>
@@ -137,8 +116,8 @@ const initials = (n: string) =>
 
 // ─── SCORE BADGE ─────────────────────────────────────────────────
 function ScoreBadge({ score }: { score: number }) {
-  const color = score>=80?"#059669":score>=60?"#D97706":score>=40?"#6366F1":"#DC2626";
-  const bg    = score>=80?"#D1FAE5":score>=60?"#FEF3C7":score>=40?"#EEF2FF":"#FEE2E2";
+  const color = score>=80?"#059669":score>=60?"#D97706":score>=40?THEME.accent:"#DC2626";
+  const bg    = score>=80?"#D1FAE5":score>=60?"#FEF3C7":score>=40?"#E8EEF3":"#FEE2E2";
   const lbl   = score>=80?"Excellent":score>=60?"Good":score>=40?"Fair":"Low";
   return (
     <View style={[zs.badge,{backgroundColor:bg,borderColor:color+"40"}]}>
@@ -168,7 +147,7 @@ function StudentDetailModal({
           <View style={sd.handle}/>
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Hero */}
-            <LinearGradient colors={["#050D1A","#0A1628","#0D2137"]} style={sd.hero}>
+            <LinearGradient colors={[THEME.headerDark, THEME.headerMid, THEME.headerLight]} style={sd.hero}>
               <TouchableOpacity onPress={onClose} style={sd.closeBtn}>
                 <Ionicons name="close" size={17} color="rgba(255,255,255,0.6)"/>
               </TouchableOpacity>
@@ -191,7 +170,7 @@ function StudentDetailModal({
               {rec && (
                 <View style={sd.aiBox}>
                   <View style={sd.aiBoxHead}>
-                    <Ionicons name="sparkles" size={14} color="#6366F1"/>
+                    <Ionicons name="sparkles" size={14} color={THEME.accent}/>
                     <Text style={sd.aiBoxTitle}>Gemini AI Analysis</Text>
                   </View>
                   <Text style={sd.aiBoxText}>{rec.aiReason}</Text>
@@ -264,7 +243,7 @@ function StudentDetailModal({
                   ] as any[]).filter(Boolean).map((c:any,i:number)=>(
                     <View key={i} style={sd.contactRow}>
                       <View style={sd.contactIcon}>
-                        <Ionicons name={c.icon} size={14} color="#0066CC"/>
+                        <Ionicons name={c.icon} size={14} color={THEME.accent}/>
                       </View>
                       <Text style={sd.contactTxt} numberOfLines={1}>{c.val}</Text>
                     </View>
@@ -282,11 +261,11 @@ function StudentDetailModal({
 
 const sd = StyleSheet.create({
   overlay:        {flex:1,backgroundColor:"rgba(0,0,0,0.6)",justifyContent:"flex-end"},
-  sheet:          {backgroundColor:"#fff",borderTopLeftRadius:28,borderTopRightRadius:28,maxHeight:height*0.9,overflow:"hidden"},
-  handle:         {width:42,height:4,borderRadius:2,backgroundColor:"#E2E8F0",alignSelf:"center",marginTop:12},
+  sheet:          {backgroundColor:THEME.card,borderTopLeftRadius:28,borderTopRightRadius:28,maxHeight:height*0.9,overflow:"hidden"},
+  handle:         {width:42,height:4,borderRadius:2,backgroundColor:THEME.border,alignSelf:"center",marginTop:12},
   hero:           {paddingTop:22,paddingHorizontal:22,paddingBottom:26,alignItems:"center",overflow:"hidden"},
   closeBtn:       {position:"absolute",top:14,right:14,width:30,height:30,borderRadius:15,backgroundColor:"rgba(255,255,255,0.1)",justifyContent:"center",alignItems:"center"},
-  heroAv:         {width:72,height:72,borderRadius:36,backgroundColor:"#1E3A5F",justifyContent:"center",alignItems:"center",borderWidth:3,borderColor:"rgba(255,255,255,0.2)",marginBottom:12},
+  heroAv:         {width:72,height:72,borderRadius:36,backgroundColor:"rgba(255,255,255,0.15)",justifyContent:"center",alignItems:"center",borderWidth:3,borderColor:"rgba(255,255,255,0.2)",marginBottom:12},
   heroAvTxt:      {fontSize:22,fontWeight:"900",color:"#fff"},
   heroName:       {fontSize:19,fontWeight:"900",color:"#fff",textAlign:"center"},
   heroDeg:        {fontSize:13,color:"rgba(255,255,255,0.55)",marginTop:4,textAlign:"center"},
@@ -294,28 +273,28 @@ const sd = StyleSheet.create({
   statusBadge:    {paddingHorizontal:12,paddingVertical:6,borderRadius:20},
   statusBadgeTxt: {fontSize:12,fontWeight:"700"},
   body:           {padding:18},
-  aiBox:          {backgroundColor:"#F5F3FF",borderRadius:14,padding:14,marginBottom:18,borderWidth:1.5,borderColor:"#DDD6FE"},
+  aiBox:          {backgroundColor:"#EEF2F7",borderRadius:14,padding:14,marginBottom:18,borderWidth:1.5,borderColor:"#D0DCE8"},
   aiBoxHead:      {flexDirection:"row",alignItems:"center",gap:7,marginBottom:8},
-  aiBoxTitle:     {fontSize:12,fontWeight:"800",color:"#4C1D95"},
-  aiBoxText:      {fontSize:12,color:"#5B21B6",lineHeight:19},
-  statsRow:       {flexDirection:"row",backgroundColor:"#F8FAFC",borderRadius:14,marginBottom:18,borderWidth:1,borderColor:"#E2E8F0",overflow:"hidden"},
+  aiBoxTitle:     {fontSize:12,fontWeight:"800",color:THEME.accent},
+  aiBoxText:      {fontSize:12,color:THEME.accentLight,lineHeight:19},
+  statsRow:       {flexDirection:"row",backgroundColor:THEME.bg,borderRadius:14,marginBottom:18,borderWidth:1,borderColor:THEME.border,overflow:"hidden"},
   statBox:        {flex:1,padding:14,alignItems:"center"},
-  statBorder:     {borderLeftWidth:1,borderRightWidth:1,borderColor:"#E2E8F0"},
-  statVal:        {fontSize:16,fontWeight:"900",color:"#0A1628"},
-  statKey:        {fontSize:11,color:"#94A3B8",marginTop:3,fontWeight:"600"},
+  statBorder:     {borderLeftWidth:1,borderRightWidth:1,borderColor:THEME.border},
+  statVal:        {fontSize:16,fontWeight:"900",color:THEME.text},
+  statKey:        {fontSize:11,color:THEME.muted,marginTop:3,fontWeight:"600"},
   sec:            {marginBottom:18},
-  secTitle:       {fontSize:13,fontWeight:"800",color:"#0A1628",marginBottom:9},
-  bio:            {fontSize:13,color:"#475569",lineHeight:20},
+  secTitle:       {fontSize:13,fontWeight:"800",color:THEME.text,marginBottom:9},
+  bio:            {fontSize:13,color:THEME.sub,lineHeight:20},
   skillsRow:      {flexDirection:"row",flexWrap:"wrap",gap:7},
   matchedChip:    {flexDirection:"row",alignItems:"center",gap:4,backgroundColor:"#D1FAE5",paddingHorizontal:9,paddingVertical:4,borderRadius:20},
   matchedChipTxt: {fontSize:11,fontWeight:"700",color:"#059669"},
   missingChip:    {flexDirection:"row",alignItems:"center",gap:4,backgroundColor:"#FEE2E2",paddingHorizontal:9,paddingVertical:4,borderRadius:20},
   missingChipTxt: {fontSize:11,fontWeight:"700",color:"#DC2626"},
-  skillChip:      {backgroundColor:"#EFF6FF",borderRadius:20,paddingHorizontal:11,paddingVertical:5,borderWidth:1,borderColor:"#BFDBFE"},
-  skillChipTxt:   {fontSize:11,fontWeight:"700",color:"#1D4ED8"},
-  contactRow:     {flexDirection:"row",alignItems:"center",gap:9,paddingVertical:9,borderBottomWidth:1,borderColor:"#F1F5F9"},
-  contactIcon:    {width:32,height:32,borderRadius:9,backgroundColor:"#EFF6FF",justifyContent:"center",alignItems:"center"},
-  contactTxt:     {flex:1,fontSize:13,color:"#334155",fontWeight:"500"},
+  skillChip:      {backgroundColor:"#EEF2F7",borderRadius:20,paddingHorizontal:11,paddingVertical:5,borderWidth:1,borderColor:"#D0DCE8"},
+  skillChipTxt:   {fontSize:11,fontWeight:"700",color:THEME.accent},
+  contactRow:     {flexDirection:"row",alignItems:"center",gap:9,paddingVertical:9,borderBottomWidth:1,borderColor:THEME.border},
+  contactIcon:    {width:32,height:32,borderRadius:9,backgroundColor:"#EEF2F7",justifyContent:"center",alignItems:"center"},
+  contactTxt:     {flex:1,fontSize:13,color:THEME.sub,fontWeight:"500"},
 });
 
 // ─── MINI STUDENT ROW inside post card ───────────────────────────
@@ -346,19 +325,19 @@ function StudentRow({ rec, rank, onPress }: { rec:Rec; rank:number; onPress:()=>
       </View>
       <View style={{alignItems:"flex-end",gap:4}}>
         <ScoreBadge score={rec.matchScore}/>
-        <Ionicons name="chevron-forward" size={13} color="#94A3B8"/>
+        <Ionicons name="chevron-forward" size={13} color={THEME.muted}/>
       </View>
     </TouchableOpacity>
   );
 }
 const mr = StyleSheet.create({
-  row:      {flexDirection:"row",alignItems:"center",gap:10,paddingVertical:12,paddingHorizontal:14,borderBottomWidth:1,borderColor:"#F8FAFC"},
+  row:      {flexDirection:"row",alignItems:"center",gap:10,paddingVertical:12,paddingHorizontal:14,borderBottomWidth:1,borderColor:THEME.bg},
   rankBadge:{width:24,height:24,borderRadius:12,justifyContent:"center",alignItems:"center"},
   rankTxt:  {fontSize:10,fontWeight:"900"},
-  avatar:   {width:38,height:38,borderRadius:19,backgroundColor:"#0A1628",justifyContent:"center",alignItems:"center",borderWidth:1.5,borderColor:"#E2E8F0"},
+  avatar:   {width:38,height:38,borderRadius:19,backgroundColor:THEME.headerDark,justifyContent:"center",alignItems:"center",borderWidth:1.5,borderColor:THEME.border},
   avatarTxt:{fontSize:12,fontWeight:"900",color:"#fff"},
-  name:     {fontSize:13,fontWeight:"700",color:"#0A1628"},
-  uni:      {fontSize:11,color:"#94A3B8"},
+  name:     {fontSize:13,fontWeight:"700",color:THEME.text},
+  uni:      {fontSize:11,color:THEME.muted},
   mPill:    {backgroundColor:"#D1FAE5",paddingHorizontal:7,paddingVertical:3,borderRadius:20},
   mPillTxt: {fontSize:10,fontWeight:"700",color:"#059669"},
 });
@@ -398,15 +377,15 @@ function PostCard({
       <View style={pc.actionRow}>
         {pr.recs.length > 0 ? (
           <TouchableOpacity style={pc.expandBtn} onPress={()=>setExpanded(!expanded)}>
-            <Ionicons name="people" size={14} color="#0066CC"/>
+            <Ionicons name="people" size={14} color={THEME.accent}/>
             <Text style={pc.expandBtnTxt}>{pr.recs.length} matched students</Text>
-            <Ionicons name={expanded?"chevron-up":"chevron-down"} size={14} color="#0066CC"/>
+            <Ionicons name={expanded?"chevron-up":"chevron-down"} size={14} color={THEME.accent}/>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
             style={[pc.analyzeWrap,pr.loading&&{opacity:0.65}]}
             onPress={onLoadRecs} disabled={pr.loading}>
-            <LinearGradient colors={["#4F46E5","#6D28D9"]} style={pc.analyzeGrad}
+            <LinearGradient colors={[THEME.headerDark, THEME.headerLight]} style={pc.analyzeGrad}
               start={{x:0,y:0}} end={{x:1,y:0}}>
               <Ionicons name={pr.loading?"hourglass":"sparkles"} size={14} color="#fff"/>
               <Text style={pc.analyzeTxt}>{pr.loading?"Analyzing...":"Find Matches with AI"}</Text>
@@ -429,24 +408,24 @@ function PostCard({
   );
 }
 const pc = StyleSheet.create({
-  card:        {backgroundColor:"#fff",borderRadius:18,overflow:"hidden",marginBottom:14,shadowColor:"#000",shadowOpacity:0.07,shadowRadius:10,elevation:4},
+  card:        {backgroundColor:THEME.card,borderRadius:18,overflow:"hidden",marginBottom:14,shadowColor:"#000",shadowOpacity:0.07,shadowRadius:10,elevation:4},
   banner:      {padding:16,overflow:"hidden"},
   bannerDecor: {position:"absolute",width:120,height:120,borderRadius:60,backgroundColor:"rgba(255,255,255,0.08)",top:-30,right:-30},
   typePill:    {alignSelf:"flex-start",backgroundColor:"rgba(255,255,255,0.22)",paddingHorizontal:10,paddingVertical:4,borderRadius:20,marginBottom:7},
   typePillTxt: {fontSize:10,fontWeight:"700",color:"#fff"},
   bannerTitle: {fontSize:15,fontWeight:"900",color:"#fff"},
   bannerDesc:  {fontSize:12,color:"rgba(255,255,255,0.65)",marginTop:4,lineHeight:17},
-  skillsBar:   {borderBottomWidth:1,borderColor:"#F1F5F9"},
+  skillsBar:   {borderBottomWidth:1,borderColor:THEME.border},
   skillPill:   {paddingHorizontal:10,paddingVertical:4,borderRadius:20},
   skillPillTxt:{fontSize:11,fontWeight:"700"},
   actionRow:   {padding:12},
-  expandBtn:   {flexDirection:"row",alignItems:"center",gap:7,backgroundColor:"#EFF6FF",paddingHorizontal:14,paddingVertical:10,borderRadius:12},
-  expandBtnTxt:{flex:1,fontSize:13,fontWeight:"700",color:"#0066CC"},
+  expandBtn:   {flexDirection:"row",alignItems:"center",gap:7,backgroundColor:"#EEF2F7",paddingHorizontal:14,paddingVertical:10,borderRadius:12},
+  expandBtnTxt:{flex:1,fontSize:13,fontWeight:"700",color:THEME.accent},
   analyzeWrap: {borderRadius:12,overflow:"hidden"},
   analyzeGrad: {flexDirection:"row",alignItems:"center",justifyContent:"center",gap:8,paddingVertical:12,paddingHorizontal:16},
   analyzeTxt:  {fontSize:13,fontWeight:"700",color:"#fff"},
   errorTxt:    {fontSize:11,color:"#DC2626",marginTop:6},
-  studentList: {borderTopWidth:1,borderColor:"#F1F5F9"},
+  studentList: {borderTopWidth:1,borderColor:THEME.border},
 });
 
 // ─── SEARCH RESULT CARD ───────────────────────────────────────────
@@ -456,7 +435,7 @@ function SearchRecCard({ rec, rank, onPress }: { rec:Rec; rank:number; onPress:(
   return (
     <TouchableOpacity style={src.card} onPress={onPress} activeOpacity={0.88}>
       <LinearGradient
-        colors={rank<3?[rankColors[rank],rankColors[rank]+"99"]:["#0066CC","#0080EE"]}
+        colors={rank<3?[rankColors[rank],rankColors[rank]+"99"]:[THEME.headerDark,THEME.headerLight]}
         style={src.stripe} start={{x:0,y:0}} end={{x:1,y:0}}/>
       <View style={src.inner}>
         {/* Avatar + rank */}
@@ -464,7 +443,7 @@ function SearchRecCard({ rec, rank, onPress }: { rec:Rec; rank:number; onPress:(
           <View style={src.avatar}>
             <Text style={src.avatarTxt}>{initials(rec.studentName)}</Text>
           </View>
-          <View style={[src.rankBadge,{backgroundColor:rank<3?rankColors[rank]:"#64748B"}]}>
+          <View style={[src.rankBadge,{backgroundColor:rank<3?rankColors[rank]:THEME.sub}]}>
             {rank<3
               ? <Ionicons name={rankIcons[rank]} size={8} color="#fff"/>
               : <Text style={{fontSize:8,fontWeight:"900",color:"#fff"}}>#{rank+1}</Text>}
@@ -497,29 +476,29 @@ function SearchRecCard({ rec, rank, onPress }: { rec:Rec; rank:number; onPress:(
         </View>
       </View>
       <View style={src.reasonBox}>
-        <Ionicons name="sparkles" size={11} color="#6366F1"/>
+        <Ionicons name="sparkles" size={11} color={THEME.accent}/>
         <Text style={src.reasonTxt} numberOfLines={2}>{rec.aiReason}</Text>
       </View>
     </TouchableOpacity>
   );
 }
 const src = StyleSheet.create({
-  card:      {backgroundColor:"#fff",borderRadius:18,overflow:"hidden",marginBottom:12,shadowColor:"#000",shadowOpacity:0.07,shadowRadius:10,elevation:4},
+  card:      {backgroundColor:THEME.card,borderRadius:18,overflow:"hidden",marginBottom:12,shadowColor:"#000",shadowOpacity:0.07,shadowRadius:10,elevation:4},
   stripe:    {width:"100%",height:4},
   inner:     {flexDirection:"row",alignItems:"flex-start",padding:14},
-  avatar:    {width:46,height:46,borderRadius:23,backgroundColor:"#0A1628",justifyContent:"center",alignItems:"center",borderWidth:2,borderColor:"#E2E8F0"},
+  avatar:    {width:46,height:46,borderRadius:23,backgroundColor:THEME.headerDark,justifyContent:"center",alignItems:"center",borderWidth:2,borderColor:THEME.border},
   avatarTxt: {fontSize:14,fontWeight:"900",color:"#fff"},
   rankBadge: {marginTop:-5,paddingHorizontal:5,paddingVertical:2,borderRadius:10,flexDirection:"row",alignItems:"center",gap:2},
-  name:      {fontSize:14,fontWeight:"800",color:"#0A1628"},
-  deg:       {fontSize:12,color:"#475569",marginTop:2},
-  uni:       {fontSize:11,color:"#94A3B8",marginTop:1},
+  name:      {fontSize:14,fontWeight:"800",color:THEME.text},
+  deg:       {fontSize:12,color:THEME.sub,marginTop:2},
+  uni:       {fontSize:11,color:THEME.muted,marginTop:1},
   mPill:     {flexDirection:"row",alignItems:"center",gap:3,backgroundColor:"#D1FAE5",paddingHorizontal:7,paddingVertical:3,borderRadius:20},
   mPillTxt:  {fontSize:10,fontWeight:"700",color:"#059669"},
   xPill:     {flexDirection:"row",alignItems:"center",gap:3,backgroundColor:"#FEE2E2",paddingHorizontal:7,paddingVertical:3,borderRadius:20},
   xPillTxt:  {fontSize:10,fontWeight:"700",color:"#DC2626"},
   cgpa:      {fontSize:11,fontWeight:"700",color:"#F59E0B"},
-  reasonBox: {flexDirection:"row",alignItems:"flex-start",gap:6,backgroundColor:"#F5F3FF",marginHorizontal:14,marginBottom:14,padding:9,borderRadius:11},
-  reasonTxt: {flex:1,fontSize:11,color:"#4C1D95",lineHeight:16,fontWeight:"500"},
+  reasonBox: {flexDirection:"row",alignItems:"flex-start",gap:6,backgroundColor:"#EEF2F7",marginHorizontal:14,marginBottom:14,padding:9,borderRadius:11},
+  reasonTxt: {flex:1,fontSize:11,color:THEME.accentLight,lineHeight:16,fontWeight:"500"},
 });
 
 // ─── MAIN SCREEN ─────────────────────────────────────────────────
@@ -585,28 +564,20 @@ Sort by matchScore descending.`;
     try {
       const skills = requiredSkills.split(",").map(s=>s.trim()).filter(Boolean);
       const raw    = await callGemini(buildPrompt(jobTitle,skills));
-      // const parsed = parseJSON(raw) as Rec[];
       const parsed = (parseJSON(raw) || []) as Rec[];
-      // setSearchRecs(parsed.map(r=>({
-      //   ...r,
-      //   cgpa:       ALL_STUDENTS.find(s=>s._id===r.studentId)?.cgpa       ||"N/A",
-      //   university: ALL_STUDENTS.find(s=>s._id===r.studentId)?.university  ||"",
-      //   degree:     ALL_STUDENTS.find(s=>s._id===r.studentId)?.degree      ||"",
-      // })));
       setSearchRecs(
-  (parsed || []).map(r => ({
-    studentId: r.studentId ?? "",
-    studentName: r.studentName ?? "Unknown",
-    matchScore: r.matchScore ?? 0,
-    matchedSkills: r.matchedSkills ?? [],
-    missingSkills: r.missingSkills ?? [],
-    aiReason: r.aiReason ?? "No AI reason provided",
-
-    cgpa: ALL_STUDENTS.find(s => s._id === r.studentId)?.cgpa ?? "N/A",
-    university: ALL_STUDENTS.find(s => s._id === r.studentId)?.university ?? "",
-    degree: ALL_STUDENTS.find(s => s._id === r.studentId)?.degree ?? "",
-  }))
-);
+        (parsed || []).map(r => ({
+          studentId: r.studentId ?? "",
+          studentName: r.studentName ?? "Unknown",
+          matchScore: r.matchScore ?? 0,
+          matchedSkills: r.matchedSkills ?? [],
+          missingSkills: r.missingSkills ?? [],
+          aiReason: r.aiReason ?? "No AI reason provided",
+          cgpa: ALL_STUDENTS.find(s => s._id === r.studentId)?.cgpa ?? "N/A",
+          university: ALL_STUDENTS.find(s => s._id === r.studentId)?.university ?? "",
+          degree: ALL_STUDENTS.find(s => s._id === r.studentId)?.degree ?? "",
+        }))
+      );
     } catch(e:any) {
       setSearchError("Gemini API error: " + e.message);
     } finally {
@@ -635,11 +606,11 @@ Sort by matchScore descending.`;
   const goodMatches = searchRecs.filter(r=>r.matchScore>=60).length;
 
   return (
-    <View style={{flex:1,backgroundColor:"#F0F4F8"}}>
-      <StatusBar barStyle="light-content" backgroundColor="#050D1A"/>
+    <View style={{flex:1,backgroundColor:THEME.bg}}>
+      <StatusBar barStyle="light-content" backgroundColor={THEME.headerDark}/>
 
       {/* ── Header ── */}
-      <LinearGradient colors={["#050D1A","#0A1628","#0D2137"]} style={s.header}
+      <LinearGradient colors={[THEME.headerDark, THEME.headerMid, THEME.headerLight]} style={s.header}
         start={{x:0,y:0}} end={{x:1,y:1}}>
         <View style={s.hDecor}/>
         <View style={s.hRow}>
@@ -659,7 +630,7 @@ Sort by matchScore descending.`;
         <View style={s.statsRow}>
           {[
             {n:ALL_STUDENTS.length,                              lbl:"Students",   c:"#90CAF9"},
-            {n:ALL_POSTS.length,                                 lbl:"Posts",      c:"#C4B5FD"},
+            {n:ALL_POSTS.length,                                 lbl:"Posts",      c:"#B0BEC5"},
             {n:searchRecs.length>0?goodMatches:"-",              lbl:"Good Match", c:"#A5D6A7"},
           ].map((st,i)=>(
             <View key={i} style={s.statCard}>
@@ -675,7 +646,7 @@ Sort by matchScore descending.`;
               onPress={()=>setActiveTab(tab)}>
               <Ionicons
                 name={tab==="search"?"search":"layers"}
-                size={13} color={activeTab===tab?"#0A1628":"rgba(255,255,255,0.5)"}/>
+                size={13} color={activeTab===tab?THEME.headerDark:"rgba(255,255,255,0.5)"}/>
               <Text style={[s.tabTxt,activeTab===tab&&s.tabTxtActive]}>{lbl}</Text>
             </TouchableOpacity>
           ))}
@@ -696,7 +667,7 @@ Sort by matchScore descending.`;
             {/* Input card */}
             <View style={s.inputCard}>
               <View style={s.inputHead}>
-                <Ionicons name="search" size={15} color="#0066CC"/>
+                <Ionicons name="search" size={15} color={THEME.accent}/>
                 <Text style={s.inputHeadTxt}>Define Your Post</Text>
               </View>
 
@@ -704,7 +675,7 @@ Sort by matchScore descending.`;
               <TextInput
                 style={s.input}
                 placeholder="e.g. Frontend Developer Intern"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={THEME.muted}
                 value={jobTitle}
                 onChangeText={setJobTitle}
                 returnKeyType="next"
@@ -716,7 +687,7 @@ Sort by matchScore descending.`;
               <TextInput
                 style={[s.input,{height:66,textAlignVertical:"top",paddingTop:12}]}
                 placeholder="e.g. React, TypeScript, Node.js, REST APIs"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={THEME.muted}
                 value={requiredSkills}
                 onChangeText={setRequiredSkills}
                 multiline
@@ -733,7 +704,7 @@ Sort by matchScore descending.`;
 
               <TouchableOpacity onPress={analyzeSearch} disabled={searchLoading} activeOpacity={0.85}>
                 <LinearGradient
-                  colors={searchLoading?["#64748B","#475569"]:["#4F46E5","#6D28D9"]}
+                  colors={searchLoading?["#64748B","#475569"]:[THEME.headerDark,THEME.headerLight]}
                   style={s.analyzeBtn} start={{x:0,y:0}} end={{x:1,y:0}}>
                   <Animated.View style={{flexDirection:"row",alignItems:"center",gap:9,
                     transform:[{scale:searchLoading?pulseAnim:new Animated.Value(1)}]}}>
@@ -772,7 +743,7 @@ Sort by matchScore descending.`;
               <>
                 <View style={[s.secRow,{marginBottom:12}]}>
                   <View style={s.secLeft}>
-                    <View style={[s.secBar,{backgroundColor:"#6366F1"}]}/>
+                    <View style={[s.secBar,{backgroundColor:THEME.accent}]}/>
                     <Text style={s.secTitle}>AI Rankings</Text>
                   </View>
                   <Text style={s.resultInfo}>{searchRecs.length} students · {goodMatches} good matches</Text>
@@ -787,7 +758,7 @@ Sort by matchScore descending.`;
             {/* Empty state */}
             {searchRecs.length===0&&!searchLoading&&!searchError && (
               <View style={s.emptyState}>
-                <LinearGradient colors={["#4F46E5","#6D28D9"]} style={s.emptyIconBox}>
+                <LinearGradient colors={[THEME.headerDark,THEME.headerLight]} style={s.emptyIconBox}>
                   <Ionicons name="sparkles" size={30} color="#fff"/>
                 </LinearGradient>
                 <Text style={s.emptyTitle}>AI-Powered Matching</Text>
@@ -812,7 +783,7 @@ Sort by matchScore descending.`;
           showsVerticalScrollIndicator={false}>
           <View style={[s.secRow,{marginBottom:14}]}>
             <View style={s.secLeft}>
-              <View style={[s.secBar,{backgroundColor:"#6366F1"}]}/>
+              <View style={[s.secBar,{backgroundColor:THEME.accent}]}/>
               <Text style={s.secTitle}>All Posts</Text>
             </View>
             <Text style={s.resultInfo}>{ALL_POSTS.length} opportunities</Text>
@@ -854,14 +825,14 @@ const s = StyleSheet.create({
   tab:      {flex:1,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,paddingVertical:10,borderRadius:14,backgroundColor:"rgba(255,255,255,0.07)",borderWidth:1,borderColor:"rgba(255,255,255,0.06)"},
   tabActive:{backgroundColor:"#fff",borderColor:"#fff"},
   tabTxt:   {fontSize:13,fontWeight:"700",color:"rgba(255,255,255,0.55)"},
-  tabTxtActive:{color:"#0A1628"},
+  tabTxtActive:{color:THEME.headerDark},
 
   // Input card
-  inputCard:{backgroundColor:"#fff",borderRadius:20,padding:18,marginBottom:16,shadowColor:"#000",shadowOpacity:0.06,shadowRadius:10,elevation:3},
+  inputCard:{backgroundColor:THEME.card,borderRadius:20,padding:18,marginBottom:16,shadowColor:"#000",shadowOpacity:0.06,shadowRadius:10,elevation:3},
   inputHead:{flexDirection:"row",alignItems:"center",gap:8,marginBottom:16},
-  inputHeadTxt:{fontSize:15,fontWeight:"800",color:"#0A1628"},
-  label:    {fontSize:12,fontWeight:"700",color:"#64748B",marginBottom:7},
-  input:    {backgroundColor:"#F8FAFC",borderRadius:12,paddingHorizontal:14,paddingVertical:12,fontSize:13,color:"#0A1628",borderWidth:1.5,borderColor:"#E2E8F0",fontWeight:"500"},
+  inputHeadTxt:{fontSize:15,fontWeight:"800",color:THEME.text},
+  label:    {fontSize:12,fontWeight:"700",color:THEME.sub,marginBottom:7},
+  input:    {backgroundColor:THEME.bg,borderRadius:12,paddingHorizontal:14,paddingVertical:12,fontSize:13,color:THEME.text,borderWidth:1.5,borderColor:THEME.border,fontWeight:"500"},
   errBox:   {flexDirection:"row",alignItems:"flex-start",gap:6,backgroundColor:"#FEF2F2",padding:10,borderRadius:11,marginTop:11,borderWidth:1,borderColor:"#FECACA"},
   errTxt:   {flex:1,fontSize:11,color:"#DC2626",lineHeight:16},
   analyzeBtn:{borderRadius:14,paddingVertical:15,alignItems:"center",marginTop:16},
@@ -870,21 +841,21 @@ const s = StyleSheet.create({
   // Sections
   secRow:   {flexDirection:"row",justifyContent:"space-between",alignItems:"center"},
   secLeft:  {flexDirection:"row",alignItems:"center",gap:8},
-  secBar:   {width:4,height:16,borderRadius:2,backgroundColor:"#0066CC"},
-  secTitle: {fontSize:16,fontWeight:"800",color:"#0A1628"},
-  resultInfo:{fontSize:10,color:"#94A3B8",fontWeight:"600",maxWidth:width*0.44,textAlign:"right"},
+  secBar:   {width:4,height:16,borderRadius:2,backgroundColor:THEME.accent},
+  secTitle: {fontSize:16,fontWeight:"800",color:THEME.text},
+  resultInfo:{fontSize:10,color:THEME.muted,fontWeight:"600",maxWidth:width*0.44,textAlign:"right"},
 
   // Presets
-  presetChip:    {paddingHorizontal:14,paddingVertical:8,borderRadius:20,backgroundColor:"#F1F5F9",borderWidth:1.5,borderColor:"#E2E8F0"},
-  presetChipActive:{backgroundColor:"#0A1628",borderColor:"#0A1628"},
-  presetTxt:     {fontSize:12,fontWeight:"600",color:"#64748B"},
+  presetChip:    {paddingHorizontal:14,paddingVertical:8,borderRadius:20,backgroundColor:THEME.card,borderWidth:1.5,borderColor:THEME.border},
+  presetChipActive:{backgroundColor:THEME.headerDark,borderColor:THEME.headerDark},
+  presetTxt:     {fontSize:12,fontWeight:"600",color:THEME.sub},
   presetTxtActive:{color:"#fff",fontWeight:"700"},
 
   // Empty state
-  emptyState:  {backgroundColor:"#fff",borderRadius:20,padding:26,alignItems:"center",shadowColor:"#000",shadowOpacity:0.05,shadowRadius:8,elevation:2},
+  emptyState:  {backgroundColor:THEME.card,borderRadius:20,padding:26,alignItems:"center",shadowColor:"#000",shadowOpacity:0.05,shadowRadius:8,elevation:2},
   emptyIconBox:{width:68,height:68,borderRadius:22,justifyContent:"center",alignItems:"center",marginBottom:14},
-  emptyTitle:  {fontSize:16,fontWeight:"900",color:"#0A1628",marginBottom:9},
-  emptySub:    {fontSize:13,color:"#64748B",textAlign:"center",lineHeight:20,marginBottom:18},
+  emptyTitle:  {fontSize:16,fontWeight:"900",color:THEME.text,marginBottom:9},
+  emptySub:    {fontSize:13,color:THEME.sub,textAlign:"center",lineHeight:20,marginBottom:18},
   featureRow:  {flexDirection:"row",alignItems:"center",gap:8,alignSelf:"stretch",marginBottom:6},
-  featureTxt:  {fontSize:13,fontWeight:"600",color:"#475569"},
+  featureTxt:  {fontSize:13,fontWeight:"600",color:THEME.sub},
 });

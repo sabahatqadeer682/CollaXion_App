@@ -115,8 +115,6 @@
 // export default IndustryLogin;
 
 
-
-
 import { MaterialIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useState } from "react";
@@ -293,4 +291,3 @@ const styles = StyleSheet.create({
 });
 
 export default IndustryLogin;
-
