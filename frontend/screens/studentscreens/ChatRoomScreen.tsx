@@ -942,7 +942,9 @@ import {
     FlatList,
     Image,
     KeyboardAvoidingView,
+    Modal,
     Platform,
+    Pressable,
     StyleSheet,
     Text,
     TextInput,
@@ -961,18 +963,26 @@ interface Msg {
     imageUrl?: string;
     createdAt?: string;
     isOptimistic?: boolean;
+    deletedForEveryone?: boolean;
 }
 
-/* ✅ helper */
+/* ✅ helpers */
 const getInitial = (name?: string) => {
     if (!name || name.trim().length === 0) return "S";
     return name.trim().charAt(0).toUpperCase();
 };
 
+const resolveAvatarUri = (raw?: string | null): string | null => {
+    if (!raw) return null;
+    if (raw.startsWith("data:") || raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+    if (raw.startsWith("file://")) return null;
+    return `${CONSTANT.API_BASE_URL}${raw.startsWith("/") ? "" : "/"}${raw}`;
+};
+
 const ChatRoomScreen = () => {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
-    const { otherEmail, otherName } = route.params || {};
+    const { otherEmail, otherName, otherAvatar: otherAvatarParam } = route.params || {};
 
     const [myEmail, setMyEmail] = useState("");
     const [myName, setMyName] = useState("");
@@ -980,6 +990,10 @@ const ChatRoomScreen = () => {
     const [inputText, setInputText] = useState("");
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+    const [actionMsg, setActionMsg] = useState<Msg | null>(null);
+    const [otherAvatar, setOtherAvatar] = useState<string | null>(otherAvatarParam || null);
+    const [avatarFailed, setAvatarFailed] = useState(false);
+    const [avatarPreview, setAvatarPreview] = useState(false);
 
     const flatRef = useRef<FlatList>(null);
     const typingTimeout = useRef<any>(null);
@@ -1021,10 +1035,23 @@ const ChatRoomScreen = () => {
             setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 80);
         };
 
+        const handleMessageDeleted = (data: any) => {
+            if (!data?._id) return;
+            setMessages((prev) =>
+                prev.map((m) =>
+                    m._id === data._id
+                        ? { ...m, deletedForEveryone: true, text: "", imageUrl: undefined }
+                        : m
+                )
+            );
+        };
+
         socket.on("newMessage", handleNewMessage);
+        socket.on("messageDeleted", handleMessageDeleted);
 
         return () => {
             socket.off("newMessage", handleNewMessage);
+            socket.off("messageDeleted", handleMessageDeleted);
             socket.disconnect();
         };
     }, [myEmail]);
@@ -1034,6 +1061,24 @@ const ChatRoomScreen = () => {
         if (!myEmail || !otherEmail) return;
         fetchMessages();
     }, [myEmail, otherEmail]);
+
+    /* ─── Always pull the latest profile image for the other user ─── */
+    useEffect(() => {
+        if (!otherEmail) return;
+        (async () => {
+            try {
+                const res = await axios.get(
+                    `${CONSTANT.API_BASE_URL}/api/student/getStudent/${otherEmail}`
+                );
+                if (res.data?.profileImage) {
+                    setOtherAvatar(res.data.profileImage);
+                    setAvatarFailed(false);
+                }
+            } catch {
+                /* fall back to letter avatar */
+            }
+        })();
+    }, [otherEmail]);
 
     const fetchMessages = async () => {
         try {
@@ -1107,26 +1152,109 @@ const ChatRoomScreen = () => {
         }
     };
 
+    /* ─── Delete handlers ─── */
+    const deleteForMe = async (msg: Msg) => {
+        setActionMsg(null);
+        if (!msg._id) {
+            setMessages((prev) => prev.filter((m) => m !== msg));
+            return;
+        }
+        try {
+            await axios.post(
+                `${CONSTANT.API_BASE_URL}/api/chat/message/${msg._id}/hide`,
+                { email: myEmail }
+            );
+            setMessages((prev) => prev.filter((m) => m._id !== msg._id));
+        } catch (err) {
+            console.log("Delete-for-me error:", err);
+            Alert.alert("Error", "Could not delete message.");
+        }
+    };
+
+    const deleteForEveryone = async (msg: Msg) => {
+        setActionMsg(null);
+        if (!msg._id) return;
+        try {
+            await axios.post(
+                `${CONSTANT.API_BASE_URL}/api/chat/message/${msg._id}/unsend`,
+                { email: myEmail }
+            );
+            setMessages((prev) =>
+                prev.map((m) =>
+                    m._id === msg._id
+                        ? { ...m, deletedForEveryone: true, text: "", imageUrl: undefined }
+                        : m
+                )
+            );
+        } catch (err: any) {
+            console.log(
+                "Delete-for-everyone error:",
+                err?.response?.status,
+                err?.response?.data || err?.message
+            );
+            Alert.alert(
+                "Error",
+                err?.response?.data?.message || "Could not unsend message."
+            );
+        }
+    };
+
     /* ─── Render message ─── */
     const renderMessage = ({ item }: { item: Msg }) => {
         const isMe = item.senderEmail === myEmail;
+        const isDeleted = item.deletedForEveryone;
 
         return (
             <View style={[styles.msgRow, isMe ? styles.meRow : styles.otherRow]}>
 
-                {/* 🔤 ONLY LETTER DP (NO IMAGE ANYMORE) */}
-                {!isMe && (
-                    <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>
-                            {getInitial(otherName)}
-                        </Text>
-                    </View>
-                )}
+                {!isMe && (() => {
+                    const uri = !avatarFailed ? resolveAvatarUri(otherAvatar) : null;
+                    if (uri) {
+                        return (
+                            <Image
+                                source={{ uri }}
+                                style={styles.avatarImg}
+                                onError={() => setAvatarFailed(true)}
+                            />
+                        );
+                    }
+                    return (
+                        <View style={styles.avatar}>
+                            <Text style={styles.avatarText}>
+                                {getInitial(otherName)}
+                            </Text>
+                        </View>
+                    );
+                })()}
 
-                <View style={[styles.bubble, isMe ? styles.me : styles.other]}>
-
-                    {/* message OR image (chat images still allowed) */}
-                    {item.imageUrl ? (
+                <Pressable
+                    onLongPress={() => !isDeleted && setActionMsg(item)}
+                    delayLongPress={250}
+                    style={({ pressed }) => [
+                        styles.bubble,
+                        isMe ? styles.me : styles.other,
+                        isDeleted && styles.deletedBubble,
+                        pressed && !isDeleted && { opacity: 0.75 },
+                    ]}
+                >
+                    {isDeleted ? (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Ionicons
+                                name="ban-outline"
+                                size={14}
+                                color={isMe ? "rgba(255,255,255,0.7)" : "#9CA3AF"}
+                            />
+                            <Text
+                                style={{
+                                    color: isMe ? "rgba(255,255,255,0.7)" : "#9CA3AF",
+                                    fontStyle: "italic",
+                                    fontSize: 13,
+                                }}
+                            >
+                                {isMe ? "You deleted this message" : "This message was deleted"}
+                            </Text>
+                        </View>
+                    ) : item.imageUrl ? (
                         <Image
                             source={{
                                 uri: `${CONSTANT.API_BASE_URL}${item.imageUrl}`,
@@ -1138,8 +1266,7 @@ const ChatRoomScreen = () => {
                             {item.text}
                         </Text>
                     )}
-
-                </View>
+                </Pressable>
             </View>
         );
     };
@@ -1153,12 +1280,29 @@ const ChatRoomScreen = () => {
                     <Ionicons name="arrow-back" size={22} color="#fff" />
                 </TouchableOpacity>
 
-                {/* 🔤 ONLY INITIAL */}
-                <View style={styles.headerAvatar}>
-                    <Text style={styles.headerAvatarText}>
-                        {getInitial(otherName)}
-                    </Text>
-                </View>
+                {(() => {
+                    const uri = !avatarFailed ? resolveAvatarUri(otherAvatar) : null;
+                    return (
+                        <Pressable
+                            onPress={() => uri && setAvatarPreview(true)}
+                            hitSlop={6}
+                        >
+                            {uri ? (
+                                <Image
+                                    source={{ uri }}
+                                    style={styles.headerAvatar}
+                                    onError={() => setAvatarFailed(true)}
+                                />
+                            ) : (
+                                <View style={styles.headerAvatar}>
+                                    <Text style={styles.headerAvatarText}>
+                                        {getInitial(otherName)}
+                                    </Text>
+                                </View>
+                            )}
+                        </Pressable>
+                    );
+                })()}
 
                 <Text style={styles.headerName}>{otherName}</Text>
             </View>
@@ -1192,6 +1336,81 @@ const ChatRoomScreen = () => {
                     <Ionicons name="send" size={24} />
                 </TouchableOpacity>
             </View>
+
+            {/* ── Profile image preview ── */}
+            <Modal
+                transparent
+                visible={avatarPreview}
+                animationType="fade"
+                onRequestClose={() => setAvatarPreview(false)}
+            >
+                <Pressable style={styles.previewBackdrop} onPress={() => setAvatarPreview(false)}>
+                    <View style={styles.previewHeader}>
+                        <Text style={styles.previewName} numberOfLines={1}>
+                            {otherName}
+                        </Text>
+                        <TouchableOpacity onPress={() => setAvatarPreview(false)} hitSlop={10}>
+                            <Ionicons name="close" size={28} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
+                    {(() => {
+                        const uri = resolveAvatarUri(otherAvatar);
+                        if (!uri) return null;
+                        return (
+                            <Image
+                                source={{ uri }}
+                                style={styles.previewImage}
+                                resizeMode="contain"
+                            />
+                        );
+                    })()}
+                </Pressable>
+            </Modal>
+
+            {/* ── Message action sheet ── */}
+            <Modal
+                transparent
+                visible={!!actionMsg}
+                animationType="fade"
+                onRequestClose={() => setActionMsg(null)}
+            >
+                <Pressable style={styles.sheetBackdrop} onPress={() => setActionMsg(null)}>
+                    <Pressable style={styles.sheet}>
+                        <View style={styles.sheetHandle} />
+                        <Text style={styles.sheetTitle}>Message options</Text>
+
+                        <TouchableOpacity
+                            style={styles.sheetItem}
+                            onPress={() => actionMsg && deleteForMe(actionMsg)}
+                        >
+                            <Ionicons name="trash-outline" size={20} color="#193648" />
+                            <Text style={styles.sheetItemText}>Delete for me</Text>
+                        </TouchableOpacity>
+
+                        {actionMsg?.senderEmail === myEmail && (
+                            <TouchableOpacity
+                                style={styles.sheetItem}
+                                onPress={() => actionMsg && deleteForEveryone(actionMsg)}
+                            >
+                                <Ionicons name="trash" size={20} color="#EF4444" />
+                                <Text style={[styles.sheetItemText, { color: "#EF4444" }]}>
+                                    Delete for everyone
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity
+                            style={[styles.sheetItem, { borderTopWidth: 0 }]}
+                            onPress={() => setActionMsg(null)}
+                        >
+                            <Ionicons name="close" size={20} color="#6B7280" />
+                            <Text style={[styles.sheetItemText, { color: "#6B7280" }]}>
+                                Cancel
+                            </Text>
+                        </TouchableOpacity>
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </KeyboardAvoidingView>
     );
 };
@@ -1246,6 +1465,13 @@ const styles = StyleSheet.create({
         marginRight: 5,
     },
 
+    avatarImg: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        marginRight: 5,
+    },
+
     avatarText: {
         color: "#fff",
         fontSize: 12,
@@ -1280,5 +1506,81 @@ const styles = StyleSheet.create({
         borderColor: "#ccc",
         borderRadius: 20,
         paddingHorizontal: 10,
+    },
+
+    deletedBubble: {
+        backgroundColor: "#E5E7EB",
+        opacity: 0.85,
+    },
+
+    sheetBackdrop: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.45)",
+        justifyContent: "flex-end",
+    },
+    sheet: {
+        backgroundColor: "#fff",
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingBottom: Platform.OS === "ios" ? 28 : 14,
+        paddingTop: 8,
+    },
+    sheetHandle: {
+        alignSelf: "center",
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: "#E5E7EB",
+        marginBottom: 12,
+    },
+    sheetTitle: {
+        fontSize: 13,
+        color: "#6B7280",
+        fontWeight: "700",
+        paddingHorizontal: 18,
+        paddingBottom: 10,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+    },
+    sheetItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 14,
+        paddingVertical: 14,
+        paddingHorizontal: 18,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: "#F3F4F6",
+    },
+    sheetItemText: {
+        fontSize: 15,
+        fontWeight: "600",
+        color: "#193648",
+    },
+
+    previewBackdrop: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.92)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    previewHeader: {
+        position: "absolute",
+        top: Platform.OS === "ios" ? 50 : 24,
+        left: 18,
+        right: 18,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+    },
+    previewName: {
+        color: "#fff",
+        fontSize: 17,
+        fontWeight: "700",
+        flex: 1,
+        marginRight: 12,
+    },
+    previewImage: {
+        width: "92%",
+        height: "70%",
     },
 });

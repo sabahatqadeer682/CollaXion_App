@@ -175,6 +175,7 @@ import express from "express";
 import Internship from "../models/Internship.js";
 import Application from "../models/Application.js";
 import Notification from "../models/Notification.js";
+import { notifyStudent } from "../utils/notify.js";
 
 const router = express.Router();
 
@@ -295,18 +296,13 @@ router.post("/apply", async (req, res) => {
     });
     await application.save();
 
-    // 5. Create Notification (Wrapped in try-catch so app doesn't crash if notif fails)
-    try {
-      await Notification.create({
-        studentEmail: studentEmail,
-        title: "Application Submitted! 🎉",
-        message: `Your application for "${internship.title}" at ${internship.company} has been received.`,
-        type: "application",
-      });
-    } catch (notifErr) {
-      console.error("Notification Creation Error:", notifErr.message);
-      // We don't return error here because application is already saved successfully
-    }
+    // 5. Create + broadcast notification (helper handles errors internally)
+    await notifyStudent(req, {
+      studentEmail,
+      title: "Application Submitted! 🎉",
+      message: `Your application for "${internship.title}" at ${internship.company} has been received.`,
+      type: "application",
+    });
 
     res.json({ 
       message: "Application submitted successfully!", 

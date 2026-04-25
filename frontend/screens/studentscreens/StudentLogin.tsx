@@ -25,7 +25,24 @@ const StudentLogin = () => {
     const [emailError, setEmailError] = useState("");
     const [passwordError, setPasswordError] = useState("");
 
-    // 📌 validation
+    const EMAIL_PATTERN = /^[\w-.]+@students\.riphah\.edu\.pk$/;
+
+    const validateEmail = (value: string): string => {
+        const trimmed = value.trim();
+        if (trimmed === "") return "Email is required";
+        if (trimmed.length > 254) return "Email is too long";
+        if (!EMAIL_PATTERN.test(trimmed)) return "Email must end with @students.riphah.edu.pk";
+        return "";
+    };
+
+    const validatePassword = (value: string): string => {
+        if (value === "") return "Password is required";
+        if (value.length < 6) return "Password must be at least 6 characters";
+        if (value.length > 128) return "Password is too long";
+        if (/\s/.test(value)) return "Password cannot contain spaces";
+        return "";
+    };
+
     const handleEmailChange = (text: string) => {
         let updatedEmail = text;
 
@@ -34,38 +51,37 @@ const StudentLogin = () => {
         }
 
         setEmail(updatedEmail);
-
-        const emailPattern = /^[\w-\.]+@students\.riphah\.edu\.pk$/;
-        if (updatedEmail.trim() === "") {
-            setEmailError("Email is required");
-        } else if (!emailPattern.test(updatedEmail)) {
-            setEmailError("Email must end with @students.riphah.edu.pk");
-        } else {
-            setEmailError("");
-        }
+        setEmailError(validateEmail(updatedEmail));
     };
 
     const handlePasswordChange = (text: string) => {
         setPassword(text);
-        if (text.trim().length < 6) {
-            setPasswordError("Password must be at least 6 characters");
-        } else {
-            setPasswordError("");
-        }
+        setPasswordError(validatePassword(text));
     };
 
     const handleLogin = async () => {
-        if (emailError || passwordError || !email || !password) {
+        const trimmedEmail = email.trim();
+        const emailErr = validateEmail(trimmedEmail);
+        const passwordErr = validatePassword(password);
+
+        setEmailError(emailErr);
+        setPasswordError(passwordErr);
+
+        if (emailErr || passwordErr) {
             Alert.alert("Error", "Please fix all validation errors before login.");
             return;
         }
 
         try {
-            const res = await axios.post(`${CONSTANT.API_BASE_URL}/api/student/login`, { email, password });
+            const res = await axios.post(`${CONSTANT.API_BASE_URL}/api/student/login`, { email: trimmedEmail, password });
             console.log("Server Response:", res.data);
 
 
             if (res.data.success) {
+                // Drop any cached image from a previous account so the new user
+                // doesn't see the wrong DP before fetchStudentStats runs
+                await AsyncStorage.removeItem("studentProfileImage");
+
                 // Save student email & fullName locally
                 await AsyncStorage.setItem("studentEmail", res.data.student.email);
                 await AsyncStorage.setItem("studentFullName", res.data.student.fullName);

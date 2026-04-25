@@ -82,6 +82,16 @@ const messageSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        // Emails for whom this message is hidden (delete-for-me)
+        hiddenFor: {
+            type: [String],
+            default: [],
+        },
+        // Sender unsent the message for everyone
+        deletedForEveryone: {
+            type: Boolean,
+            default: false,
+        },
     },
     { timestamps: true }
 );

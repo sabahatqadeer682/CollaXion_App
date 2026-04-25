@@ -186,6 +186,687 @@
 
 
 
+// import { CONSTANT } from "@/constants/constant";
+// import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+// import AsyncStorage from "@react-native-async-storage/async-storage";
+// import { useFocusEffect } from "@react-navigation/native";
+// import axios from "axios";
+// import React, { useCallback, useState } from "react";
+// import {
+//     ActivityIndicator,
+//     FlatList,
+//     Modal,
+//     ScrollView,
+//     StyleSheet,
+//     Text,
+//     TouchableOpacity,
+//     View,
+// } from "react-native";
+
+// const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: string; step: number }> = {
+//     Pending: { color: "#D97706", bg: "#FFFBEB", icon: "clock-outline", step: 1 },
+//     "Under Review": { color: "#2563EB", bg: "#EFF6FF", icon: "magnify", step: 2 },
+//     Shortlisted: { color: "#7C3AED", bg: "#F5F3FF", icon: "star-outline", step: 3 },
+//     Approved: { color: "#059669", bg: "#ECFDF5", icon: "check-circle", step: 4 },
+//     Rejected: { color: "#DC2626", bg: "#FEF2F2", icon: "close-circle", step: 0 },
+// };
+
+// const STEPS = ["Pending", "Under Review", "Shortlisted", "Approved"];
+
+// const MyApplicationsScreen = () => {
+//     const [applications, setApplications] = useState<any[]>([]);
+//     const [loading, setLoading] = useState(true);
+//     const [selectedApp, setSelectedApp] = useState<any>(null);
+//     const [detailVisible, setDetailVisible] = useState(false);
+
+//     useFocusEffect(
+//         useCallback(() => {
+//             fetchApplications();
+//         }, [])
+//     );
+
+//     const fetchApplications = async () => {
+//         try {
+//             const email = await AsyncStorage.getItem("studentEmail");
+//             if (!email) return;
+//             const res = await axios.get(`${CONSTANT.API_BASE_URL}/api/applications/${email}`);
+//             setApplications(res.data);
+//         } catch (err) {
+//             console.log("Applications fetch error:", err);
+//         } finally {
+//             setLoading(false);
+//         }
+//     };
+
+//     const renderCard = ({ item }: { item: any }) => {
+//         const status = item.status || "Pending";
+//         const cfg = STATUS_CONFIG[status] || STATUS_CONFIG["Pending"];
+//         const internship = item.internshipId;
+
+//         return (
+//             <TouchableOpacity style={styles.card} onPress={() => { setSelectedApp(item); setDetailVisible(true); }}>
+//                 <View style={styles.cardTop}>
+//                     <View style={styles.companyIcon}>
+//                         <MaterialCommunityIcons name="office-building" size={24} color="#193648" />
+//                     </View>
+//                     <View style={{ flex: 1, marginLeft: 12 }}>
+//                         <Text style={styles.cardTitle} numberOfLines={1}>{internship?.title || "Internship"}</Text>
+//                         <Text style={styles.cardCompany}>{internship?.company || "Company"}</Text>
+//                     </View>
+//                     <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
+//                         <MaterialCommunityIcons name={cfg.icon as any} size={12} color={cfg.color} />
+//                         <Text style={[styles.statusText, { color: cfg.color }]}>{status}</Text>
+//                     </View>
+//                 </View>
+
+//                 {/* Progress Bar */}
+//                 {status !== "Rejected" && (
+//                     <View style={styles.progressContainer}>
+//                         {STEPS.map((step, i) => {
+//                             const isActive = i < cfg.step;
+//                             const isCurrent = i === cfg.step - 1;
+//                             return (
+//                                 <View key={step} style={styles.progressStep}>
+//                                     <View style={[
+//                                         styles.progressDot,
+//                                         isActive ? styles.progressDotActive : styles.progressDotInactive,
+//                                         isCurrent && styles.progressDotCurrent,
+//                                     ]}>
+//                                         {isActive && !isCurrent && (
+//                                             <MaterialCommunityIcons name="check" size={10} color="#fff" />
+//                                         )}
+//                                     </View>
+//                                     {i < STEPS.length - 1 && (
+//                                         <View style={[styles.progressLine, isActive && styles.progressLineActive]} />
+//                                     )}
+//                                 </View>
+//                             );
+//                         })}
+//                     </View>
+//                 )}
+
+//                 <View style={styles.cardFooter}>
+//                     <Text style={styles.footerText}>
+//                         Applied {new Date(item.appliedAt).toDateString()}
+//                     </Text>
+//                     <Text style={[styles.tapMore, { color: cfg.color }]}>View Details →</Text>
+//                 </View>
+//             </TouchableOpacity>
+//         );
+//     };
+
+//     return (
+//         <View style={styles.container}>
+//             <View style={styles.summaryRow}>
+//                 <View style={styles.summaryChip}>
+//                     <Text style={styles.summaryNum}>{applications.length}</Text>
+//                     <Text style={styles.summaryLabel}>Total</Text>
+//                 </View>
+//                 <View style={styles.summaryChip}>
+//                     <Text style={[styles.summaryNum, { color: "#D97706" }]}>
+//                         {applications.filter(a => a.status === "Pending").length}
+//                     </Text>
+//                     <Text style={styles.summaryLabel}>Pending</Text>
+//                 </View>
+//                 <View style={styles.summaryChip}>
+//                     <Text style={[styles.summaryNum, { color: "#7C3AED" }]}>
+//                         {applications.filter(a => a.status === "Shortlisted").length}
+//                     </Text>
+//                     <Text style={styles.summaryLabel}>Shortlisted</Text>
+//                 </View>
+//                 <View style={styles.summaryChip}>
+//                     <Text style={[styles.summaryNum, { color: "#059669" }]}>
+//                         {applications.filter(a => a.status === "Approved").length}
+//                     </Text>
+//                     <Text style={styles.summaryLabel}>Approved</Text>
+//                 </View>
+//             </View>
+
+//             {loading ? (
+//                 <ActivityIndicator color="#193648" size="large" style={{ marginTop: 60 }} />
+//             ) : (
+//                 <FlatList
+//                     data={applications}
+//                     keyExtractor={(item) => item._id}
+//                     renderItem={renderCard}
+//                     contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+//                     ListEmptyComponent={
+//                         <View style={styles.emptyState}>
+//                             <MaterialCommunityIcons name="briefcase-off" size={64} color="#D1D5DB" />
+//                             <Text style={styles.emptyTitle}>No Applications Yet</Text>
+//                             <Text style={styles.emptySubText}>Browse internships and start applying!</Text>
+//                         </View>
+//                     }
+//                 />
+//             )}
+
+//             {/* Detail Modal */}
+//             <Modal visible={detailVisible} animationType="slide" transparent>
+//                 <View style={styles.modalOverlay}>
+//                     <View style={styles.detailModal}>
+//                         <View style={styles.modalHeader}>
+//                             <Text style={styles.modalTitle}>Application Details</Text>
+//                             <TouchableOpacity onPress={() => setDetailVisible(false)} style={styles.closeBtn}>
+//                                 <Ionicons name="close" size={20} color="#374151" />
+//                             </TouchableOpacity>
+//                         </View>
+
+//                         <ScrollView showsVerticalScrollIndicator={false}>
+//                             {selectedApp && (() => {
+//                                 const status = selectedApp.status || "Pending";
+//                                 const cfg = STATUS_CONFIG[status];
+//                                 const internship = selectedApp.internshipId;
+//                                 return (
+//                                     <>
+//                                         <View style={[styles.statusCard, { backgroundColor: cfg.bg }]}>
+//                                             <MaterialCommunityIcons name={cfg.icon as any} size={36} color={cfg.color} />
+//                                             <Text style={[styles.statusBigText, { color: cfg.color }]}>{status}</Text>
+//                                             <Text style={styles.statusDesc}>
+//                                                 {status === "Pending" && "Your application is in queue for review"}
+//                                                 {status === "Under Review" && "The team is actively reviewing your profile"}
+//                                                 {status === "Shortlisted" && "Congratulations! You've been shortlisted 🎉"}
+//                                                 {status === "Approved" && "You've been selected for this internship! 🎊"}
+//                                                 {status === "Rejected" && "Unfortunately, you weren't selected this time"}
+//                                             </Text>
+//                                         </View>
+
+//                                         <Text style={styles.detailSectionTitle}>Internship Info</Text>
+//                                         <View style={styles.infoGrid}>
+//                                             <View style={styles.infoBox}><Text style={styles.infoLabel}>Position</Text><Text style={styles.infoValue}>{internship?.title}</Text></View>
+//                                             <View style={styles.infoBox}><Text style={styles.infoLabel}>Company</Text><Text style={styles.infoValue}>{internship?.company}</Text></View>
+//                                             <View style={styles.infoBox}><Text style={styles.infoLabel}>Type</Text><Text style={styles.infoValue}>{internship?.type}</Text></View>
+//                                             <View style={styles.infoBox}><Text style={styles.infoLabel}>Duration</Text><Text style={styles.infoValue}>{internship?.duration}</Text></View>
+//                                         </View>
+
+//                                         {selectedApp.coverLetter && (
+//                                             <>
+//                                                 <Text style={styles.detailSectionTitle}>Your Cover Letter</Text>
+//                                                 <View style={styles.coverLetterBox}>
+//                                                     <Text style={styles.coverLetterText}>{selectedApp.coverLetter}</Text>
+//                                                 </View>
+//                                             </>
+//                                         )}
+
+//                                         <Text style={styles.detailSectionTitle}>Status History</Text>
+//                                         {selectedApp.statusHistory?.map((h: any, i: number) => (
+//                                             <View key={i} style={styles.historyItem}>
+//                                                 <View style={[styles.historyDot, { backgroundColor: STATUS_CONFIG[h.status]?.color || "#9CA3AF" }]} />
+//                                                 <View>
+//                                                     <Text style={styles.historyStatus}>{h.status}</Text>
+//                                                     <Text style={styles.historyDate}>{new Date(h.date).toDateString()} • {h.note}</Text>
+//                                                 </View>
+//                                             </View>
+//                                         ))}
+//                                     </>
+//                                 );
+//                             })()}
+//                         </ScrollView>
+//                     </View>
+//                 </View>
+//             </Modal>
+//         </View>
+//     );
+// };
+
+// const styles = StyleSheet.create({
+//     container: { flex: 1, backgroundColor: "#F0F4F8" },
+//     summaryRow: {
+//         flexDirection: "row",
+//         backgroundColor: "#fff",
+//         padding: 16,
+//         gap: 8,
+//         borderBottomWidth: 1,
+//         borderBottomColor: "#F3F4F6",
+//     },
+//     summaryChip: { flex: 1, alignItems: "center", paddingVertical: 8 },
+//     summaryNum: { fontSize: 22, fontWeight: "800", color: "#193648" },
+//     summaryLabel: { fontSize: 11, color: "#6B7280", marginTop: 2 },
+//     card: { backgroundColor: "#fff", borderRadius: 20, padding: 18, marginBottom: 14, elevation: 2 },
+//     cardTop: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
+//     companyIcon: {
+//         width: 52, height: 52, borderRadius: 14,
+//         backgroundColor: "#EFF6FF", justifyContent: "center", alignItems: "center",
+//     },
+//     cardTitle: { fontSize: 15, fontWeight: "700", color: "#111827" },
+//     cardCompany: { fontSize: 13, color: "#6B7280", marginTop: 2 },
+//     statusBadge: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, gap: 4 },
+//     statusText: { fontSize: 11, fontWeight: "700" },
+//     progressContainer: { flexDirection: "row", alignItems: "center", marginBottom: 14, paddingHorizontal: 4 },
+//     progressStep: { flex: 1, flexDirection: "row", alignItems: "center" },
+//     progressDot: { width: 20, height: 20, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+//     progressDotActive: { backgroundColor: "#193648" },
+//     progressDotCurrent: { backgroundColor: "#3B82F6", borderWidth: 2, borderColor: "#BFDBFE" },
+//     progressDotInactive: { backgroundColor: "#E5E7EB" },
+//     progressLine: { flex: 1, height: 2, backgroundColor: "#E5E7EB", marginHorizontal: 2 },
+//     progressLineActive: { backgroundColor: "#193648" },
+//     cardFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+//     footerText: { fontSize: 12, color: "#9CA3AF" },
+//     tapMore: { fontSize: 12, fontWeight: "600" },
+//     emptyState: { alignItems: "center", paddingTop: 80 },
+//     emptyTitle: { fontSize: 18, fontWeight: "700", color: "#374151", marginTop: 16 },
+//     emptySubText: { fontSize: 14, color: "#9CA3AF", marginTop: 8 },
+//     modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+//     detailModal: {
+//         backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28,
+//         padding: 24, maxHeight: "92%",
+//     },
+//     modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+//     modalTitle: { fontSize: 20, fontWeight: "800", color: "#111827" },
+//     closeBtn: { backgroundColor: "#F3F4F6", borderRadius: 20, padding: 8 },
+//     statusCard: { borderRadius: 20, padding: 24, alignItems: "center", marginBottom: 24 },
+//     statusBigText: { fontSize: 22, fontWeight: "800", marginTop: 8 },
+//     statusDesc: { fontSize: 14, color: "#6B7280", textAlign: "center", marginTop: 6 },
+//     detailSectionTitle: { fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 10 },
+//     infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 },
+//     infoBox: { width: "47%", backgroundColor: "#F9FAFB", borderRadius: 12, padding: 12 },
+//     infoLabel: { fontSize: 11, color: "#9CA3AF", fontWeight: "600", textTransform: "uppercase", marginBottom: 4 },
+//     infoValue: { fontSize: 14, color: "#111827", fontWeight: "600" },
+//     coverLetterBox: { backgroundColor: "#F9FAFB", borderRadius: 14, padding: 16, marginBottom: 20 },
+//     coverLetterText: { fontSize: 14, color: "#374151", lineHeight: 22 },
+//     historyItem: { flexDirection: "row", alignItems: "flex-start", gap: 14, marginBottom: 14 },
+//     historyDot: { width: 12, height: 12, borderRadius: 6, marginTop: 4 },
+//     historyStatus: { fontSize: 14, fontWeight: "600", color: "#111827" },
+//     historyDate: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+// });
+
+// export default MyApplicationsScreen;
+
+
+
+
+
+
+// import { CONSTANT } from "@/constants/constant";
+// import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+// import AsyncStorage from "@react-native-async-storage/async-storage";
+// import { useFocusEffect } from "@react-navigation/native";
+// import axios from "axios";
+// import React, { useCallback, useState } from "react";
+// import {
+//     ActivityIndicator,
+//     FlatList,
+//     Modal,
+//     ScrollView,
+//     StyleSheet,
+//     Text,
+//     TouchableOpacity,
+//     View,
+// } from "react-native";
+
+// // ─── Status config ────────────────────────────────────────────────────────────
+// // "Send to Liaison" and "Send to Industry" are sub-states of the Shortlisted
+// // phase from the industry side. They live at step 3 (same as Shortlisted).
+// const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: string; step: number; label?: string }> = {
+//     Pending:            { color: "#D97706", bg: "#FFFBEB", icon: "clock-outline",      step: 1 },
+//     "Under Review":     { color: "#2563EB", bg: "#EFF6FF", icon: "magnify",             step: 2 },
+//     Shortlisted:        { color: "#7C3AED", bg: "#F5F3FF", icon: "star-outline",        step: 3 },
+//     "Send to Liaison":  { color: "#7C3AED", bg: "#F5F3FF", icon: "account-arrow-right", step: 3, label: "Shortlisted" },
+//     "Send to Industry": { color: "#7C3AED", bg: "#F5F3FF", icon: "domain",              step: 3, label: "Shortlisted" },
+//     Approved:           { color: "#059669", bg: "#ECFDF5", icon: "check-decagram",      step: 4 },
+//     Rejected:           { color: "#DC2626", bg: "#FEF2F2", icon: "close-circle",        step: 0 },
+// };
+
+// const STEPS = ["Pending", "Under Review", "Shortlisted", "Approved"];
+
+// // Helper: group "Send to Liaison" / "Send to Industry" as Approved for the
+// // Approved filter on the home screen (they are NOT approved here — keep them
+// // as step 3). Only "Approved" itself counts as selected.
+// const isApproved  = (s: string) => s === "Approved";
+// const isShortlist = (s: string) => ["Shortlisted", "Send to Liaison", "Send to Industry"].includes(s);
+
+// const MyApplicationsScreen = () => {
+//     const [applications, setApplications] = useState<any[]>([]);
+//     const [loading, setLoading] = useState(true);
+//     const [selectedApp, setSelectedApp] = useState<any>(null);
+//     const [detailVisible, setDetailVisible] = useState(false);
+
+//     useFocusEffect(
+//         useCallback(() => {
+//             fetchApplications();
+//         }, [])
+//     );
+
+//     const fetchApplications = async () => {
+//         try {
+//             const email = await AsyncStorage.getItem("studentEmail");
+//             if (!email) return;
+//             const res = await axios.get(`${CONSTANT.API_BASE_URL}/api/applications/${email}`);
+//             setApplications(res.data);
+//         } catch (err) {
+//             console.log("Applications fetch error:", err);
+//         } finally {
+//             setLoading(false);
+//         }
+//     };
+
+//     const renderCard = ({ item }: { item: any }) => {
+//         const status = item.status || "Pending";
+//         const cfg = STATUS_CONFIG[status] || STATUS_CONFIG["Pending"];
+//         // Display label: "Send to Liaison" → show badge as "Shortlisted" with sub-text
+//         const displayLabel = cfg.label || status;
+//         const internship = item.internshipId;
+
+//         return (
+//             <TouchableOpacity
+//                 style={[styles.card, isApproved(status) && styles.cardApproved]}
+//                 onPress={() => { setSelectedApp(item); setDetailVisible(true); }}
+//             >
+//                 {/* Green top accent bar for Approved */}
+//                 {isApproved(status) && <View style={styles.approvedAccent} />}
+
+//                 <View style={styles.cardTop}>
+//                     <View style={[styles.companyIcon, isApproved(status) && styles.companyIconApproved]}>
+//                         <MaterialCommunityIcons
+//                             name={isApproved(status) ? "check-decagram" : "office-building"}
+//                             size={24}
+//                             color={isApproved(status) ? "#059669" : "#193648"}
+//                         />
+//                     </View>
+//                     <View style={{ flex: 1, marginLeft: 12 }}>
+//                         <Text style={styles.cardTitle} numberOfLines={1}>{internship?.title || "Internship"}</Text>
+//                         <Text style={styles.cardCompany}>{internship?.company || "Company"}</Text>
+//                     </View>
+//                     <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
+//                         <MaterialCommunityIcons name={cfg.icon as any} size={12} color={cfg.color} />
+//                         <Text style={[styles.statusText, { color: cfg.color }]}>{displayLabel}</Text>
+//                     </View>
+//                 </View>
+
+//                 {/* Sub-label for industry-side shortlist statuses */}
+//                 {(status === "Send to Liaison" || status === "Send to Industry") && (
+//                     <View style={styles.subStatusRow}>
+//                         <MaterialCommunityIcons name={cfg.icon as any} size={13} color={cfg.color} />
+//                         <Text style={[styles.subStatusText, { color: cfg.color }]}>
+//                             {status === "Send to Liaison"
+//                                 ? "Forwarded to liaison office"
+//                                 : "Forwarded to industry partner"}
+//                         </Text>
+//                     </View>
+//                 )}
+
+//                 {/* Approved celebration row */}
+//                 {isApproved(status) && (
+//                     <View style={styles.approvedRow}>
+//                         <MaterialCommunityIcons name="party-popper" size={16} color="#059669" />
+//                         <Text style={styles.approvedRowText}>Congratulations! You've been selected 🎉</Text>
+//                     </View>
+//                 )}
+
+//                 {/* Progress bar */}
+//                 {status !== "Rejected" && (
+//                     <View style={styles.progressContainer}>
+//                         {STEPS.map((step, i) => {
+//                             const isActive  = i < cfg.step;
+//                             const isCurrent = i === cfg.step - 1;
+//                             return (
+//                                 <View key={step} style={styles.progressStep}>
+//                                     <View style={[
+//                                         styles.progressDot,
+//                                         isActive  ? styles.progressDotActive   : styles.progressDotInactive,
+//                                         isCurrent && (isApproved(status) ? styles.progressDotApproved : styles.progressDotCurrent),
+//                                     ]}>
+//                                         {isActive && !isCurrent && (
+//                                             <MaterialCommunityIcons name="check" size={10} color="#fff" />
+//                                         )}
+//                                     </View>
+//                                     {i < STEPS.length - 1 && (
+//                                         <View style={[
+//                                             styles.progressLine,
+//                                             isActive && (isApproved(status) ? styles.progressLineApproved : styles.progressLineActive),
+//                                         ]} />
+//                                     )}
+//                                 </View>
+//                             );
+//                         })}
+//                     </View>
+//                 )}
+
+//                 <View style={styles.cardFooter}>
+//                     <Text style={styles.footerText}>Applied {new Date(item.appliedAt).toDateString()}</Text>
+//                     <Text style={[styles.tapMore, { color: cfg.color }]}>View Details →</Text>
+//                 </View>
+//             </TouchableOpacity>
+//         );
+//     };
+
+//     return (
+//         <View style={styles.container}>
+//             {/* Summary chips */}
+//             <View style={styles.summaryRow}>
+//                 <View style={styles.summaryChip}>
+//                     <Text style={styles.summaryNum}>{applications.length}</Text>
+//                     <Text style={styles.summaryLabel}>Total</Text>
+//                 </View>
+//                 <View style={styles.summaryChip}>
+//                     <Text style={[styles.summaryNum, { color: "#D97706" }]}>
+//                         {applications.filter(a => a.status === "Pending").length}
+//                     </Text>
+//                     <Text style={styles.summaryLabel}>Pending</Text>
+//                 </View>
+//                 <View style={styles.summaryChip}>
+//                     <Text style={[styles.summaryNum, { color: "#7C3AED" }]}>
+//                         {applications.filter(a => isShortlist(a.status)).length}
+//                     </Text>
+//                     <Text style={styles.summaryLabel}>Shortlisted</Text>
+//                 </View>
+//                 <View style={styles.summaryChip}>
+//                     <Text style={[styles.summaryNum, { color: "#059669" }]}>
+//                         {applications.filter(a => isApproved(a.status)).length}
+//                     </Text>
+//                     <Text style={styles.summaryLabel}>Approved</Text>
+//                 </View>
+//             </View>
+
+//             {loading ? (
+//                 <ActivityIndicator color="#193648" size="large" style={{ marginTop: 60 }} />
+//             ) : (
+//                 <FlatList
+//                     data={applications}
+//                     keyExtractor={(item) => item._id}
+//                     renderItem={renderCard}
+//                     contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+//                     ListEmptyComponent={
+//                         <View style={styles.emptyState}>
+//                             <MaterialCommunityIcons name="briefcase-off" size={64} color="#D1D5DB" />
+//                             <Text style={styles.emptyTitle}>No Applications Yet</Text>
+//                             <Text style={styles.emptySubText}>Browse internships and start applying!</Text>
+//                         </View>
+//                     }
+//                 />
+//             )}
+
+//             {/* Detail Modal */}
+//             <Modal visible={detailVisible} animationType="slide" transparent>
+//                 <View style={styles.modalOverlay}>
+//                     <View style={styles.detailModal}>
+//                         <View style={styles.modalHeader}>
+//                             <Text style={styles.modalTitle}>Application Details</Text>
+//                             <TouchableOpacity onPress={() => setDetailVisible(false)} style={styles.closeBtn}>
+//                                 <Ionicons name="close" size={20} color="#374151" />
+//                             </TouchableOpacity>
+//                         </View>
+
+//                         <ScrollView showsVerticalScrollIndicator={false}>
+//                             {selectedApp && (() => {
+//                                 const status = selectedApp.status || "Pending";
+//                                 const cfg = STATUS_CONFIG[status] || STATUS_CONFIG["Pending"];
+//                                 const displayLabel = cfg.label || status;
+//                                 const internship = selectedApp.internshipId;
+//                                 return (
+//                                     <>
+//                                         <View style={[styles.statusCard, { backgroundColor: cfg.bg }]}>
+//                                             <MaterialCommunityIcons name={cfg.icon as any} size={36} color={cfg.color} />
+//                                             <Text style={[styles.statusBigText, { color: cfg.color }]}>{displayLabel}</Text>
+//                                             <Text style={styles.statusDesc}>
+//                                                 {status === "Pending"            && "Your application is in queue for review"}
+//                                                 {status === "Under Review"        && "The team is actively reviewing your profile"}
+//                                                 {status === "Shortlisted"         && "Congratulations! You've been shortlisted 🎉"}
+//                                                 {status === "Send to Liaison"     && "Your profile has been forwarded to the liaison office 📋"}
+//                                                 {status === "Send to Industry"    && "Your profile has been forwarded to the industry partner 🏢"}
+//                                                 {status === "Approved"            && "You've been selected for this internship! 🎊"}
+//                                                 {status === "Rejected"            && "Unfortunately, you weren't selected this time"}
+//                                             </Text>
+//                                         </View>
+
+//                                         <Text style={styles.detailSectionTitle}>Internship Info</Text>
+//                                         <View style={styles.infoGrid}>
+//                                             <View style={styles.infoBox}><Text style={styles.infoLabel}>Position</Text><Text style={styles.infoValue}>{internship?.title}</Text></View>
+//                                             <View style={styles.infoBox}><Text style={styles.infoLabel}>Company</Text><Text style={styles.infoValue}>{internship?.company}</Text></View>
+//                                             <View style={styles.infoBox}><Text style={styles.infoLabel}>Type</Text><Text style={styles.infoValue}>{internship?.type}</Text></View>
+//                                             <View style={styles.infoBox}><Text style={styles.infoLabel}>Duration</Text><Text style={styles.infoValue}>{internship?.duration}</Text></View>
+//                                         </View>
+
+//                                         {selectedApp.coverLetter && (
+//                                             <>
+//                                                 <Text style={styles.detailSectionTitle}>Your Cover Letter</Text>
+//                                                 <View style={styles.coverLetterBox}>
+//                                                     <Text style={styles.coverLetterText}>{selectedApp.coverLetter}</Text>
+//                                                 </View>
+//                                             </>
+//                                         )}
+
+//                                         <Text style={styles.detailSectionTitle}>Status History</Text>
+//                                         {selectedApp.statusHistory?.map((h: any, i: number) => {
+//                                             const hCfg = STATUS_CONFIG[h.status] || STATUS_CONFIG["Pending"];
+//                                             return (
+//                                                 <View key={i} style={styles.historyItem}>
+//                                                     <View style={[styles.historyDot, { backgroundColor: hCfg.color }]} />
+//                                                     <View>
+//                                                         <Text style={styles.historyStatus}>{hCfg.label || h.status}</Text>
+//                                                         <Text style={styles.historyDate}>{new Date(h.date).toDateString()} • {h.note}</Text>
+//                                                     </View>
+//                                                 </View>
+//                                             );
+//                                         })}
+//                                     </>
+//                                 );
+//                             })()}
+//                         </ScrollView>
+//                     </View>
+//                 </View>
+//             </Modal>
+//         </View>
+//     );
+// };
+
+// const styles = StyleSheet.create({
+//     container: { flex: 1, backgroundColor: "#F0F4F8" },
+//     summaryRow: {
+//         flexDirection: "row",
+//         backgroundColor: "#fff",
+//         padding: 16,
+//         gap: 8,
+//         borderBottomWidth: 1,
+//         borderBottomColor: "#F3F4F6",
+//     },
+//     summaryChip: { flex: 1, alignItems: "center", paddingVertical: 8 },
+//     summaryNum: { fontSize: 22, fontWeight: "800", color: "#193648" },
+//     summaryLabel: { fontSize: 11, color: "#6B7280", marginTop: 2 },
+
+//     // Card
+//     card: { backgroundColor: "#fff", borderRadius: 20, padding: 18, marginBottom: 14, elevation: 2, overflow: "hidden" },
+//     cardApproved: {
+//         backgroundColor: "#F0FDF4",
+//         borderWidth: 1.5,
+//         borderColor: "#86EFAC",
+//         elevation: 4,
+//         shadowColor: "#059669",
+//         shadowOffset: { width: 0, height: 4 },
+//         shadowOpacity: 0.12,
+//         shadowRadius: 10,
+//     },
+//     approvedAccent: {
+//         position: "absolute",
+//         top: 0, left: 0, right: 0,
+//         height: 4,
+//         backgroundColor: "#059669",
+//         borderTopLeftRadius: 20,
+//         borderTopRightRadius: 20,
+//     },
+//     approvedRow: {
+//         flexDirection: "row",
+//         alignItems: "center",
+//         backgroundColor: "#DCFCE7",
+//         borderRadius: 10,
+//         paddingHorizontal: 12,
+//         paddingVertical: 7,
+//         marginBottom: 14,
+//         gap: 6,
+//     },
+//     approvedRowText: { fontSize: 12, fontWeight: "700", color: "#059669", flex: 1 },
+
+//     subStatusRow: {
+//         flexDirection: "row",
+//         alignItems: "center",
+//         backgroundColor: "#F5F3FF",
+//         borderRadius: 10,
+//         paddingHorizontal: 12,
+//         paddingVertical: 7,
+//         marginBottom: 14,
+//         gap: 6,
+//     },
+//     subStatusText: { fontSize: 12, fontWeight: "600" },
+
+//     cardTop: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
+//     companyIcon: {
+//         width: 52, height: 52, borderRadius: 14,
+//         backgroundColor: "#EFF6FF", justifyContent: "center", alignItems: "center",
+//     },
+//     companyIconApproved: { backgroundColor: "#DCFCE7" },
+//     cardTitle: { fontSize: 15, fontWeight: "700", color: "#111827" },
+//     cardCompany: { fontSize: 13, color: "#6B7280", marginTop: 2 },
+//     statusBadge: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, gap: 4 },
+//     statusText: { fontSize: 11, fontWeight: "700" },
+
+//     // Progress
+//     progressContainer: { flexDirection: "row", alignItems: "center", marginBottom: 14, paddingHorizontal: 4 },
+//     progressStep: { flex: 1, flexDirection: "row", alignItems: "center" },
+//     progressDot: { width: 20, height: 20, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+//     progressDotActive:   { backgroundColor: "#193648" },
+//     progressDotCurrent:  { backgroundColor: "#3B82F6", borderWidth: 2, borderColor: "#BFDBFE" },
+//     progressDotApproved: { backgroundColor: "#059669", borderWidth: 2, borderColor: "#A7F3D0" },
+//     progressDotInactive: { backgroundColor: "#E5E7EB" },
+//     progressLine:         { flex: 1, height: 2, backgroundColor: "#E5E7EB", marginHorizontal: 2 },
+//     progressLineActive:   { backgroundColor: "#193648" },
+//     progressLineApproved: { backgroundColor: "#059669" },
+
+//     cardFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+//     footerText: { fontSize: 12, color: "#9CA3AF" },
+//     tapMore: { fontSize: 12, fontWeight: "600" },
+//     emptyState: { alignItems: "center", paddingTop: 80 },
+//     emptyTitle: { fontSize: 18, fontWeight: "700", color: "#374151", marginTop: 16 },
+//     emptySubText: { fontSize: 14, color: "#9CA3AF", marginTop: 8 },
+
+//     // Modal
+//     modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+//     detailModal: { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, maxHeight: "92%" },
+//     modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+//     modalTitle: { fontSize: 20, fontWeight: "800", color: "#111827" },
+//     closeBtn: { backgroundColor: "#F3F4F6", borderRadius: 20, padding: 8 },
+//     statusCard: { borderRadius: 20, padding: 24, alignItems: "center", marginBottom: 24 },
+//     statusBigText: { fontSize: 22, fontWeight: "800", marginTop: 8 },
+//     statusDesc: { fontSize: 14, color: "#6B7280", textAlign: "center", marginTop: 6 },
+//     detailSectionTitle: { fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 10 },
+//     infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 },
+//     infoBox: { width: "47%", backgroundColor: "#F9FAFB", borderRadius: 12, padding: 12 },
+//     infoLabel: { fontSize: 11, color: "#9CA3AF", fontWeight: "600", textTransform: "uppercase", marginBottom: 4 },
+//     infoValue: { fontSize: 14, color: "#111827", fontWeight: "600" },
+//     coverLetterBox: { backgroundColor: "#F9FAFB", borderRadius: 14, padding: 16, marginBottom: 20 },
+//     coverLetterText: { fontSize: 14, color: "#374151", lineHeight: 22 },
+//     historyItem: { flexDirection: "row", alignItems: "flex-start", gap: 14, marginBottom: 14 },
+//     historyDot: { width: 12, height: 12, borderRadius: 6, marginTop: 4 },
+//     historyStatus: { fontSize: 14, fontWeight: "600", color: "#111827" },
+//     historyDate: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+// });
+
+// export default MyApplicationsScreen;
+
+
+
+
+
+
+
 import { CONSTANT } from "@/constants/constant";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -203,20 +884,110 @@ import {
     View,
 } from "react-native";
 
-const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: string; step: number }> = {
-    Pending: { color: "#D97706", bg: "#FFFBEB", icon: "clock-outline", step: 1 },
-    "Under Review": { color: "#2563EB", bg: "#EFF6FF", icon: "magnify", step: 2 },
-    Shortlisted: { color: "#7C3AED", bg: "#F5F3FF", icon: "star-outline", step: 3 },
-    Approved: { color: "#059669", bg: "#ECFDF5", icon: "check-circle", step: 4 },
-    Rejected: { color: "#DC2626", bg: "#FEF2F2", icon: "close-circle", step: 0 },
+// ─── Status config ────────────────────────────────────────────────────────────
+const STATUS_CONFIG: Record<string, {
+    color: string;
+    bg: string;
+    icon: string;
+    step: number;
+    label?: string;
+    activeColor: string;
+    lineColor: string;
+}> = {
+    Pending: {
+        color: "#D97706",
+        bg: "#FFFBEB",
+        icon: "clock-outline",
+        step: 1,
+        activeColor: "#D97706",
+        lineColor: "#D97706",
+    },
+    "Under Review": {
+        color: "#2563EB",
+        bg: "#EFF6FF",
+        icon: "magnify",
+        step: 2,
+        activeColor: "#2563EB",
+        lineColor: "#2563EB",
+    },
+    Shortlisted: {
+        color: "#193648",
+        bg: "#F5F3FF",
+        icon: "star-outline",
+        step: 3,
+        activeColor: "#193648",
+        lineColor: "#7C3AED",
+    },
+    "Send to Liaison": {
+        color: "##193648",
+        bg: "#F5F3FF",
+        icon: "account-arrow-right",
+        step: 3,
+        label: "Shortlisted",
+        activeColor: "#193648",
+        lineColor: "#7C3AED",
+    },
+    "Send to Industry": {
+        color: "#193648",
+        bg: "#F5F3FF",
+        icon: "domain",
+        step: 3,
+        label: "Shortlisted",
+        activeColor: "#193648",
+        lineColor: "#7C3AED",
+    },
+    Approved: {
+        color: "#059669",
+        bg: "#ECFDF5",
+        icon: "check-decagram",
+        step: 4,
+        activeColor: "#059669",
+        lineColor: "#059669",
+    },
+    Rejected: {
+        color: "#DC2626",
+        bg: "#FEF2F2",
+        icon: "close-circle",
+        step: 0,
+        activeColor: "#DC2626",
+        lineColor: "#DC2626",
+    },
 };
 
+
+const mapStatus = (s) => {
+    if (!s) return "Pending";
+
+    switch (s.toLowerCase()) {
+        case "pending":
+            return "Pending";
+        case "under_review":
+            return "Under Review";
+        case "shortlisted":
+            return "Shortlisted";
+        case "sent_to_liaison":
+            return "Send to Liaison";
+        case "sent_to_industry":
+            return "Send to Industry";
+        case "approved":
+            return "Approved";
+        case "rejected":
+            return "Rejected";
+        default:
+            return "Pending";
+    }
+};
 const STEPS = ["Pending", "Under Review", "Shortlisted", "Approved"];
+
+const isApproved  = (s: string) => s === "Approved";
+const isRejected  = (s: string) => s === "Rejected";
+const isShortlist = (s: string) =>
+    ["Shortlisted", "Send to Liaison", "Send to Industry"].includes(s);
 
 const MyApplicationsScreen = () => {
     const [applications, setApplications] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [selectedApp, setSelectedApp] = useState<any>(null);
+    const [loading, setLoading]           = useState(true);
+    const [selectedApp, setSelectedApp]   = useState<any>(null);
     const [detailVisible, setDetailVisible] = useState(false);
 
     useFocusEffect(
@@ -229,7 +1000,9 @@ const MyApplicationsScreen = () => {
         try {
             const email = await AsyncStorage.getItem("studentEmail");
             if (!email) return;
-            const res = await axios.get(`${CONSTANT.API_BASE_URL}/api/applications/${email}`);
+            const res = await axios.get(
+                `${CONSTANT.API_BASE_URL}/api/applications/${email}`
+            );
             setApplications(res.data);
         } catch (err) {
             console.log("Applications fetch error:", err);
@@ -238,46 +1011,179 @@ const MyApplicationsScreen = () => {
         }
     };
 
+    // ─── Card ─────────────────────────────────────────────────────────────────
     const renderCard = ({ item }: { item: any }) => {
-        const status = item.status || "Pending";
-        const cfg = STATUS_CONFIG[status] || STATUS_CONFIG["Pending"];
-        const internship = item.internshipId;
+        // const status       = item.status || "Pending";
+
+
+        const status = mapStatus(item.status);
+        const cfg          = STATUS_CONFIG[status] || STATUS_CONFIG["Pending"];
+        const displayLabel = cfg.label || status;
+        const internship   = item.internshipId;
 
         return (
-            <TouchableOpacity style={styles.card} onPress={() => { setSelectedApp(item); setDetailVisible(true); }}>
+            <TouchableOpacity
+                style={[
+                    styles.card,
+                    isApproved(status) && styles.cardApproved,
+                    isRejected(status) && styles.cardRejected,
+                ]}
+                onPress={() => {
+                    setSelectedApp(item);
+                    setDetailVisible(true);
+                }}
+                activeOpacity={0.85}
+            >
+                {/* Top accent bar */}
+                {isApproved(status) && <View style={[styles.accentBar, { backgroundColor: "#059669" }]} />}
+                {isRejected(status) && <View style={[styles.accentBar, { backgroundColor: "#DC2626" }]} />}
+
+                {/* Card top row */}
                 <View style={styles.cardTop}>
-                    <View style={styles.companyIcon}>
-                        <MaterialCommunityIcons name="office-building" size={24} color="#193648" />
+                    <View
+                        style={[
+                            styles.companyIcon,
+                            { backgroundColor: cfg.bg },
+                        ]}
+                    >
+                        <MaterialCommunityIcons
+                            name={
+                                isApproved(status)
+                                    ? "check-decagram"
+                                    : isRejected(status)
+                                    ? "close-circle"
+                                    : "office-building"
+                            }
+                            size={24}
+                            color={cfg.color}
+                        />
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.cardTitle} numberOfLines={1}>{internship?.title || "Internship"}</Text>
-                        <Text style={styles.cardCompany}>{internship?.company || "Company"}</Text>
+                        <Text style={styles.cardTitle} numberOfLines={1}>
+                            {internship?.title || "Internship"}
+                        </Text>
+                        <Text style={styles.cardCompany}>
+                            {internship?.company || "Company"}
+                        </Text>
                     </View>
-                    <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
-                        <MaterialCommunityIcons name={cfg.icon as any} size={12} color={cfg.color} />
-                        <Text style={[styles.statusText, { color: cfg.color }]}>{status}</Text>
+                    <View
+                        style={[
+                            styles.statusBadge,
+                            { backgroundColor: cfg.bg },
+                        ]}
+                    >
+                        <MaterialCommunityIcons
+                            name={cfg.icon as any}
+                            size={12}
+                            color={cfg.color}
+                        />
+                        <Text style={[styles.statusText, { color: cfg.color }]}>
+                            {displayLabel}
+                        </Text>
                     </View>
                 </View>
 
-                {/* Progress Bar */}
-                {status !== "Rejected" && (
+                {/* Sub-label for Send to Liaison / Send to Industry */}
+                {(status === "Send to Liaison" ||
+                    status === "Send to Industry") && (
+                    <View
+                        style={[
+                            styles.subStatusRow,
+                            { backgroundColor: cfg.bg },
+                        ]}
+                    >
+                        <MaterialCommunityIcons
+                            name={cfg.icon as any}
+                            size={13}
+                            color={cfg.color}
+                        />
+                        <Text
+                            style={[
+                                styles.subStatusText,
+                                { color: cfg.color },
+                            ]}
+                        >
+                            {status === "Send to Liaison"
+                                ? "Forwarded to liaison office"
+                                : "Forwarded to industry partner"}
+                        </Text>
+                    </View>
+                )}
+
+                {/* Approved celebration row */}
+                {isApproved(status) && (
+                    <View style={styles.approvedRow}>
+                        <MaterialCommunityIcons
+                            name="party-popper"
+                            size={16}
+                            color="#059669"
+                        />
+                        <Text style={styles.approvedRowText}>
+                            Congratulations! You've been selected 🎉
+                        </Text>
+                    </View>
+                )}
+
+                {/* Rejected row */}
+                {isRejected(status) && (
+                    <View style={styles.rejectedRow}>
+                        <MaterialCommunityIcons
+                            name="emoticon-sad-outline"
+                            size={16}
+                            color="#DC2626"
+                        />
+                        <Text style={styles.rejectedRowText}>
+                            Unfortunately not selected this time
+                        </Text>
+                    </View>
+                )}
+
+                {/* ── Progress bar ── */}
+                {!isRejected(status) && (
                     <View style={styles.progressContainer}>
                         {STEPS.map((step, i) => {
-                            const isActive = i < cfg.step;
-                            const isCurrent = i === cfg.step - 1;
+                            const isFilled  = i < cfg.step;
+                            const isLastFilled = i === cfg.step - 1;
+
                             return (
                                 <View key={step} style={styles.progressStep}>
-                                    <View style={[
-                                        styles.progressDot,
-                                        isActive ? styles.progressDotActive : styles.progressDotInactive,
-                                        isCurrent && styles.progressDotCurrent,
-                                    ]}>
-                                        {isActive && !isCurrent && (
-                                            <MaterialCommunityIcons name="check" size={10} color="#fff" />
+                                    {/* Dot */}
+                                    <View
+                                        style={[
+                                            styles.progressDot,
+                                            isFilled
+                                                ? {
+                                                      backgroundColor:
+                                                          cfg.activeColor,
+                                                  }
+                                                : styles.progressDotInactive,
+                                            isLastFilled && {
+                                                borderWidth: 2.5,
+                                                borderColor:
+                                                    cfg.activeColor + "55",
+                                            },
+                                        ]}
+                                    >
+                                        {isFilled && !isLastFilled && (
+                                            <MaterialCommunityIcons
+                                                name="check"
+                                                size={10}
+                                                color="#fff"
+                                            />
                                         )}
                                     </View>
+
+                                    {/* Connector line */}
                                     {i < STEPS.length - 1 && (
-                                        <View style={[styles.progressLine, isActive && styles.progressLineActive]} />
+                                        <View
+                                            style={[
+                                                styles.progressLine,
+                                                isFilled && {
+                                                    backgroundColor:
+                                                        cfg.lineColor,
+                                                },
+                                            ]}
+                                        />
                                     )}
                                 </View>
                             );
@@ -285,121 +1191,351 @@ const MyApplicationsScreen = () => {
                     </View>
                 )}
 
+                {/* Rejected — red "X" bar */}
+                {isRejected(status) && (
+                    <View style={styles.rejectedBar}>
+                        <View style={styles.rejectedBarLine} />
+                        <View
+                            style={[
+                                styles.progressDot,
+                                { backgroundColor: "#DC2626" },
+                            ]}
+                        >
+                            <MaterialCommunityIcons
+                                name="close"
+                                size={10}
+                                color="#fff"
+                            />
+                        </View>
+                        <View style={styles.rejectedBarLine} />
+                    </View>
+                )}
+
                 <View style={styles.cardFooter}>
                     <Text style={styles.footerText}>
-                        Applied {new Date(item.appliedAt).toDateString()}
+                        Applied{" "}
+                        {new Date(item.appliedAt).toDateString()}
                     </Text>
-                    <Text style={[styles.tapMore, { color: cfg.color }]}>View Details →</Text>
+                    <Text style={[styles.tapMore, { color: cfg.color }]}>
+                        View Details →
+                    </Text>
                 </View>
             </TouchableOpacity>
         );
     };
 
+    // ─── Screen ───────────────────────────────────────────────────────────────
     return (
         <View style={styles.container}>
+            {/* Summary chips */}
             <View style={styles.summaryRow}>
                 <View style={styles.summaryChip}>
-                    <Text style={styles.summaryNum}>{applications.length}</Text>
+                    <Text style={styles.summaryNum}>
+                        {applications.length}
+                    </Text>
                     <Text style={styles.summaryLabel}>Total</Text>
                 </View>
                 <View style={styles.summaryChip}>
-                    <Text style={[styles.summaryNum, { color: "#D97706" }]}>
-                        {applications.filter(a => a.status === "Pending").length}
+                    <Text
+                        style={[styles.summaryNum, { color: "#D97706" }]}
+                    >
+                        {
+                            applications.filter(
+                                // (a) => a.status === "Pending"
+                                (a) => mapStatus(a.status) === "Pending"
+                            ).length
+                        }
                     </Text>
                     <Text style={styles.summaryLabel}>Pending</Text>
                 </View>
                 <View style={styles.summaryChip}>
-                    <Text style={[styles.summaryNum, { color: "#7C3AED" }]}>
-                        {applications.filter(a => a.status === "Shortlisted").length}
+                    <Text
+                        style={[styles.summaryNum, { color: "#7C3AED" }]}
+                    >
+                        {
+                            applications.filter((a) =>
+                                // isShortlist(a.status)
+
+                            isShortlist(mapStatus(a.status))
+                            ).length
+                        }
                     </Text>
                     <Text style={styles.summaryLabel}>Shortlisted</Text>
                 </View>
                 <View style={styles.summaryChip}>
-                    <Text style={[styles.summaryNum, { color: "#059669" }]}>
-                        {applications.filter(a => a.status === "Approved").length}
+                    <Text
+                        style={[styles.summaryNum, { color: "#059669" }]}
+                    >
+                        {
+                            applications.filter((a) =>
+                                // isApproved(a.status)
+                            isApproved(mapStatus(a.status))
+                            ).length
+                        }
                     </Text>
                     <Text style={styles.summaryLabel}>Approved</Text>
+                </View>
+                <View style={styles.summaryChip}>
+                    <Text
+                        style={[styles.summaryNum, { color: "#DC2626" }]}
+                    >
+                        {
+                            applications.filter((a) =>
+                                // isRejected(a.status)
+                            isRejected(mapStatus(a.status))
+                            ).length
+                        }
+                    </Text>
+                    <Text style={styles.summaryLabel}>Rejected</Text>
                 </View>
             </View>
 
             {loading ? (
-                <ActivityIndicator color="#193648" size="large" style={{ marginTop: 60 }} />
+                <ActivityIndicator
+                    color="#193648"
+                    size="large"
+                    style={{ marginTop: 60 }}
+                />
             ) : (
                 <FlatList
                     data={applications}
                     keyExtractor={(item) => item._id}
                     renderItem={renderCard}
-                    contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                    contentContainerStyle={{
+                        padding: 16,
+                        paddingBottom: 100,
+                    }}
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
-                            <MaterialCommunityIcons name="briefcase-off" size={64} color="#D1D5DB" />
-                            <Text style={styles.emptyTitle}>No Applications Yet</Text>
-                            <Text style={styles.emptySubText}>Browse internships and start applying!</Text>
+                            <MaterialCommunityIcons
+                                name="briefcase-off"
+                                size={64}
+                                color="#D1D5DB"
+                            />
+                            <Text style={styles.emptyTitle}>
+                                No Applications Yet
+                            </Text>
+                            <Text style={styles.emptySubText}>
+                                Browse internships and start applying!
+                            </Text>
                         </View>
                     }
                 />
             )}
 
-            {/* Detail Modal */}
+            {/* ── Detail Modal ── */}
             <Modal visible={detailVisible} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
                     <View style={styles.detailModal}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Application Details</Text>
-                            <TouchableOpacity onPress={() => setDetailVisible(false)} style={styles.closeBtn}>
-                                <Ionicons name="close" size={20} color="#374151" />
+                            <Text style={styles.modalTitle}>
+                                Application Details
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => setDetailVisible(false)}
+                                style={styles.closeBtn}
+                            >
+                                <Ionicons
+                                    name="close"
+                                    size={20}
+                                    color="#374151"
+                                />
                             </TouchableOpacity>
                         </View>
 
                         <ScrollView showsVerticalScrollIndicator={false}>
-                            {selectedApp && (() => {
-                                const status = selectedApp.status || "Pending";
-                                const cfg = STATUS_CONFIG[status];
-                                const internship = selectedApp.internshipId;
-                                return (
-                                    <>
-                                        <View style={[styles.statusCard, { backgroundColor: cfg.bg }]}>
-                                            <MaterialCommunityIcons name={cfg.icon as any} size={36} color={cfg.color} />
-                                            <Text style={[styles.statusBigText, { color: cfg.color }]}>{status}</Text>
-                                            <Text style={styles.statusDesc}>
-                                                {status === "Pending" && "Your application is in queue for review"}
-                                                {status === "Under Review" && "The team is actively reviewing your profile"}
-                                                {status === "Shortlisted" && "Congratulations! You've been shortlisted 🎉"}
-                                                {status === "Approved" && "You've been selected for this internship! 🎊"}
-                                                {status === "Rejected" && "Unfortunately, you weren't selected this time"}
-                                            </Text>
-                                        </View>
+                            {selectedApp &&
+                                (() => {
+                                    // const status =
+                                    //     selectedApp.status || "Pending";
 
-                                        <Text style={styles.detailSectionTitle}>Internship Info</Text>
-                                        <View style={styles.infoGrid}>
-                                            <View style={styles.infoBox}><Text style={styles.infoLabel}>Position</Text><Text style={styles.infoValue}>{internship?.title}</Text></View>
-                                            <View style={styles.infoBox}><Text style={styles.infoLabel}>Company</Text><Text style={styles.infoValue}>{internship?.company}</Text></View>
-                                            <View style={styles.infoBox}><Text style={styles.infoLabel}>Type</Text><Text style={styles.infoValue}>{internship?.type}</Text></View>
-                                            <View style={styles.infoBox}><Text style={styles.infoLabel}>Duration</Text><Text style={styles.infoValue}>{internship?.duration}</Text></View>
-                                        </View>
+                                    const status = mapStatus(selectedApp.status);
+                                    const cfg =
+                                        STATUS_CONFIG[status] ||
+                                        STATUS_CONFIG["Pending"];
+                                    const displayLabel =
+                                        cfg.label || status;
+                                    const internship =
+                                        selectedApp.internshipId;
 
-                                        {selectedApp.coverLetter && (
-                                            <>
-                                                <Text style={styles.detailSectionTitle}>Your Cover Letter</Text>
-                                                <View style={styles.coverLetterBox}>
-                                                    <Text style={styles.coverLetterText}>{selectedApp.coverLetter}</Text>
+                                    return (
+                                        <>
+                                            {/* Status card */}
+                                            <View
+                                                style={[
+                                                    styles.statusCard,
+                                                    {
+                                                        backgroundColor:
+                                                            cfg.bg,
+                                                        borderColor:
+                                                            cfg.color +
+                                                            "40",
+                                                        borderWidth: 1.5,
+                                                    },
+                                                ]}
+                                            >
+                                                <MaterialCommunityIcons
+                                                    name={cfg.icon as any}
+                                                    size={40}
+                                                    color={cfg.color}
+                                                />
+                                                <Text
+                                                    style={[
+                                                        styles.statusBigText,
+                                                        { color: cfg.color },
+                                                    ]}
+                                                >
+                                                    {displayLabel}
+                                                </Text>
+                                                <Text
+                                                    style={styles.statusDesc}
+                                                >
+                                                    {status === "Pending" &&
+                                                        "Your application is in queue for review"}
+                                                    {status ===
+                                                        "Under Review" &&
+                                                        "The team is actively reviewing your profile"}
+                                                    {status ===
+                                                        "Shortlisted" &&
+                                                        "Congratulations! You've been shortlisted 🎉"}
+                                                    {status ===
+                                                        "Send to Liaison" &&
+                                                        "Your profile has been forwarded to the liaison office 📋"}
+                                                    {status ===
+                                                        "Send to Industry" &&
+                                                        "Your profile has been forwarded to the industry partner 🏢"}
+                                                    {status === "Approved" &&
+                                                        "You've been selected for this internship! 🎊"}
+                                                    {status === "Rejected" &&
+                                                        "Unfortunately, you weren't selected this time"}
+                                                </Text>
+                                            </View>
+
+                                            {/* Modal progress bar */}
+                                            {!isRejected(status) && (
+                                                <View style={styles.modalProgressWrapper}>
+                                                    <View style={styles.progressContainer}>
+                                                        {STEPS.map((step, i) => {
+                                                            const isFilled = i < cfg.step;
+                                                            const isLastFilled = i === cfg.step - 1;
+                                                            return (
+                                                                <View key={step} style={styles.progressStep}>
+                                                                    <View style={[
+                                                                        styles.progressDot,
+                                                                        isFilled
+                                                                            ? { backgroundColor: cfg.activeColor }
+                                                                            : styles.progressDotInactive,
+                                                                        isLastFilled && {
+                                                                            borderWidth: 2.5,
+                                                                            borderColor: cfg.activeColor + "55",
+                                                                        },
+                                                                    ]}>
+                                                                        {isFilled && !isLastFilled && (
+                                                                            <MaterialCommunityIcons name="check" size={10} color="#fff" />
+                                                                        )}
+                                                                    </View>
+                                                                    {i < STEPS.length - 1 && (
+                                                                        <View style={[
+                                                                            styles.progressLine,
+                                                                            isFilled && { backgroundColor: cfg.lineColor },
+                                                                        ]} />
+                                                                    )}
+                                                                </View>
+                                                            );
+                                                        })}
+                                                    </View>
+                                                    <View style={styles.stepLabelsRow}>
+                                                        {STEPS.map((step, i) => (
+                                                            <Text key={step} style={[
+                                                                styles.stepLabel,
+                                                                i < cfg.step && { color: cfg.activeColor, fontWeight: "700" },
+                                                            ]}>
+                                                                {step}
+                                                            </Text>
+                                                        ))}
+                                                    </View>
                                                 </View>
-                                            </>
-                                        )}
+                                            )}
 
-                                        <Text style={styles.detailSectionTitle}>Status History</Text>
-                                        {selectedApp.statusHistory?.map((h: any, i: number) => (
-                                            <View key={i} style={styles.historyItem}>
-                                                <View style={[styles.historyDot, { backgroundColor: STATUS_CONFIG[h.status]?.color || "#9CA3AF" }]} />
-                                                <View>
-                                                    <Text style={styles.historyStatus}>{h.status}</Text>
-                                                    <Text style={styles.historyDate}>{new Date(h.date).toDateString()} • {h.note}</Text>
+                                            {/* Internship info */}
+                                            <Text style={styles.detailSectionTitle}>
+                                                Internship Info
+                                            </Text>
+                                            <View style={styles.infoGrid}>
+                                                <View style={styles.infoBox}>
+                                                    <Text style={styles.infoLabel}>Position</Text>
+                                                    <Text style={styles.infoValue}>{internship?.title}</Text>
+                                                </View>
+                                                <View style={styles.infoBox}>
+                                                    <Text style={styles.infoLabel}>Company</Text>
+                                                    <Text style={styles.infoValue}>{internship?.company}</Text>
+                                                </View>
+                                                <View style={styles.infoBox}>
+                                                    <Text style={styles.infoLabel}>Type</Text>
+                                                    <Text style={styles.infoValue}>{internship?.type}</Text>
+                                                </View>
+                                                <View style={styles.infoBox}>
+                                                    <Text style={styles.infoLabel}>Duration</Text>
+                                                    <Text style={styles.infoValue}>{internship?.duration}</Text>
                                                 </View>
                                             </View>
-                                        ))}
-                                    </>
-                                );
-                            })()}
+
+                                            {/* Cover letter */}
+                                            {selectedApp.coverLetter && (
+                                                <>
+                                                    <Text style={styles.detailSectionTitle}>
+                                                        Your Cover Letter
+                                                    </Text>
+                                                    <View style={styles.coverLetterBox}>
+                                                        <Text style={styles.coverLetterText}>
+                                                            {selectedApp.coverLetter}
+                                                        </Text>
+                                                    </View>
+                                                </>
+                                            )}
+
+                                            {/* Status history */}
+                                            <Text style={styles.detailSectionTitle}>
+                                                Status History
+                                            </Text>
+                                            {selectedApp.statusHistory?.map(
+                                                (h: any, i: number) => {
+                                                    const hCfg =
+                                                        STATUS_CONFIG[
+                                                            h.status
+                                                        ] ||
+                                                        STATUS_CONFIG[
+                                                            "Pending"
+                                                        ];
+                                                    return (
+                                                        <View
+                                                            key={i}
+                                                            style={styles.historyItem}
+                                                        >
+                                                            <View
+                                                                style={[
+                                                                    styles.historyDot,
+                                                                    {
+                                                                        backgroundColor:
+                                                                            hCfg.color,
+                                                                    },
+                                                                ]}
+                                                            />
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={styles.historyStatus}>
+                                                                    {hCfg.label || h.status}
+                                                                </Text>
+                                                                <Text style={styles.historyDate}>
+                                                                    {new Date(h.date).toDateString()} • {h.note}
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+                                                    );
+                                                }
+                                            )}
+                                        </>
+                                    );
+                                })()}
                         </ScrollView>
                     </View>
                 </View>
@@ -410,63 +1546,251 @@ const MyApplicationsScreen = () => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#F0F4F8" },
+
+    // ── Summary ───────────────────────────────────────────────────────────────
     summaryRow: {
         flexDirection: "row",
         backgroundColor: "#fff",
-        padding: 16,
-        gap: 8,
+        padding: 12,
+        gap: 4,
         borderBottomWidth: 1,
         borderBottomColor: "#F3F4F6",
     },
-    summaryChip: { flex: 1, alignItems: "center", paddingVertical: 8 },
-    summaryNum: { fontSize: 22, fontWeight: "800", color: "#193648" },
-    summaryLabel: { fontSize: 11, color: "#6B7280", marginTop: 2 },
-    card: { backgroundColor: "#fff", borderRadius: 20, padding: 18, marginBottom: 14, elevation: 2 },
-    cardTop: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
+    summaryChip: { flex: 1, alignItems: "center", paddingVertical: 6 },
+    summaryNum:  { fontSize: 20, fontWeight: "800", color: "#193648" },
+    summaryLabel:{ fontSize: 10, color: "#6B7280", marginTop: 2 },
+
+    // ── Card ──────────────────────────────────────────────────────────────────
+    card: {
+        backgroundColor: "#fff",
+        borderRadius: 20,
+        padding: 18,
+        marginBottom: 14,
+        elevation: 2,
+        overflow: "hidden",
+    },
+    cardApproved: {
+        backgroundColor: "#F0FDF4",
+        borderWidth: 1.5,
+        borderColor: "#86EFAC",
+        elevation: 4,
+        shadowColor: "#059669",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 10,
+    },
+    cardRejected: {
+        backgroundColor: "#FFF5F5",
+        borderWidth: 1.5,
+        borderColor: "#FECACA",
+        elevation: 2,
+    },
+    accentBar: {
+        position: "absolute",
+        top: 0, left: 0, right: 0,
+        height: 4,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+    },
+
+    cardTop: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
     companyIcon: {
-        width: 52, height: 52, borderRadius: 14,
-        backgroundColor: "#EFF6FF", justifyContent: "center", alignItems: "center",
+        width: 52, height: 52,
+        borderRadius: 14,
+        justifyContent: "center",
+        alignItems: "center",
     },
-    cardTitle: { fontSize: 15, fontWeight: "700", color: "#111827" },
+    cardTitle:   { fontSize: 15, fontWeight: "700", color: "#111827" },
     cardCompany: { fontSize: 13, color: "#6B7280", marginTop: 2 },
-    statusBadge: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, gap: 4 },
-    statusText: { fontSize: 11, fontWeight: "700" },
-    progressContainer: { flexDirection: "row", alignItems: "center", marginBottom: 14, paddingHorizontal: 4 },
-    progressStep: { flex: 1, flexDirection: "row", alignItems: "center" },
-    progressDot: { width: 20, height: 20, borderRadius: 10, justifyContent: "center", alignItems: "center" },
-    progressDotActive: { backgroundColor: "#193648" },
-    progressDotCurrent: { backgroundColor: "#3B82F6", borderWidth: 2, borderColor: "#BFDBFE" },
-    progressDotInactive: { backgroundColor: "#E5E7EB" },
-    progressLine: { flex: 1, height: 2, backgroundColor: "#E5E7EB", marginHorizontal: 2 },
-    progressLineActive: { backgroundColor: "#193648" },
-    cardFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-    footerText: { fontSize: 12, color: "#9CA3AF" },
-    tapMore: { fontSize: 12, fontWeight: "600" },
-    emptyState: { alignItems: "center", paddingTop: 80 },
-    emptyTitle: { fontSize: 18, fontWeight: "700", color: "#374151", marginTop: 16 },
-    emptySubText: { fontSize: 14, color: "#9CA3AF", marginTop: 8 },
-    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-    detailModal: {
-        backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28,
-        padding: 24, maxHeight: "92%",
+    statusBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
+        gap: 4,
     },
-    modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+    statusText: { fontSize: 11, fontWeight: "700" },
+
+    subStatusRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        marginBottom: 12,
+        gap: 6,
+    },
+    subStatusText: { fontSize: 12, fontWeight: "600" },
+
+    approvedRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#DCFCE7",
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        marginBottom: 12,
+        gap: 6,
+    },
+    approvedRowText: { fontSize: 12, fontWeight: "700", color: "#059669", flex: 1 },
+
+    rejectedRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#FEE2E2",
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        marginBottom: 12,
+        gap: 6,
+    },
+    rejectedRowText: { fontSize: 12, fontWeight: "700", color: "#DC2626", flex: 1 },
+
+    // ── Progress ──────────────────────────────────────────────────────────────
+    progressContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 12,
+        paddingHorizontal: 4,
+    },
+    progressStep: { flex: 1, flexDirection: "row", alignItems: "center" },
+    progressDot: {
+        width: 20, height: 20,
+        borderRadius: 10,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    progressDotInactive: { backgroundColor: "#E5E7EB" },
+    progressLine:  { flex: 1, height: 2, backgroundColor: "#E5E7EB", marginHorizontal: 2 },
+
+    // Rejected bar (single red dot centred)
+    rejectedBar: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 12,
+        paddingHorizontal: 4,
+    },
+    rejectedBarLine: {
+        flex: 1,
+        height: 2,
+        backgroundColor: "#FECACA",
+        marginHorizontal: 2,
+    },
+
+    cardFooter: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+    footerText: { fontSize: 12, color: "#9CA3AF" },
+    tapMore:    { fontSize: 12, fontWeight: "600" },
+
+    // ── Empty ─────────────────────────────────────────────────────────────────
+    emptyState:   { alignItems: "center", paddingTop: 80 },
+    emptyTitle:   { fontSize: 18, fontWeight: "700", color: "#374151", marginTop: 16 },
+    emptySubText: { fontSize: 14, color: "#9CA3AF", marginTop: 8 },
+
+    // ── Modal ─────────────────────────────────────────────────────────────────
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        justifyContent: "flex-end",
+    },
+    detailModal: {
+        backgroundColor: "#fff",
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        padding: 24,
+        maxHeight: "92%",
+    },
+    modalHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 20,
+    },
     modalTitle: { fontSize: 20, fontWeight: "800", color: "#111827" },
-    closeBtn: { backgroundColor: "#F3F4F6", borderRadius: 20, padding: 8 },
-    statusCard: { borderRadius: 20, padding: 24, alignItems: "center", marginBottom: 24 },
+    closeBtn: {
+        backgroundColor: "#F3F4F6",
+        borderRadius: 20,
+        padding: 8,
+    },
+
+    statusCard: {
+        borderRadius: 20,
+        padding: 24,
+        alignItems: "center",
+        marginBottom: 20,
+    },
     statusBigText: { fontSize: 22, fontWeight: "800", marginTop: 8 },
-    statusDesc: { fontSize: 14, color: "#6B7280", textAlign: "center", marginTop: 6 },
-    detailSectionTitle: { fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 10 },
-    infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 },
-    infoBox: { width: "47%", backgroundColor: "#F9FAFB", borderRadius: 12, padding: 12 },
-    infoLabel: { fontSize: 11, color: "#9CA3AF", fontWeight: "600", textTransform: "uppercase", marginBottom: 4 },
-    infoValue: { fontSize: 14, color: "#111827", fontWeight: "600" },
-    coverLetterBox: { backgroundColor: "#F9FAFB", borderRadius: 14, padding: 16, marginBottom: 20 },
+    statusDesc: {
+        fontSize: 14,
+        color: "#6B7280",
+        textAlign: "center",
+        marginTop: 6,
+    },
+
+    // Modal progress with step labels
+    modalProgressWrapper: {
+        marginBottom: 20,
+        paddingHorizontal: 4,
+    },
+    stepLabelsRow: {
+        flexDirection: "row",
+        marginTop: 6,
+    },
+    stepLabel: {
+        flex: 1,
+        fontSize: 9,
+        color: "#9CA3AF",
+        textAlign: "center",
+        fontWeight: "600",
+        textTransform: "uppercase",
+    },
+
+    detailSectionTitle: {
+        fontSize: 16,
+        fontWeight: "700",
+        color: "#111827",
+        marginBottom: 10,
+    },
+    infoGrid: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 10,
+        marginBottom: 20,
+    },
+    infoBox: {
+        width: "47%",
+        backgroundColor: "#F9FAFB",
+        borderRadius: 12,
+        padding: 12,
+    },
+    infoLabel: {
+        fontSize: 11,
+        color: "#9CA3AF",
+        fontWeight: "600",
+        textTransform: "uppercase",
+        marginBottom: 4,
+    },
+    infoValue:      { fontSize: 14, color: "#111827", fontWeight: "600" },
+    coverLetterBox: {
+        backgroundColor: "#F9FAFB",
+        borderRadius: 14,
+        padding: 16,
+        marginBottom: 20,
+    },
     coverLetterText: { fontSize: 14, color: "#374151", lineHeight: 22 },
-    historyItem: { flexDirection: "row", alignItems: "flex-start", gap: 14, marginBottom: 14 },
-    historyDot: { width: 12, height: 12, borderRadius: 6, marginTop: 4 },
-    historyStatus: { fontSize: 14, fontWeight: "600", color: "#111827" },
-    historyDate: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+    historyItem: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: 14,
+        marginBottom: 14,
+    },
+    historyDot:   { width: 12, height: 12, borderRadius: 6, marginTop: 4 },
+    historyStatus:{ fontSize: 14, fontWeight: "600", color: "#111827" },
+    historyDate:  { fontSize: 12, color: "#6B7280", marginTop: 2 },
 });
 
 export default MyApplicationsScreen;

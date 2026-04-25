@@ -263,6 +263,7 @@ import express from "express";
 import Event from "../models/Event.js";
 
 import Notification from "../../student/models/Notification.js";
+import { notifyStudent } from "../utils/notify.js";
 
 
 const router = express.Router();
@@ -579,18 +580,13 @@ router.post("/register", async (req, res) => {
     //   ).toDateString()} at ${event.time}.`,
     //   type: "event",
     // });
-try {
-    const notif = new Notification({
-        studentEmail: studentEmail,
+    await notifyStudent(req, {
+        studentEmail,
         title: "Event Registration Confirmed! 📅",
         message: `You're registered for "${event.title}" on ${new Date(event.date).toDateString()} at ${event.time}.`,
         type: "event",
     });
-    await notif.save();
-} catch (notifErr) {
-    console.log("Notif error:", notifErr.message);
-    // registration fail nahi hogi notification error se
-}
+
     res.json({ message: "Registered successfully!", event });
   } catch (err) {
     res.status(500).json({ error: err.message });

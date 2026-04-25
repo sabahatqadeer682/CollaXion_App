@@ -321,72 +321,86 @@ router.post("/upload-cv/:email", upload.single("cv"), async (req, res) => {
 
 
         student.cvUrl = `/uploads/cv/${req.file.filename}`;
+        // Mark as processing so the frontend can show a state
+        student.cvProcessing = true;
+        await student.save();
 
-        console.log("Starting AI analysis...");
+        // 🚀 Respond IMMEDIATELY — mobile fetch was timing out on the
+        // multi-second Gemini calls below, surfacing as "Network request failed".
+        res.status(200).json({
+            success: true,
+            message: "CV uploaded. AI analysis is running in the background.",
+            student,
+        });
 
-        // Extract skills using AI
-        let extractedData;
-        try {
-            extractedData = await extractSkillsFromCV(uploadedFilePath, fileType);
-            if (!extractedData || !extractedData.skills) {
-                throw new Error("No data extracted from CV");
-            }
-            console.log("AI extraction successful");
-            student.extractedSkills = extractedData.skills || [];
+        // ── Background AI extraction (fire-and-forget) ──
+        (async () => {
+            try {
+                console.log("Starting AI analysis for", email);
+                const extractedData = await extractSkillsFromCV(uploadedFilePath, fileType);
+                if (!extractedData || !extractedData.skills) {
+                    throw new Error("No data extracted from CV");
+                }
+                console.log("AI extraction successful for", email);
 
+                const fresh = await Student.findOne({ email });
+                if (!fresh) return;
 
-            if (Array.isArray(extractedData.education)) {
-                extractedData.education = extractedData.education.map((edu) => {
-                    if (typeof edu === "object" && edu !== null) {
-                        const degree = edu.degree || "";
-                        const institution = edu.institution || "";
-                        const years = edu.years || "";
-                        return `${degree} - ${institution} (${years})`.trim();
+                fresh.extractedSkills = extractedData.skills || [];
+
+                if (Array.isArray(extractedData.education)) {
+                    extractedData.education = extractedData.education.map((edu) => {
+                        if (typeof edu === "object" && edu !== null) {
+                            const degree = edu.degree || "";
+                            const institution = edu.institution || "";
+                            const years = edu.years || "";
+                            return `${degree} - ${institution} (${years})`.trim();
+                        }
+                        return edu;
+                    });
+                }
+                fresh.education = extractedData.education;
+
+                if (Array.isArray(extractedData.experience)) {
+                    extractedData.experience = extractedData.experience.map((exp) => {
+                        if (typeof exp === "object" && exp !== null) {
+                            const title = exp.title || "";
+                            const company = exp.company || "";
+                            const duration = exp.duration || "";
+                            return `${title} - ${company} (${duration})`.trim();
+                        }
+                        return exp;
+                    });
+                }
+                fresh.experience = extractedData.experience || [];
+                fresh.professionalSummary = extractedData.summary || "";
+                fresh.cvProcessing = false;
+                await fresh.save();
+
+                // Push a notification + WS event so the UI updates in real time
+                try {
+                    const { notifyStudent } = await import("../utils/notify.js");
+                    await notifyStudent(req, {
+                        studentEmail: email,
+                        title: "CV Analysis Complete ✅",
+                        message: `Found ${fresh.extractedSkills.length} skills in your CV.`,
+                        type: "general",
+                    });
+                } catch (notifErr) {
+                    console.warn("CV notif error:", notifErr.message);
+                }
+            } catch (aiError) {
+                console.error("AI extraction failed:", aiError.message);
+                try {
+                    const fresh = await Student.findOne({ email });
+                    if (fresh) {
+                        fresh.cvProcessing = false;
+                        await fresh.save();
                     }
-                    return edu;
-                });
+                } catch {}
             }
-
-            // push into MongoDB
-            student.education = extractedData.education;
-
-
-            // Experience
-            if (Array.isArray(extractedData.experience)) {
-                extractedData.experience = extractedData.experience.map((exp) => {
-                    if (typeof exp === "object" && exp !== null) {
-                        const title = exp.title || "";
-                        const company = exp.company || "";
-                        const duration = exp.duration || "";
-                        return `${title} - ${company} (${duration})`.trim();
-                    }
-                    return exp;
-                });
-            }
-
-            // Save to student
-            student.experience = extractedData.experience || [];
-
-            student.professionalSummary = extractedData.summary || '';
-            await student.save();
-            return res.status(200).json({
-                success: true,
-                message: "CV uploaded and AI extraction Success.",
-                student,
-            });
-
-        } catch (aiError) {
-            console.error("AI extraction failed:", aiError.message);
-            await student.save();
-
-            return res.status(200).json({
-                success: true,
-                message: "CV uploaded but skill extraction failed. Please try again or contact support.",
-                student,
-                error: "AI_EXTRACTION_FAILED",
-                errorDetails: aiError.message
-            });
-        }
+        })();
+        return;
 
     } catch (err) {
         console.error("Error uploading CV:", err);
@@ -703,6 +717,61 @@ router.delete("/delete-cv/:email", async (req, res) => {
     }
 });
 
+// ============================
+// VIEW CV — streams the file inline with proper headers
+// GET /api/student/view-cv/:email
+// ============================
+router.get("/view-cv/:email", async (req, res) => {
+    try {
+        const { email } = req.params;
+        const student = await Student.findOne({ email });
+        if (!student || !student.cvUrl) {
+            return res.status(404).send("CV not found");
+        }
+
+        // Decode in case the URL was stored with %20 etc.
+        const stored = decodeURIComponent(student.cvUrl);
+        const relative = stored.replace(/^\/+/, "");
+        const justName = path.basename(relative);
+
+        // Try several possible locations — whichever one actually exists wins.
+        const candidates = [
+            path.join(__dirname, "..", "..", relative),                  // backend/<relative>
+            path.join(process.cwd(), relative),                          // <cwd>/<relative>
+            path.join(__dirname, "..", "..", "uploads", "cv", justName), // backend/uploads/cv/<name>
+            path.join(process.cwd(), "uploads", "cv", justName),         // <cwd>/uploads/cv/<name>
+        ];
+
+        const filePath = candidates.find((p) => {
+            try { return fs.existsSync(p); } catch { return false; }
+        });
+
+        if (!filePath) {
+            console.warn("View CV — file not found. Tried:", candidates, "cvUrl:", student.cvUrl);
+            return res
+                .status(404)
+                .send("CV file is missing on the server. It may have been deleted — please re-upload your CV.");
+        }
+
+        const ext = path.extname(filePath).toLowerCase();
+        const mime =
+            ext === ".pdf"
+                ? "application/pdf"
+                : ext === ".doc"
+                ? "application/msword"
+                : ext === ".docx"
+                ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                : "application/octet-stream";
+
+        res.setHeader("Content-Type", mime);
+        res.setHeader("Content-Disposition", `inline; filename="${path.basename(filePath)}"`);
+        res.setHeader("Cache-Control", "no-store");
+        fs.createReadStream(filePath).pipe(res);
+    } catch (err) {
+        console.error("View CV error:", err);
+        res.status(500).send("Error serving CV");
+    }
+});
 
 
 // Update apply internship route

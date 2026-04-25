@@ -58,6 +58,7 @@
 
 import express from "express";
 import Feedback from "../models/Feedback.js";
+import { notifyStudent } from "../utils/notify.js";
 
 const router = express.Router();
 
@@ -90,6 +91,13 @@ router.post("/submit", async (req, res) => {
       category: category || "Overall",
       comment,
       isAnonymous: isAnonymous || false,
+    });
+
+    await notifyStudent(req, {
+      studentEmail,
+      title: "Feedback Submitted ⭐",
+      message: `Thanks for sharing your ${rating}-star feedback for ${companyName}.`,
+      type: "general",
     });
 
     res.status(201).json({

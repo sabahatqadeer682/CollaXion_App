@@ -1,6 +1,7 @@
 import express from "express";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import { notifyStudent } from "../utils/notify.js";
 dotenv.config();
 
 const router = express.Router();
@@ -69,6 +70,15 @@ router.post("/send-rating", async (req, res) => {
             </table>
             </body></html>`,
         });
+
+        if (studentEmail) {
+            await notifyStudent(req, {
+                studentEmail,
+                title: "Rating Sent ✨",
+                message: `Thanks for your ${stars}-star rating! Your feedback helps us improve.`,
+                type: "general",
+            });
+        }
 
         return res.status(200).json({ success: true, message: "Rating submitted! Thankyou" });
     } catch (err) {

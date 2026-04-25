@@ -254,7 +254,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import axios from "axios";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -263,6 +263,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import socket from "./utils/Socket";
 
 const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string }> = {
     application: { icon: "briefcase-check", color: "#2563EB", bg: "#EFF6FF" },
@@ -291,6 +292,28 @@ const NotificationScreen = () => {
             fetchNotifications();
         }, [])
     );
+
+    // Live updates — new notifications pushed via WS get prepended to the list
+    useEffect(() => {
+        let cleanup = () => {};
+        (async () => {
+            const email = await AsyncStorage.getItem("studentEmail");
+            if (!email) return;
+            socket.connect(CONSTANT.API_BASE_URL, email);
+
+            const handleNewNotification = (notif: any) => {
+                if (!notif || notif.studentEmail !== email) return;
+                setNotifications((prev) => {
+                    if (notif._id && prev.some((n) => n._id === notif._id)) return prev;
+                    return [notif, ...prev];
+                });
+            };
+
+            socket.on("newNotification", handleNewNotification);
+            cleanup = () => socket.off("newNotification", handleNewNotification);
+        })();
+        return () => cleanup();
+    }, []);
 
     const fetchNotifications = async () => {
         try {

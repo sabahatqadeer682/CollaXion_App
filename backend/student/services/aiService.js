@@ -6,10 +6,12 @@ import { PDFParse } from "pdf-parse";
 
 
 dotenv.config();
+<<<<<<< Updated upstream
 const genAI = new GoogleGenerativeAI('AIzaSyBa_i7gosdyuzREuPg2Qz0YqSP9xAdAgxQ');
+=======
+>>>>>>> Stashed changes
 
-
-// AIzaSyAntuRm7cNgAHGVvgDe7ZUAGlDkIVhAhXA
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
 
 let pdfParse;
 const getPdfParse = async () => {
@@ -55,44 +57,42 @@ export const extractSkillsFromCV = async (filePath, fileType) => {
             throw new Error("Resume text extraction failed.");
         }
 
-        // Gemini model
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-        const prompt = `
-Extract the following details from the resume below and return only clean JSON:
-{
-  "name": "",
-  "email": "",
-  "phone": "",
-  "education": [],
-  "experience": [],
-  "skills": [],
-  "summary": ""
-}
+        // Cap resume text — long CVs needlessly inflate the prompt and latency.
+        const trimmed = textContent.replace(/\s+/g, " ").trim().slice(0, 6000);
 
-Resume Text:
-${textContent}
-`;
+        // Gemini model — disable "thinking" mode + force JSON output for speed.
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 1024,
+                responseMimeType: "application/json",
+                // gemini-2.5-flash thinks-before-answering by default — kill it.
+                thinkingConfig: { thinkingBudget: 0 },
+            },
+        });
+
+        const prompt = `Extract the following from this resume. Return JSON ONLY in this shape:
+{"name":"","email":"","phone":"","education":[],"experience":[],"skills":[],"summary":""}
+
+Resume:
+${trimmed}`;
 
         console.log("Sending data to Gemini...");
+        const t0 = Date.now();
 
         const result = await model.generateContent(prompt);
-        let output = result.response.text().trim();
-        output = output.replace(/json|/g, "").trim();
+        const output = result.response.text().trim();
+        console.log(`Gemini responded in ${Date.now() - t0}ms`);
 
-        let data;
-        const cleaned = output
-            .replace(/```json|```/g, "")
-            .trim();
-
-        data = JSON.parse(cleaned);
+        // responseMimeType ensures pure JSON, but strip stray fences just in case.
+        const cleaned = output.replace(/```json|```/g, "").trim();
+        const data = JSON.parse(cleaned);
 
         return data;
     } catch (error) {
-        console.error("Error:", error.message);
-        res.status(500).json({
-            success: false,
-            message: error.message || "Parsing failed.",
-        });
+        console.error("extractSkillsFromCV error:", error.message);
+        throw error; // let the caller (upload route) decide how to handle it
     }
 };
 

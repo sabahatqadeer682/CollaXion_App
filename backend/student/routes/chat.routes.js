@@ -311,7 +311,10 @@ router.get("/messages/:myEmail/:otherEmail", async (req, res) => {
 
         const roomId = Message.getRoomId(myEmail, otherEmail);
 
-        const messages = await Message.find({ roomId })
+        const messages = await Message.find({
+            roomId,
+            hiddenFor: { $ne: myEmail },
+        })
             .sort({ createdAt: 1 })
             .limit(100);
 
@@ -327,6 +330,82 @@ router.get("/messages/:myEmail/:otherEmail", async (req, res) => {
         res.status(500).json({ success: false, message: "Server error" });
     }
 });
+
+// ============================
+// DELETE message FOR ME (hide locally)
+// POST /api/chat/message/:id/hide   body: { email }
+// ============================
+router.post("/message/:id/hide", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const email = req.body?.email || req.query?.email;
+        if (!email) {
+            return res.status(400).json({ success: false, message: "email required" });
+        }
+        const msg = await Message.findById(id);
+        if (!msg) {
+            return res.status(404).json({ success: false, message: "Message not found" });
+        }
+        if (msg.senderEmail !== email && msg.receiverEmail !== email) {
+            return res.status(403).json({ success: false, message: "Not your message" });
+        }
+        if (!msg.hiddenFor.includes(email)) {
+            msg.hiddenFor.push(email);
+            await msg.save();
+        }
+        res.status(200).json({ success: true, message: "Hidden" });
+    } catch (err) {
+        console.error("Hide message error:", err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
+// ============================
+// UNSEND message FOR EVERYONE (sender only)
+// POST /api/chat/message/:id/unsend   body: { email }
+// (Also accepts DELETE for backward compatibility)
+// ============================
+const unsendHandler = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const email = req.body?.email || req.query?.email;
+        if (!email) {
+            return res.status(400).json({ success: false, message: "email required" });
+        }
+        const msg = await Message.findById(id);
+        if (!msg) {
+            return res.status(404).json({ success: false, message: "Message not found" });
+        }
+        if (msg.senderEmail !== email) {
+            return res.status(403).json({
+                success: false,
+                message: "Only the sender can delete for everyone",
+            });
+        }
+        msg.deletedForEveryone = true;
+        msg.text = "";
+        msg.imageUrl = null;
+        await msg.save();
+
+        const broadcast = req.app.locals.broadcast;
+        if (broadcast) {
+            const payload = {
+                event: "messageDeleted",
+                data: { _id: msg._id, roomId: msg.roomId },
+            };
+            broadcast(msg.senderEmail, payload);
+            broadcast(msg.receiverEmail, payload);
+        }
+
+        res.status(200).json({ success: true, message: msg });
+    } catch (err) {
+        console.error("Delete-for-everyone error:", err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+router.post("/message/:id/unsend", unsendHandler);
+router.delete("/message/:id", unsendHandler);
 
 // ============================
 // SEND a text message (REST fallback)
