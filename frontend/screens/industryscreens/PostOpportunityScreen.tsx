@@ -3,36 +3,37 @@ import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import React, { useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert, Animated, Image, KeyboardAvoidingView, Platform,
   ScrollView, StatusBar, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
 } from "react-native";
-import { C, useUser } from "./shared";
+import { useUser } from "./shared";
 
-// ── Color Theme (CollaXion) ───────────────────────────────────
+// ── Theme — matches CollaXion industry dashboard ───────────────────
 const T = {
-  bg:       "#F0F4F8",
-  header:   "#0D2E3E",
-  card:     "#FFFFFF",
-  border:   "#E2E8F0",
-  navy:     "#0D2E3E",
-  teal:     "#1A3C4E",
-  text:     "#0D2E3E",
-  sub:      "#5A7A8A",
-  muted:    "#94A3B8",
-  white:    "#FFFFFF",
-  green:    "#059669",
-  greenDark:"#047857",
-  inputBg:  "#F8FAFC",
-  placeholder: "#94A3B8",
+  bg:          "#F0F4F8",
+  header:      "#193648",
+  card:        "#FFFFFF",
+  border:      "#E2EAF0",
+  navy:        "#193648",
+  text:        "#0D1B2A",
+  sub:         "#5B7080",
+  muted:       "#94A3B8",
+  white:       "#FFFFFF",
+  green:       "#059669",
+  iconBg:      "#EEF3F7",
+  inputBg:     "#FFFFFF",
+  placeholder: "#9BB0BC",
+  chipBg:      "#EEF3F7",
 };
 
 type PostType = "Internship" | "Project" | "Workshop";
 
-const POST_TYPES: { label: PostType; icon: string; color: string; bg: string; desc: string }[] = [
-  { label: "Internship", icon: "briefcase", color: "#0D2E3E", bg: "#EFF6FF", desc: "Paid/unpaid work experience" },
-  { label: "Project",    icon: "flask",     color: "#0D2E3E", bg: "#FAF5FF", desc: "Research or development project" },
-  { label: "Workshop",   icon: "school",    color: "#0D2E3E", bg: "#FFF7ED", desc: "Training or bootcamp event" },
+const POST_TYPES: { label: PostType; icon: string; desc: string }[] = [
+  { label: "Internship", icon: "briefcase-outline", desc: "Paid / unpaid work experience" },
+  { label: "Project",    icon: "flask-outline",    desc: "Research or development" },
+  { label: "Workshop",   icon: "school-outline",   desc: "Training or bootcamp" },
 ];
 
 const SKILL_SUGGESTIONS = [
@@ -58,20 +59,23 @@ export function PostOpportunityScreen() {
   const [mode, setMode]             = useState<"Onsite" | "Remote" | "Hybrid">("Onsite");
   const [poster, setPoster]         = useState<string | null>(null);
   const [loading, setLoading]       = useState(false);
-  const [step, setStep]             = useState<1 | 2>(1);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
   }, []);
 
   const pickImage = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.85, aspect: [16, 9],
+      quality: 0.5, aspect: [16, 9],
+      base64: true,                       // native base64 — reliable on RN
     });
-    if (!res.canceled) setPoster(res.assets[0].uri);
+    if (!res.canceled) {
+      const a = res.assets[0];
+      setPoster(a.base64 ? `data:image/jpeg;base64,${a.base64}` : a.uri);
+    }
   };
 
   const addSkill = (sk: string) => {
@@ -96,7 +100,7 @@ export function PostOpportunityScreen() {
       const payload = {
         type, title: title.trim(), description: description.trim(),
         skills, stipend, duration, seats, deadline, location, mode,
-        poster: poster || null,
+        poster,                          // already a data URI from the picker
       };
       const response = await ax().post("/api/industry/posts", payload);
       console.log("✅ Post created:", response.data?._id);
@@ -123,419 +127,402 @@ export function PostOpportunityScreen() {
     }
   };
 
-  const typeConfig = POST_TYPES.find((p) => p.label === type)!;
-
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
       <StatusBar barStyle="light-content" backgroundColor={T.header} />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => nav.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={22} color={T.white} />
-          </TouchableOpacity>
-          <View style={{ flex: 1, marginLeft: 14 }}>
-            <Text style={styles.headerTitle}>Post Opportunity</Text>
-            <Text style={styles.headerSub}>Reach hundreds of students</Text>
-          </View>
-          {step === 2 && (
-            <TouchableOpacity onPress={() => setStep(1)} style={styles.stepBackBtn}>
-              <Text style={styles.stepBackTxt}>← Details</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Step indicator */}
-        <View style={styles.stepRow}>
-          {["Type & Info", "Preview & Post"].map((label, i) => (
-            <View key={i} style={styles.stepItem}>
-              <View style={[styles.stepDot,
-                step > i ? styles.stepDotDone :
-                i === step - 1 ? styles.stepDotActive :
-                styles.stepDotInactive]}>
-                {step > i + 1
-                  ? <Ionicons name="checkmark" size={12} color={T.white} />
-                  : <Text style={styles.stepDotTxt}>{i + 1}</Text>}
-              </View>
-              <Text style={[styles.stepLabel, step === i + 1 && { color: T.white }]}>{label}</Text>
-              {i < 1 && <View style={[styles.stepLine, step > 1 && styles.stepLineDone]} />}
-            </View>
-          ))}
+      {/* ── Header ── */}
+      <View style={s.header}>
+        <TouchableOpacity onPress={() => nav.goBack()} style={s.backBtn}>
+          <Ionicons name="arrow-back" size={22} color={T.white} />
+        </TouchableOpacity>
+        <View style={{ flex: 1, marginLeft: 14 }}>
+          <Text style={s.headerTitle}>Post Opportunity</Text>
+          <Text style={s.headerSub}>Reach hundreds of students</Text>
         </View>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}>
+
         <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            contentContainerStyle={{ paddingBottom: 140 }}>
 
-          {step === 1 ? (
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-
-              {/* Type Selector */}
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Opportunity Type</Text>
-                <View style={styles.typeRow}>
-                  {POST_TYPES.map((pt) => (
+            {/* ── Type Selector ── */}
+            <View style={s.section}>
+              <Text style={s.sectionLabel}>Opportunity Type</Text>
+              <View style={s.typeRow}>
+                {POST_TYPES.map((pt) => {
+                  const active = type === pt.label;
+                  return (
                     <TouchableOpacity key={pt.label}
-                      style={[styles.typeTile, type === pt.label && { borderColor: pt.color, borderWidth: 2 }]}
+                      style={[s.typeTile, active && s.typeTileActive]}
                       onPress={() => setType(pt.label)} activeOpacity={0.85}>
-                      <View style={[styles.typeTileIcon, { backgroundColor: type === pt.label ? pt.color : "#F1F5F9" }]}>
-                        <Ionicons name={pt.icon as any} size={22}
-                          color={type === pt.label ? T.white : T.muted} />
+                      <View style={[s.typeTileIcon, active && { backgroundColor: T.navy }]}>
+                        <Ionicons name={pt.icon as any} size={20}
+                          color={active ? T.white : T.navy} />
                       </View>
-                      <Text style={[styles.typeTileLabel, type === pt.label && { color: pt.color, fontWeight: "800" }]}>
+                      <Text style={[s.typeTileLabel, active && { color: T.navy, fontWeight: "800" }]}>
                         {pt.label}
                       </Text>
-                      <Text style={styles.typeTileDesc}>{pt.desc}</Text>
+                      <Text style={s.typeTileDesc} numberOfLines={2}>{pt.desc}</Text>
                     </TouchableOpacity>
-                  ))}
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* ── Banner ── */}
+            <View style={s.section}>
+              <Text style={s.sectionLabel}>Banner Image (Optional)</Text>
+              <TouchableOpacity onPress={pickImage} activeOpacity={0.88}>
+                {poster ? (
+                  <View style={s.posterPreviewWrap}>
+                    <Image source={{ uri: poster }} style={s.posterPreview} />
+                    <TouchableOpacity style={s.posterRemove} onPress={() => setPoster(null)}>
+                      <Ionicons name="close-circle" size={24} color={T.white} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={s.posterPlaceholder}>
+                    <View style={s.posterIconCircle}>
+                      <Ionicons name="image-outline" size={26} color={T.navy} />
+                    </View>
+                    <Text style={s.posterPlaceholderTxt}>Tap to upload banner</Text>
+                    <Text style={s.posterPlaceholderSub}>16:9 recommended</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* ── Title ── */}
+            <View style={s.section}>
+              <Text style={s.sectionLabel}>Title <Text style={s.required}>*</Text></Text>
+              <View style={s.inputBox}>
+                <Ionicons name="bookmark-outline" size={18} color={T.muted} />
+                <TextInput
+                  style={s.input}
+                  placeholder={
+                    type === "Internship" ? "e.g. Frontend Developer Intern" :
+                    type === "Project"    ? "e.g. AI Research Project" :
+                                            "e.g. Data Science Bootcamp"
+                  }
+                  placeholderTextColor={T.placeholder} value={title}
+                  onChangeText={setTitle} maxLength={80}
+                />
+              </View>
+            </View>
+
+            {/* ── Description ── */}
+            <View style={s.section}>
+              <Text style={s.sectionLabel}>Description <Text style={s.required}>*</Text></Text>
+              <View style={[s.inputBox, s.textAreaBox]}>
+                <TextInput
+                  style={[s.input, s.textArea]}
+                  placeholder="Describe the role, responsibilities, and what students will learn..."
+                  placeholderTextColor={T.placeholder} value={description}
+                  onChangeText={setDesc} multiline numberOfLines={5} textAlignVertical="top"
+                />
+              </View>
+              <Text style={s.charCount}>{description.length} / 1000</Text>
+            </View>
+
+            {/* ── Stipend + Duration ── */}
+            <View style={[s.section, s.rowSection]}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.sectionLabel}>Stipend / Fee</Text>
+                <View style={s.inputBox}>
+                  <Ionicons name="cash-outline" size={18} color={T.muted} />
+                  <TextInput style={s.input} placeholder="PKR 25,000/mo"
+                    placeholderTextColor={T.placeholder} value={stipend} onChangeText={setStipend} />
                 </View>
               </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.sectionLabel}>Duration</Text>
+                <View style={s.inputBox}>
+                  <Ionicons name="time-outline" size={18} color={T.muted} />
+                  <TextInput style={s.input} placeholder="3 Months"
+                    placeholderTextColor={T.placeholder} value={duration} onChangeText={setDuration} />
+                </View>
+              </View>
+            </View>
 
-              {/* Banner */}
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Banner Image (Optional)</Text>
-                <TouchableOpacity onPress={pickImage} activeOpacity={0.88}>
-                  {poster ? (
-                    <View style={styles.posterPreviewWrap}>
-                      <Image source={{ uri: poster }} style={styles.posterPreview} />
-                      <TouchableOpacity style={styles.posterRemove} onPress={() => setPoster(null)}>
-                        <Ionicons name="close-circle" size={22} color={T.white} />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <View style={[styles.posterPlaceholder, { backgroundColor: typeConfig.color }]}>
-                      <Ionicons name="image-outline" size={32} color="rgba(255,255,255,0.6)" />
-                      <Text style={styles.posterPlaceholderTxt}>Tap to upload banner</Text>
-                      <Text style={styles.posterPlaceholderSub}>16:9 recommended</Text>
-                    </View>
-                  )}
+            {/* ── Seats + Deadline ── */}
+            <View style={[s.section, s.rowSection]}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.sectionLabel}>Open Seats</Text>
+                <View style={s.inputBox}>
+                  <Ionicons name="people-outline" size={18} color={T.muted} />
+                  <TextInput style={s.input} placeholder="5"
+                    placeholderTextColor={T.placeholder} value={seats} onChangeText={setSeats}
+                    keyboardType="numeric" />
+                </View>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.sectionLabel}>Deadline</Text>
+                <View style={s.inputBox}>
+                  <Ionicons name="calendar-outline" size={18} color={T.muted} />
+                  <TextInput style={s.input} placeholder="30 Jun 2026"
+                    placeholderTextColor={T.placeholder} value={deadline} onChangeText={setDeadline} />
+                </View>
+              </View>
+            </View>
+
+            {/* ── Mode ── */}
+            <View style={s.section}>
+              <Text style={s.sectionLabel}>Work Mode</Text>
+              <View style={s.modeRow}>
+                {(["Onsite", "Remote", "Hybrid"] as const).map((m) => {
+                  const active = mode === m;
+                  return (
+                    <TouchableOpacity key={m}
+                      style={[s.modeChip, active && s.modeChipActive]}
+                      onPress={() => setMode(m)} activeOpacity={0.85}>
+                      <Ionicons
+                        name={m === "Onsite" ? "business-outline" : m === "Remote" ? "wifi-outline" : "swap-horizontal-outline"}
+                        size={15} color={active ? T.white : T.sub} />
+                      <Text style={[s.modeChipTxt, active && { color: T.white, fontWeight: "800" }]}>{m}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* ── Location ── */}
+            <View style={s.section}>
+              <Text style={s.sectionLabel}>Location</Text>
+              <View style={s.inputBox}>
+                <Ionicons name="location-outline" size={18} color={T.muted} />
+                <TextInput style={s.input} placeholder="City, Building, or 'Remote'"
+                  placeholderTextColor={T.placeholder} value={location} onChangeText={setLocation} />
+              </View>
+            </View>
+
+            {/* ── Skills ── */}
+            <View style={s.section}>
+              <Text style={s.sectionLabel}>Required Skills</Text>
+              <View style={s.inputBox}>
+                <Ionicons name="sparkles-outline" size={18} color={T.muted} />
+                <TextInput style={s.input} placeholder="Type a skill and press +"
+                  placeholderTextColor={T.placeholder} value={skillInput}
+                  onChangeText={setSkillInput} onSubmitEditing={() => addSkill(skillInput)}
+                  returnKeyType="done" />
+                <TouchableOpacity onPress={() => addSkill(skillInput)} style={s.addSkillBtn}>
+                  <Ionicons name="add" size={18} color={T.white} />
                 </TouchableOpacity>
               </View>
 
-              {/* Title */}
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Title *</Text>
-                <View style={styles.inputBox}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder={`e.g. ${type === "Internship" ? "Frontend Developer Intern" : type === "Project" ? "AI Research Project" : "Data Science Bootcamp"}`}
-                    placeholderTextColor={T.placeholder} value={title}
-                    onChangeText={setTitle} maxLength={80}
-                  />
-                </View>
-              </View>
-
-              {/* Description */}
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Description *</Text>
-                <View style={[styles.inputBox, { padding: 0 }]}>
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Describe the role, responsibilities, and what students will learn..."
-                    placeholderTextColor={T.placeholder} value={description}
-                    onChangeText={setDesc} multiline numberOfLines={5} textAlignVertical="top"
-                  />
-                </View>
-              </View>
-
-              {/* Stipend + Duration */}
-              <View style={[styles.section, { flexDirection: "row", gap: 12 }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sectionLabel}>Stipend / Fee</Text>
-                  <View style={styles.inputBox}>
-                    <TextInput style={styles.input} placeholder="e.g. PKR 25,000/mo"
-                      placeholderTextColor={T.placeholder} value={stipend} onChangeText={setStipend} />
-                  </View>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sectionLabel}>Duration</Text>
-                  <View style={styles.inputBox}>
-                    <TextInput style={styles.input} placeholder="e.g. 3 Months"
-                      placeholderTextColor={T.placeholder} value={duration} onChangeText={setDuration} />
-                  </View>
-                </View>
-              </View>
-
-              {/* Seats + Deadline */}
-              <View style={[styles.section, { flexDirection: "row", gap: 12 }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sectionLabel}>Open Seats</Text>
-                  <View style={styles.inputBox}>
-                    <TextInput style={styles.input} placeholder="e.g. 5"
-                      placeholderTextColor={T.placeholder} value={seats} onChangeText={setSeats} keyboardType="numeric" />
-                  </View>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sectionLabel}>Application Deadline</Text>
-                  <View style={styles.inputBox}>
-                    <TextInput style={styles.input} placeholder="e.g. 30 Jun 2025"
-                      placeholderTextColor={T.placeholder} value={deadline} onChangeText={setDeadline} />
-                  </View>
-                </View>
-              </View>
-
-              {/* Mode */}
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Work Mode</Text>
-                <View style={styles.modeRow}>
-                  {(["Onsite", "Remote", "Hybrid"] as const).map((m) => (
-                    <TouchableOpacity key={m}
-                      style={[styles.modeChip, mode === m && { borderColor: T.navy, backgroundColor: "#EFF6FF" }]}
-                      onPress={() => setMode(m)}>
-                      <Text style={[styles.modeChipTxt, mode === m && { color: T.navy, fontWeight: "700" }]}>{m}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Location */}
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Location</Text>
-                <View style={[styles.inputBox, { flexDirection: "row", alignItems: "center", gap: 8 }]}>
-                  <Ionicons name="location-outline" size={18} color={T.placeholder} />
-                  <TextInput style={[styles.input, { flex: 1 }]} placeholder="City, Building, or 'Remote'"
-                    placeholderTextColor={T.placeholder} value={location} onChangeText={setLocation} />
-                </View>
-              </View>
-
-              {/* Skills */}
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Required Skills</Text>
-                <View style={[styles.inputBox, { flexDirection: "row", alignItems: "center", gap: 8 }]}>
-                  <TextInput style={[styles.input, { flex: 1 }]} placeholder="Type a skill and press +"
-                    placeholderTextColor={T.placeholder} value={skillInput}
-                    onChangeText={setSkillInput} onSubmitEditing={() => addSkill(skillInput)} />
-                  <TouchableOpacity onPress={() => addSkill(skillInput)} style={styles.addSkillBtn}>
-                    <Ionicons name="add" size={20} color={T.white} />
+              {/* Suggestions */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled" style={{ marginTop: 10 }}>
+                {SKILL_SUGGESTIONS.filter((sk) => !skills.includes(sk)).map((sk) => (
+                  <TouchableOpacity key={sk} onPress={() => addSkill(sk)} style={s.suggestionChip}>
+                    <Ionicons name="add-circle-outline" size={13} color={T.navy} />
+                    <Text style={s.suggestionTxt}>{sk}</Text>
                   </TouchableOpacity>
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-                  {SKILL_SUGGESTIONS.filter((s) => !skills.includes(s)).map((s) => (
-                    <TouchableOpacity key={s} onPress={() => addSkill(s)} style={styles.suggestionChip}>
-                      <Text style={styles.suggestionTxt}>+ {s}</Text>
-                    </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Selected */}
+              {skills.length > 0 && (
+                <View style={s.selectedSkillsRow}>
+                  {skills.map((sk) => (
+                    <View key={sk} style={s.selectedChip}>
+                      <Text style={s.selectedChipTxt}>{sk}</Text>
+                      <TouchableOpacity onPress={() => removeSkill(sk)}>
+                        <Ionicons name="close-circle" size={16} color={T.navy} />
+                      </TouchableOpacity>
+                    </View>
                   ))}
-                </ScrollView>
-                {skills.length > 0 && (
-                  <View style={styles.selectedSkillsRow}>
-                    {skills.map((s) => (
-                      <View key={s} style={styles.selectedChip}>
-                        <Text style={styles.selectedChipTxt}>{s}</Text>
-                        <TouchableOpacity onPress={() => removeSkill(s)}>
-                          <Ionicons name="close-circle" size={16} color={T.navy} />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-                )}
+                </View>
+              )}
+            </View>
+
+            {/* ── Tip card ── */}
+            <View style={s.tipCard}>
+              <View style={s.tipIcon}>
+                <Ionicons name="bulb-outline" size={18} color={T.navy} />
               </View>
-
-              {/* Next */}
-              <TouchableOpacity style={styles.nextBtn}
-                onPress={() => {
-                  if (!title.trim() || !description.trim()) {
-                    Alert.alert("Required", "Fill in title and description."); return;
-                  }
-                  setStep(2);
-                }} activeOpacity={0.88}>
-                <View style={styles.nextBtnInner}>
-                  <Text style={styles.nextBtnTxt}>Preview Post</Text>
-                  <Ionicons name="arrow-forward" size={18} color={T.white} />
-                </View>
-              </TouchableOpacity>
-            </ScrollView>
-
-          ) : (
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 50 }}>
-              <View style={styles.previewLabel}>
-                <Ionicons name="eye-outline" size={16} color={T.sub} />
-                <Text style={styles.previewLabelTxt}>How students will see your post</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.tipTitle}>Tip</Text>
+                <Text style={s.tipBody}>
+                  A clear title and 2-3 sentence description usually doubles the number of applicants.
+                </Text>
               </View>
-
-              <View style={styles.previewCard}>
-                <View style={styles.postHeader}>
-                  <View style={styles.postAvatarWrap}>
-                    {user?.logo
-                      ? <Image source={{ uri: user.logo }} style={styles.postAvatar} />
-                      : <Text style={styles.postAvatarTxt}>
-                          {user?.name?.split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase() || "CX"}
-                        </Text>}
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={styles.previewOrgName}>{user?.name || "Your Company"}</Text>
-                    <Text style={styles.previewTime}>Just now</Text>
-                  </View>
-                  <View style={[styles.typeBadge, {
-                    backgroundColor: type === "Internship" ? "#EFF6FF" : type === "Project" ? "#FAF5FF" : "#FFF7ED"
-                  }]}>
-                    <View style={[styles.typeDot, {
-                      backgroundColor: type === "Internship" ? "#1D4ED8" : type === "Project" ? "#7C3AED" : "#C2410C"
-                    }]} />
-                    <Text style={[styles.typeBadgeTxt, {
-                      color: type === "Internship" ? "#1D4ED8" : type === "Project" ? "#7C3AED" : "#C2410C"
-                    }]}>{type}</Text>
-                  </View>
-                </View>
-
-                {poster ? (
-                  <Image source={{ uri: poster }} style={styles.previewBanner} />
-                ) : (
-                  <View style={[styles.previewBannerFlat, { backgroundColor: typeConfig.color }]}>
-                    <Ionicons name={typeConfig.icon as any} size={40} color="rgba(255,255,255,0.25)" style={{ marginBottom: 10 }} />
-                    <Text style={styles.bannerTitle}>{title || "Your Post Title"}</Text>
-                    <View style={styles.bannerMetaRow}>
-                      {duration ? <View style={styles.bannerMeta}>
-                        <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.7)" />
-                        <Text style={styles.bannerMetaTxt}>{duration}</Text></View> : null}
-                      {stipend ? <View style={styles.bannerMeta}>
-                        <Ionicons name="cash-outline" size={12} color="rgba(255,255,255,0.7)" />
-                        <Text style={styles.bannerMetaTxt}>{stipend}</Text></View> : null}
-                    </View>
-                  </View>
-                )}
-
-                <View style={styles.postBody}>
-                  <Text style={styles.previewTitle}>{title || "Your Post Title"}</Text>
-                  <Text style={styles.previewDesc}>{description || "Your description..."}</Text>
-                  <View style={styles.metaRow}>
-                    {mode ? <View style={styles.metaChip}>
-                      <Ionicons name="location-outline" size={12} color={T.navy} />
-                      <Text style={styles.metaChipTxt}>{mode}</Text></View> : null}
-                    {seats ? <View style={styles.metaChip}>
-                      <Ionicons name="people-outline" size={12} color={T.navy} />
-                      <Text style={styles.metaChipTxt}>{seats} seats</Text></View> : null}
-                    {deadline ? <View style={styles.metaChip}>
-                      <Ionicons name="calendar-outline" size={12} color={T.navy} />
-                      <Text style={styles.metaChipTxt}>Due {deadline}</Text></View> : null}
-                  </View>
-                  {skills.length > 0 && (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-                      {skills.map((sk) => (
-                        <View key={sk} style={styles.skillChip}>
-                          <Text style={styles.skillChipTxt}>{sk}</Text>
-                        </View>
-                      ))}
-                    </ScrollView>
-                  )}
-                  <View style={styles.postFooter}>
-                    <View style={styles.postFooterLeft}>
-                      <Ionicons name="people-outline" size={15} color={T.sub} />
-                      <Text style={styles.postFooterTxt}>0 applicants</Text>
-                    </View>
-                    <View style={styles.applyChip}>
-                      <Text style={styles.applyChipTxt}>Apply Now</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* Publish Button */}
-              <TouchableOpacity
-                style={[styles.nextBtn, { marginTop: 8 }]}
-                onPress={handlePost} activeOpacity={0.88} disabled={loading}>
-                <View style={[styles.nextBtnInner, {
-                  backgroundColor: loading ? T.muted : T.green,
-                }]}>
-                  <Ionicons name="paper-plane" size={18} color={T.white} />
-                  <Text style={styles.nextBtnTxt}>{loading ? "Publishing..." : "Publish Post"}</Text>
-                </View>
-              </TouchableOpacity>
-            </ScrollView>
-          )}
+            </View>
+          </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
+
+      {/* ── Sticky publish bar ── */}
+      <View style={s.publishBar}>
+        <TouchableOpacity
+          style={[s.publishBtn, (!title.trim() || !description.trim() || loading) && s.publishBtnDisabled]}
+          onPress={handlePost}
+          activeOpacity={0.88}
+          disabled={loading || !title.trim() || !description.trim()}>
+          {loading ? (
+            <>
+              <ActivityIndicator color={T.white} />
+              <Text style={s.publishBtnTxt}>Publishing…</Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="paper-plane" size={18} color={T.white} />
+              <Text style={s.publishBtnTxt}>Publish Post</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
+  // ── Header ──
   header: {
     backgroundColor: T.header,
-    paddingTop: Platform.OS === "ios" ? 58 : 46,
-    paddingHorizontal: 20, paddingBottom: 24,
+    paddingTop: Platform.OS === "ios" ? 56 : 42,
+    paddingHorizontal: 18, paddingBottom: 22,
+    flexDirection: "row", alignItems: "center",
+    borderBottomLeftRadius: 22, borderBottomRightRadius: 22,
   },
-  headerRow:  { flexDirection: "row", alignItems: "center", marginBottom: 20 },
-  backBtn:    { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.1)", justifyContent: "center", alignItems: "center" },
+  backBtn: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    justifyContent: "center", alignItems: "center",
+  },
   headerTitle: { fontSize: 18, fontWeight: "800", color: T.white },
-  headerSub:   { fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 2 },
-  stepBackBtn: { backgroundColor: "rgba(255,255,255,0.12)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  stepBackTxt: { fontSize: 12, color: T.white, fontWeight: "600" },
-  stepRow: { flexDirection: "row", alignItems: "center" },
-  stepItem: { flexDirection: "row", alignItems: "center", flex: 1 },
-  stepDot: { width: 26, height: 26, borderRadius: 13, justifyContent: "center", alignItems: "center", marginRight: 8 },
-  stepDotActive:   { backgroundColor: "rgba(255,255,255,0.3)" },
-  stepDotDone:     { backgroundColor: "#059669" },
-  stepDotInactive: { backgroundColor: "rgba(255,255,255,0.1)" },
-  stepDotTxt:  { fontSize: 12, fontWeight: "800", color: T.white },
-  stepLabel:   { fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: "600", flex: 1 },
-  stepLine:    { height: 2, flex: 0.4, backgroundColor: "rgba(255,255,255,0.15)", marginHorizontal: 8, borderRadius: 1 },
-  stepLineDone:{ backgroundColor: "#059669" },
+  headerSub:   { fontSize: 12, color: "rgba(255,255,255,0.55)", marginTop: 2 },
 
-  section: { paddingHorizontal: 16, paddingTop: 18 },
-  sectionLabel: { fontSize: 13, fontWeight: "700", color: T.text, marginBottom: 10 },
+  // ── Sections ──
+  section: { paddingHorizontal: 16, paddingTop: 16 },
+  rowSection: { flexDirection: "row", gap: 10 },
+  sectionLabel: { fontSize: 12, fontWeight: "800", color: T.text, marginBottom: 8, letterSpacing: 0.3, textTransform: "uppercase" },
+  required: { color: "#DC2626" },
 
+  // ── Type tiles ──
   typeRow: { flexDirection: "row", gap: 10 },
-  typeTile: { flex: 1, backgroundColor: T.card, borderRadius: 16, padding: 14, alignItems: "center", borderWidth: 1.5, borderColor: T.border, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  typeTileIcon:  { width: 48, height: 48, borderRadius: 14, justifyContent: "center", alignItems: "center", marginBottom: 8 },
+  typeTile: {
+    flex: 1, backgroundColor: T.card, borderRadius: 16,
+    padding: 12, alignItems: "center",
+    borderWidth: 1.5, borderColor: T.border,
+  },
+  typeTileActive: { borderColor: T.navy, backgroundColor: "#F5F9FB" },
+  typeTileIcon: {
+    width: 42, height: 42, borderRadius: 12,
+    backgroundColor: T.iconBg,
+    justifyContent: "center", alignItems: "center",
+    marginBottom: 8,
+  },
   typeTileLabel: { fontSize: 12, fontWeight: "700", color: T.text, textAlign: "center" },
-  typeTileDesc:  { fontSize: 10, color: T.muted, textAlign: "center", marginTop: 3 },
+  typeTileDesc:  { fontSize: 10, color: T.muted, textAlign: "center", marginTop: 3, lineHeight: 13 },
 
+  // ── Banner ──
   posterPreviewWrap: { borderRadius: 16, overflow: "hidden", position: "relative" },
-  posterPreview:     { width: "100%", height: 180, borderRadius: 16 },
-  posterRemove: { position: "absolute", top: 8, right: 8, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 12 },
-  posterPlaceholder: { height: 160, borderRadius: 16, justifyContent: "center", alignItems: "center" },
-  posterPlaceholderTxt: { fontSize: 14, fontWeight: "700", color: "rgba(255,255,255,0.8)", marginTop: 8 },
-  posterPlaceholderSub: { fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 4 },
+  posterPreview:     { width: "100%", height: 170, borderRadius: 16 },
+  posterRemove: {
+    position: "absolute", top: 8, right: 8,
+    backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 14,
+  },
+  posterPlaceholder: {
+    height: 150, borderRadius: 16,
+    backgroundColor: T.card,
+    justifyContent: "center", alignItems: "center",
+    borderWidth: 1.5, borderColor: T.border, borderStyle: "dashed",
+  },
+  posterIconCircle: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: T.iconBg,
+    justifyContent: "center", alignItems: "center",
+    marginBottom: 8,
+  },
+  posterPlaceholderTxt: { fontSize: 13, fontWeight: "700", color: T.text },
+  posterPlaceholderSub: { fontSize: 11, color: T.muted, marginTop: 3 },
 
-  inputBox: { backgroundColor: T.card, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1.5, borderColor: T.border, shadowColor: "#000", shadowOpacity: 0.02, shadowRadius: 4, elevation: 1 },
-  input: { fontSize: 14, color: T.text, fontWeight: "500" },
-  textArea: { height: 110, paddingTop: 12 },
+  // ── Inputs ──
+  inputBox: {
+    backgroundColor: T.inputBg,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    minHeight: 48,
+    borderWidth: 1.5, borderColor: T.border,
+    flexDirection: "row", alignItems: "center", gap: 10,
+  },
+  textAreaBox: { paddingTop: 10, paddingBottom: 10, alignItems: "flex-start" },
+  input: { flex: 1, fontSize: 14, color: T.text, paddingVertical: 0 },
+  textArea: { minHeight: 100, textAlignVertical: "top" },
+  charCount: { fontSize: 11, color: T.muted, alignSelf: "flex-end", marginTop: 4 },
 
-  modeRow: { flexDirection: "row", gap: 10 },
-  modeChip: { flex: 1, paddingVertical: 10, borderRadius: 14, borderWidth: 1.5, borderColor: T.border, backgroundColor: T.card, alignItems: "center" },
-  modeChipTxt: { fontSize: 13, fontWeight: "600", color: T.sub },
+  // ── Mode ──
+  modeRow: { flexDirection: "row", gap: 8 },
+  modeChip: {
+    flex: 1, paddingVertical: 11, borderRadius: 12,
+    borderWidth: 1.5, borderColor: T.border,
+    backgroundColor: T.card,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+  },
+  modeChipActive: { borderColor: T.navy, backgroundColor: T.navy },
+  modeChipTxt: { fontSize: 13, fontWeight: "700", color: T.sub },
 
-  addSkillBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: T.navy, justifyContent: "center", alignItems: "center" },
-  suggestionChip: { backgroundColor: "#F1F5F9", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, borderWidth: 1, borderColor: T.border },
-  suggestionTxt: { fontSize: 11, fontWeight: "600", color: T.sub },
+  // ── Skills ──
+  addSkillBtn: {
+    width: 32, height: 32, borderRadius: 9,
+    backgroundColor: T.navy,
+    justifyContent: "center", alignItems: "center",
+  },
+  suggestionChip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: T.chipBg,
+    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6,
+    marginRight: 8, borderWidth: 1, borderColor: T.border,
+  },
+  suggestionTxt: { fontSize: 11, fontWeight: "700", color: T.navy },
   selectedSkillsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
-  selectedChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#EFF6FF", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: "#BFDBFE" },
-  selectedChipTxt: { fontSize: 12, fontWeight: "700", color: T.navy },
+  selectedChip: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: T.navy,
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
+  },
+  selectedChipTxt: { fontSize: 12, fontWeight: "700", color: T.white },
 
-  nextBtn: { marginHorizontal: 16, marginTop: 24, borderRadius: 18, overflow: "hidden" },
-  nextBtnInner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 17, backgroundColor: T.navy, borderRadius: 18 },
-  nextBtnTxt: { fontSize: 16, fontWeight: "800", color: T.white },
+  // ── Tip ──
+  tipCard: {
+    flexDirection: "row", alignItems: "flex-start", gap: 12,
+    marginHorizontal: 16, marginTop: 18, padding: 14,
+    backgroundColor: "#FFF8E1", borderRadius: 14,
+    borderWidth: 1, borderColor: "#FCE8A6",
+  },
+  tipIcon: {
+    width: 32, height: 32, borderRadius: 9,
+    backgroundColor: "#FDF1C2",
+    justifyContent: "center", alignItems: "center",
+  },
+  tipTitle: { fontSize: 12, fontWeight: "800", color: "#7A5D00", marginBottom: 2 },
+  tipBody:  { fontSize: 12, color: "#8A6A00", lineHeight: 17 },
 
-  previewLabel: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 14 },
-  previewLabelTxt: { fontSize: 13, color: T.sub, fontWeight: "600" },
-  previewCard: { marginHorizontal: 16, backgroundColor: T.card, borderRadius: 20, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 14, elevation: 4 },
-  postHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14 },
-  postAvatarWrap: { width: 42, height: 42, borderRadius: 21, backgroundColor: T.navy, justifyContent: "center", alignItems: "center", overflow: "hidden" },
-  postAvatar:    { width: 42, height: 42, borderRadius: 21 },
-  postAvatarTxt: { fontSize: 15, fontWeight: "900", color: T.white },
-  previewOrgName:{ fontSize: 13, fontWeight: "700", color: T.text },
-  previewTime:   { fontSize: 11, color: T.muted, marginTop: 1 },
-  typeBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  typeDot:     { width: 6, height: 6, borderRadius: 3 },
-  typeBadgeTxt:{ fontSize: 11, fontWeight: "700" },
-  previewBanner:    { width: "100%", height: 180 },
-  previewBannerFlat:{ height: 180, justifyContent: "flex-end", paddingHorizontal: 20, paddingBottom: 18 },
-  bannerTitle:    { fontSize: 20, fontWeight: "900", color: T.white, marginBottom: 8 },
-  bannerMetaRow:  { flexDirection: "row", gap: 16 },
-  bannerMeta:     { flexDirection: "row", alignItems: "center", gap: 4 },
-  bannerMetaTxt:  { fontSize: 12, color: "rgba(255,255,255,0.75)", fontWeight: "600" },
-  postBody:  { padding: 16 },
-  previewTitle:{ fontSize: 16, fontWeight: "800", color: T.text },
-  previewDesc: { fontSize: 13, color: T.sub, marginTop: 6, lineHeight: 20 },
-  metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
-  metaChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#EFF6FF", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  metaChipTxt: { fontSize: 11, fontWeight: "600", color: T.navy },
-  skillChip: { backgroundColor: "#EFF6FF", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, marginRight: 8, borderWidth: 1, borderColor: "#BFDBFE" },
-  skillChipTxt:  { fontSize: 11, fontWeight: "700", color: T.navy },
-  postFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderColor: "#F1F5F9" },
-  postFooterLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
-  postFooterTxt:  { fontSize: 13, color: T.sub, fontWeight: "600" },
-  applyChip: { backgroundColor: T.navy, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  applyChipTxt: { fontSize: 12, color: T.white, fontWeight: "700" },
+  // ── Sticky publish bar ──
+  publishBar: {
+    position: "absolute", left: 0, right: 0, bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === "ios" ? 30 : 14,
+    backgroundColor: T.card,
+    borderTopWidth: 1, borderTopColor: T.border,
+  },
+  publishBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+    backgroundColor: T.navy,
+    paddingVertical: 16, borderRadius: 16,
+    shadowColor: T.navy, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25, shadowRadius: 10, elevation: 4,
+  },
+  publishBtnDisabled: { backgroundColor: T.muted, shadowOpacity: 0 },
+  publishBtnTxt: { fontSize: 15, fontWeight: "800", color: T.white },
 });

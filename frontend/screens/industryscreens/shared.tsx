@@ -6,11 +6,55 @@ import React, {
 } from "react";
 import {
   ActivityIndicator, Alert, Animated,
+  DeviceEventEmitter,
   Dimensions, Image, Platform,
   StyleSheet, Text, TextInput,
   TouchableOpacity, View
 } from "react-native";
 import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { CONSTANT } from "@/constants/constant";
+
+const LOGO_KEY = "industryLogo";
+export const LOGO_EVENT = "industry:logo:change";
+
+// Filter to keep only renderable URIs (http(s) URL or data URI). Anything
+// else (especially file://) is treated as empty so we never try to render
+// device-local cache paths cross-screen.
+const validLogo = (v?: string | null): string =>
+  typeof v === "string" && (/^https?:\/\//i.test(v) || v.startsWith("data:"))
+    ? v
+    : "";
+
+// ── Tiny hook every avatar can call: returns the current logo, refreshing
+// itself whenever the LOGO_EVENT fires OR whenever AsyncStorage changes.
+// Completely independent of React Context — works across Drawer/Stack
+// navigator boundaries even if context propagation lags.
+export const useIndustryLogo = (): string => {
+  const [logo, setLogo] = React.useState<string>("");
+  React.useEffect(() => {
+    let alive = true;
+    AsyncStorage.getItem(LOGO_KEY).then((v) => {
+      const ok = validLogo(v);
+      if (alive && ok) setLogo(ok);
+    }).catch(() => {});
+    const sub = DeviceEventEmitter.addListener(LOGO_EVENT, (next: string) => {
+      if (alive) setLogo(validLogo(next));
+    });
+    return () => { alive = false; sub.remove(); };
+  }, []);
+  return logo;
+};
+
+// Call this anywhere to broadcast a new logo. Saves to AsyncStorage too.
+// Local file:// URIs are silently ignored — only http(s) URLs and data
+// URIs are persisted, so other screens never get a path they can't render.
+export const broadcastLogo = (next: string) => {
+  const ok = validLogo(next);
+  if (!ok) return;
+  AsyncStorage.setItem(LOGO_KEY, ok).catch(() => {});
+  DeviceEventEmitter.emit(LOGO_EVENT, ok);
+};
 
 export const { width, height } = Dimensions.get("window");
 
@@ -38,7 +82,7 @@ export const C = {
 };
 
 // ─── API ────────────────────────────────────────────────────────
-export const BASE     = "http://192.168.0.103:5000";
+export const BASE     = CONSTANT.API_BASE_URL;
 export const API_MOU  = `${BASE}/api/industry/mous`;
 export const API_INT  = `${BASE}/api/industry/internships`;
 export const API_PROJ = `${BASE}/api/industry/projects`;
@@ -122,6 +166,11 @@ export const DEFAULT_USER = {
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<typeof DEFAULT_USER | null>(DEFAULT_USER);
+  // ── Dedicated, reactive logo slice — every avatar in the industry tree
+  // subscribes to THIS rather than user.logo, so a single setLogo() call
+  // forces every <Image> to re-render even if the broader user object
+  // wouldn't have triggered an update for some reason.
+  const [logo, setLogoState] = useState<string>("");
 
   const ax = useCallback(() =>
     axios.create({
@@ -135,11 +184,58 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   [user?._id, user?.name]
   );
 
-  const updateUser = (data: Partial<typeof DEFAULT_USER>) =>
+  // Single writer for the logo. Updates state, the user object, and the cache.
+  const setLogo = useCallback((next: string) => {
+    setLogoState(next || "");
+    setUser((p) => p ? { ...p, logo: next || "" } : p);
+    AsyncStorage.setItem(LOGO_KEY, next || "").catch(() => {});
+  }, []);
+
+  const updateUser = (data: Partial<typeof DEFAULT_USER>) => {
     setUser((p) => p ? { ...p, ...data } : p);
+    if (data.logo !== undefined) {
+      setLogoState(data.logo || "");
+      AsyncStorage.setItem(LOGO_KEY, data.logo || "").catch(() => {});
+    }
+  };
+
+  // ── Pull the latest profile (logo, name, etc.) so every screen that consumes
+  // useUser() — drawer, dashboard, post cards, profile screen, etc. — sees it.
+  const refreshUser = useCallback(async () => {
+    if (!user?.email) return;
+    try {
+      const { data } = await axios.get(
+        `${BASE}/api/industry/auth/profile?email=${encodeURIComponent(user.email)}`
+      );
+      if (data?.company) {
+        setUser((prev) => prev ? { ...prev, ...data.company } : data.company);
+        if (data.company.logo) {
+          setLogoState(data.company.logo);
+          AsyncStorage.setItem(LOGO_KEY, data.company.logo).catch(() => {});
+        }
+      }
+    } catch (err: any) {
+      console.log("Industry refreshUser error:", err?.response?.data || err.message);
+    }
+  }, [user?.email]);
+
+  // Pre-load cached logo + fetch fresh profile on mount.
+  useEffect(() => {
+    (async () => {
+      try {
+        const cached = await AsyncStorage.getItem(LOGO_KEY);
+        if (cached) {
+          setLogoState(cached);
+          setUser((prev) => prev ? { ...prev, logo: cached } : prev);
+        }
+      } catch {}
+      refreshUser();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <UserCtx.Provider value={{ user, setUser, updateUser, ax }}>
+    <UserCtx.Provider value={{ user, setUser, updateUser, refreshUser, ax, logo, setLogo }}>
       {children}
     </UserCtx.Provider>
   );

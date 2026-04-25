@@ -6,10 +6,6 @@ import { PDFParse } from "pdf-parse";
 
 
 dotenv.config();
-<<<<<<< Updated upstream
-const genAI = new GoogleGenerativeAI('AIzaSyBa_i7gosdyuzREuPg2Qz0YqSP9xAdAgxQ');
-=======
->>>>>>> Stashed changes
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
 

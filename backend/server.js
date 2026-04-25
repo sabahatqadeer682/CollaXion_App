@@ -1,9 +1,3 @@
-<<<<<<< Updated upstream
-=======
-
-
-
->>>>>>> Stashed changes
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -27,12 +21,8 @@ import feedbackRoutes from "./student/routes/FeedbackRoutes.js";
 import notificationRoutes from "./student/routes/NotificationRoutes.js";
 import chatRoutes from "./student/routes/chat.routes.js";
 import Message from "./student/models/Message.js";
-import industryApplicationRoutes from "./industry/routes/industryApplicationRoutes.js";
-import industryAuthRoutes from "./industry/routes/industryAuthRoutes.js"; // ← from file 2
-
-
-
-import industryApplicationRoutes from "./industry/routes/industryApplicationRoutes.js";
+import industryApplicationRoutes from "./industry/routes/Industryapplicationroutes.js";
+import industryAuthRoutes from "./industry/routes/industryAuthRoutes.js";
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -68,7 +58,6 @@ wss.on("connection", (ws, req) => {
     if (!clients.has(email)) clients.set(email, new Set());
     clients.get(email).add(ws);
 
-<<<<<<< Updated upstream
     ws.on("message", async (raw) => {
         try {
             const { event, data } = JSON.parse(raw.toString());
@@ -100,33 +89,6 @@ wss.on("connection", (ws, req) => {
             }
         } catch (err) {
             console.error("WS message error:", err);
-=======
-   
-
-
-ws.on("message", async (raw) => {
-    try {
-        const { event, data } = JSON.parse(raw.toString());
-
-        if (event === "sendMessage") {
-            const { senderEmail, senderName, receiverEmail, text } = data;
-            if (!senderEmail || !receiverEmail || !text?.trim()) return;
-
-            const roomId = Message.getRoomId(senderEmail, receiverEmail);
-            const message = new Message({
-                roomId,
-                senderEmail,
-               
-
-                senderName: senderName || senderEmail.split("@")[0],
-                receiverEmail,
-                text: text.trim(),
-            });
-            await message.save();
-
-            broadcast(receiverEmail, { event: "newMessage", data: message });
-            broadcast(senderEmail, { event: "newMessage", data: message });
->>>>>>> Stashed changes
         }
     });
 
@@ -142,21 +104,17 @@ ws.on("message", async (raw) => {
     ws.on("error", (err) => console.error("WS error:", err));
 });
 
-<<<<<<< Updated upstream
-app.use(express.json({ limit: "10mb" })); // ← limit raised for base64 logos (from file 2)
-=======
 // Profile / chat images are sent as base64 data URIs — bump the body limit
 // well above the default 100kb so uploads don't silently 413.
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ limit: "25mb", extended: true }));
->>>>>>> Stashed changes
 app.use(cors());
 
 app.use("/uploads", express.static("uploads"));
 app.use("/uploads/profile", express.static("uploads/profile"));
 app.use("/uploads/cv", express.static("uploads/cv"));
 
-app.use("/api/industry/auth", industryAuthRoutes);   // ← NEW (must be before /api/industry/*)
+app.use("/api/industry/auth", industryAuthRoutes);   // must be before /api/industry/*
 app.use("/api/industry/mous", mouRoutes);
 app.use("/api/industries", industryRoutes);
 app.use("/api/industry/posts", postRoutes);
@@ -172,10 +130,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/events", studentEventRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/industry", industryApplicationRoutes);
-<<<<<<< Updated upstream
 
-=======
->>>>>>> Stashed changes
 // MongoDB
 mongoose
     .connect(process.env.MONGO_URI)

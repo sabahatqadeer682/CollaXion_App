@@ -164,12 +164,39 @@ export function EventsManageScreen() {
         <View style={[s.stripe, { backgroundColor: hidden ? T.muted : tc.textColor }]} />
 
         <View style={s.cardBody}>
-          {event.banner && (
-            <Image
-              source={{ uri: event.banner }}
-              style={{ width: "100%", height: 160, borderRadius: 12, marginBottom: 10 }}
-            />
-          )}
+          {(() => {
+            const validBanner =
+              typeof event.banner === "string" &&
+              (event.banner.startsWith("data:") || /^https?:\/\//i.test(event.banner));
+            if (validBanner) {
+              return (
+                <Image
+                  key={event.banner.slice(0,32)}
+                  source={{ uri: event.banner }}
+                  style={{ width: "100%", height: 160, borderRadius: 12, marginBottom: 10 }}
+                />
+              );
+            }
+            // Fallback when banner is missing OR a stale file:// path
+            return (
+              <View style={{
+                width:"100%", height:160, borderRadius:12, marginBottom:10,
+                backgroundColor: tc.bg,
+                justifyContent:"center", alignItems:"center",
+                borderWidth:1, borderColor:"#E2E8F0",
+              }}>
+                <Ionicons name={tc.icon as any} size={36} color={tc.textColor} />
+                <Text style={{ color: tc.textColor, fontWeight:"800", marginTop:6, fontSize:13 }}>
+                  {event.title}
+                </Text>
+                {event.banner ? (
+                  <Text style={{ color:"#94A3B8", fontSize:10, marginTop:2 }}>
+                    Banner unavailable — edit to re-upload
+                  </Text>
+                ) : null}
+              </View>
+            );
+          })()}
 
           {/* Row 1: type badge + status */}
           <View style={s.cardRow}>

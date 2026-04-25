@@ -7,7 +7,7 @@ import {
   ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View
 } from "react-native";
-import { BASE, C, sharedStyles, useToast, useUser } from "./shared";
+import { BASE, broadcastLogo, C, sharedStyles, useIndustryLogo, useToast, useUser } from "./shared";
 
 // ── Color Theme (CollaXion) ───────────────────────────────────
 const T = {
@@ -26,11 +26,15 @@ const T = {
 
 export function ProfileScreen() {
   const nav = useNavigation<any>();
-  const { user, updateUser, ax } = useUser();
+  const { user, updateUser, refreshUser, setLogo, ax } = useUser();
+  const liveLogo = useIndustryLogo();
   const toast = useToast();
   const [ld, setLd] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [form, setForm] = useState({ ...user });
+  // Initialise form with user data PLUS fall back to whatever the rest of the
+  // app is showing (broadcast / cached logo). So when the user lands on this
+  // screen the avatar matches the dashboard / drawer immediately.
+  const [form, setForm] = useState({ ...user, logo: (user?.logo || liveLogo || "") });
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -40,8 +44,14 @@ export function ProfileScreen() {
           `${BASE}/api/industry/auth/profile?email=${encodeURIComponent(user.email)}`
         );
         if (data?.company) {
-          setForm(data.company);
-          updateUser(data.company);
+          // Merge server data, but preserve a renderable logo if the
+          // backend's value is missing / stale (file://) — pick the live
+          // broadcast or cached value instead.
+          const validBackend = typeof data.company.logo === "string" &&
+            (data.company.logo.startsWith("data:") || /^https?:\/\//i.test(data.company.logo));
+          const bestLogo = validBackend ? data.company.logo : (liveLogo || form.logo || "");
+          setForm({ ...data.company, logo: bestLogo });
+          updateUser({ ...data.company, logo: bestLogo });
         }
       } catch (err: any) {
         console.error("Load profile error:", err?.response?.data || err.message);
@@ -51,6 +61,19 @@ export function ProfileScreen() {
     };
     loadProfile();
   }, []);
+
+  // Convert any local URI → base64 data URI (JS fallback when picker.base64 missing)
+  const uriToDataUri = (uri: string): Promise<string> =>
+    new Promise(async (resolve, reject) => {
+      try {
+        const r = await fetch(uri);
+        const b = await r.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(b);
+      } catch (e) { reject(e); }
+    });
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -62,26 +85,89 @@ export function ProfileScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
+      quality: 0.4,
+      base64: true,
     });
-    if (!res.canceled) {
-      setForm((f: any) => ({ ...f, logo: res.assets[0].uri }));
+    if (res.canceled) return;
+    const asset = res.assets[0];
+
+    // ALWAYS produce a real data URI — file:// is never accepted.
+    let dataUri: string | null = asset.base64
+      ? `data:image/jpeg;base64,${asset.base64}`
+      : null;
+    if (!dataUri) {
+      try { dataUri = await uriToDataUri(asset.uri); }
+      catch (e) { console.log("Logo encode failed:", e); }
     }
+    if (!dataUri || !dataUri.startsWith("data:")) {
+      Alert.alert("Image error", "Could not read this image. Please try a different one.");
+      return;
+    }
+
+    setForm((f: any) => ({ ...f, logo: dataUri }));
+    broadcastLogo(dataUri);   // instant preview on dashboard / drawer
   };
 
   const save = async () => {
+    // ── Confirmation that Save fired AT ALL — if you don't see this Alert,
+    //    the latest code isn't loaded. Reload Metro & Expo Go.
+    Alert.alert(
+      "🔧 Save tapped",
+      `email: ${form.email || "(empty!)"}\nname: ${form.name || ""}\nlogo type: ${
+        !form.logo ? "empty"
+        : form.logo.startsWith("data:") ? "data URI ✅"
+        : form.logo.startsWith("file:") ? "FILE:// (will be dropped)"
+        : "other"
+      }\nlogo length: ${(form.logo || "").length}\nBASE: ${BASE}`
+    );
+
     if (!form.email) {
       toast("No email found — cannot save", "error");
       return;
     }
     setLd(true);
     try {
-      const { data } = await ax().put(`${BASE}/api/industry/auth/profile`, form);
+      // Build payload — only send a renderable logo (data URI / http URL).
+      const { logo, ...rest } = form as any;
+      const payload: any = { ...rest };
+      if (typeof logo === "string" && (logo.startsWith("data:") || /^https?:\/\//i.test(logo))) {
+        payload.logo = logo;
+      }
+
+      const resp = await ax().put(`${BASE}/api/industry/auth/profile`, payload);
+      const data = resp.data;
+
+      // Confirmation that backend responded with the saved logo
+      Alert.alert(
+        "✅ Backend response",
+        `logo saved: ${
+          data?.company?.logo
+            ? data.company.logo.substring(0, 50) + "…"
+            : "(empty / not returned)"
+        }`
+      );
+
+      // ── Adopt the server's canonical logo URL ──
+      const serverLogo = data?.company?.logo || "";
+      if (serverLogo) {
+        broadcastLogo(serverLogo);
+        setLogo?.(serverLogo);
+        setForm((f: any) => ({ ...f, ...data.company, logo: serverLogo }));
+      } else {
+        setForm((f: any) => ({ ...f, ...data.company }));
+      }
       updateUser(data.company);
+
+      await refreshUser?.();
       toast("Profile updated!", "success");
     } catch (err: any) {
-      console.error("Save error:", err?.response?.data || err.message);
-      toast(err?.response?.data?.message || "Update failed", "error");
+      const msg =
+        err?.response?.status
+          ? `HTTP ${err.response.status}: ${err?.response?.data?.message || ""}`
+          : err?.message || "Unknown error";
+      console.error("Save error:", msg);
+      Alert.alert("Save failed", msg);
+      toast("Update failed", "error");
     } finally {
       setLd(false);
     }
@@ -114,9 +200,12 @@ export function ProfileScreen() {
         {/* Banner */}
         <View style={styles.profBanner}>
           <TouchableOpacity onPress={pickImage} style={styles.profAvatarWrap}>
-            {form.logo
-              ? <Image source={{ uri: form.logo }} style={styles.profAvatarImg} />
-              : <Text style={styles.profAvatarTxt}>{initials(form.name)}</Text>}
+            {(() => {
+              const src = form.logo || liveLogo;
+              return src
+                ? <Image key={src.slice(0,32)} source={{ uri: src }} style={styles.profAvatarImg} />
+                : <Text style={styles.profAvatarTxt}>{initials(form.name)}</Text>;
+            })()}
             <View style={styles.profCamBtn}>
               <Ionicons name="camera" size={14} color={T.white} />
             </View>

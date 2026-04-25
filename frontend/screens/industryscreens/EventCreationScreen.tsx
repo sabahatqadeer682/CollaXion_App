@@ -8,7 +8,9 @@ import {
   Dimensions,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -84,6 +86,11 @@ export function EventCreationScreen() {
   const [inviteMsg,    setInviteMsg]    = useState("");
   const [loading,      setLoading]      = useState(false);
 
+  // ── Picker visibility ───────────────────────────────────────────
+  const [dateModalOpen,     setDateModalOpen]     = useState(false);
+  const [deadlineModalOpen, setDeadlineModalOpen] = useState(false);
+  const [timeModalOpen,     setTimeModalOpen]     = useState(false);
+
   // ── Prefill when editing ────────────────────────────────────────
   useEffect(() => {
     if (editMode && eventData) {
@@ -96,7 +103,12 @@ export function EventCreationScreen() {
       setMode(eventData.mode || "Physical");
       setCapacity(eventData.capacity ? String(eventData.capacity) : "");
       setDeadline(eventData.deadline || "");
-      setBanner(eventData.banner || null);
+      // Only keep the existing banner if it's a real renderable URI
+      // (data URI or http URL). Stale file:// paths from old saves are
+      // dropped so the user is prompted to re-upload.
+      const b = eventData.banner;
+      const validB = typeof b === "string" && (b.startsWith("data:") || /^https?:\/\//i.test(b));
+      setBanner(validB ? b : null);
       setTags(eventData.tags || []);
       setSelectedUnis(eventData.invitedUniversities || []);
       setInviteMsg(eventData.inviteMessage || "");
@@ -107,10 +119,14 @@ export function EventCreationScreen() {
   const pickBanner = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.85,
+      quality: 0.5,
       aspect: [16, 9],
+      base64: true,                      // native base64 — reliable on RN
     });
-    if (!res.canceled) setBanner(res.assets[0].uri);
+    if (!res.canceled) {
+      const a = res.assets[0];
+      setBanner(a.base64 ? `data:image/jpeg;base64,${a.base64}` : a.uri);
+    }
   };
 
   const toggleTag = (t: string) =>
@@ -150,42 +166,30 @@ export function EventCreationScreen() {
     };
 
     try {
-      const a = ax();
+      // Only send banner to backend if it's a valid data URI or http URL —
+      // never a stale file:// path.
+      const safeBanner =
+        typeof banner === "string" && (banner.startsWith("data:") || /^https?:\/\//i.test(banner))
+          ? banner
+          : null;
 
+      const payload = {
+        industryId: user?._id, companyName: user?.name,
+        eventType, title, description, date, time, location, mode,
+        capacity: capacity ? Number(capacity) : null, deadline,
+        banner: safeBanner,
+        tags, invitedUniversities: selectedUnis, inviteMessage: inviteMsg,
+      };
+
+      const a = ax();
       if (editMode && eventData?._id) {
-        const payload = {
-          industryId: user?._id, companyName: user?.name,
-          eventType, title, description, date, time, location, mode,
-          capacity: capacity ? Number(capacity) : null, deadline,
-          banner, tags, invitedUniversities: selectedUnis, inviteMessage: inviteMsg,
-        };
         await a.put(`/api/industry/events/${eventData._id}`, payload, { headers });
         setLoading(false);
         Alert.alert("Updated ✏️", "Event successfully updated!", [
           { text: "OK", onPress: () => nav.goBack() },
         ]);
       } else {
-        const formData = new FormData();
-        formData.append("industryId",   user?._id);
-        formData.append("companyName",  user?.name);
-        formData.append("eventType",    eventType);
-        formData.append("title",        title);
-        formData.append("description",  description);
-        formData.append("date",         date);
-        formData.append("time",         time);
-        formData.append("location",     location);
-        formData.append("mode",         mode);
-        formData.append("capacity",     capacity);
-        formData.append("deadline",     deadline);
-        formData.append("tags",              JSON.stringify(tags));
-        formData.append("invitedUniversities", JSON.stringify(selectedUnis));
-        formData.append("inviteMessage", inviteMsg);
-        if (banner) {
-          formData.append("banner", { uri: banner, name: "event.jpg", type: "image/jpeg" } as any);
-        }
-        await a.post("/api/industry/events", formData, {
-          headers: { ...headers, "Content-Type": "multipart/form-data" },
-        });
+        await a.post("/api/industry/events", payload, { headers });
         setLoading(false);
         Alert.alert("Published 🎉", "Event created and invitations sent!", [
           { text: "OK", onPress: () => nav.goBack() },
@@ -294,34 +298,28 @@ export function EventCreationScreen() {
 
               <View style={s.divider} />
 
-              {/* Date & Time */}
+              {/* Date & Time — tap to pick */}
               <View style={s.row}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.label}>Date <Text style={s.req}>*</Text></Text>
-                  <View style={s.inputRow}>
+                  <TouchableOpacity style={s.inputRow} onPress={() => setDateModalOpen(true)} activeOpacity={0.85}>
                     <Ionicons name="calendar-outline" size={15} color={THEME.sub} style={s.inputIcon} />
-                    <TextInput
-                      style={[s.inputField, { flex: 1 }]}
-                      placeholder="DD MMM YYYY"
-                      placeholderTextColor={THEME.muted}
-                      value={date}
-                      onChangeText={setDate}
-                    />
-                  </View>
+                    <Text style={[s.inputField, { flex: 1, paddingVertical: 12, color: date ? THEME.text : THEME.muted }]}>
+                      {date || "Tap to pick date"}
+                    </Text>
+                    <Ionicons name="chevron-down" size={14} color={THEME.muted} />
+                  </TouchableOpacity>
                 </View>
                 <View style={{ width: 12 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={s.label}>Time</Text>
-                  <View style={s.inputRow}>
+                  <TouchableOpacity style={s.inputRow} onPress={() => setTimeModalOpen(true)} activeOpacity={0.85}>
                     <Ionicons name="time-outline" size={15} color={THEME.sub} style={s.inputIcon} />
-                    <TextInput
-                      style={[s.inputField, { flex: 1 }]}
-                      placeholder="10:00 AM"
-                      placeholderTextColor={THEME.muted}
-                      value={time}
-                      onChangeText={setTime}
-                    />
-                  </View>
+                    <Text style={[s.inputField, { flex: 1, paddingVertical: 12, color: time ? THEME.text : THEME.muted }]}>
+                      {time || "Tap to pick time"}
+                    </Text>
+                    <Ionicons name="chevron-down" size={14} color={THEME.muted} />
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -394,16 +392,13 @@ export function EventCreationScreen() {
                 <View style={{ width: 12 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={s.label}>RSVP Deadline</Text>
-                  <View style={s.inputRow}>
+                  <TouchableOpacity style={s.inputRow} onPress={() => setDeadlineModalOpen(true)} activeOpacity={0.85}>
                     <Ionicons name="hourglass-outline" size={15} color={THEME.sub} style={s.inputIcon} />
-                    <TextInput
-                      style={[s.inputField, { flex: 1 }]}
-                      placeholder="DD MMM YYYY"
-                      placeholderTextColor={THEME.muted}
-                      value={deadline}
-                      onChangeText={setDeadline}
-                    />
-                  </View>
+                    <Text style={[s.inputField, { flex: 1, paddingVertical: 12, color: deadline ? THEME.text : THEME.muted }]}>
+                      {deadline || "Tap to pick"}
+                    </Text>
+                    <Ionicons name="chevron-down" size={14} color={THEME.muted} />
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -562,9 +557,273 @@ export function EventCreationScreen() {
           </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      {/* ── Date picker modal (Event Date) ── */}
+      <DatePickerModal
+        visible={dateModalOpen}
+        title="Select Event Date"
+        initial={date}
+        onClose={() => setDateModalOpen(false)}
+        onPick={(v) => { setDate(v); setDateModalOpen(false); }}
+      />
+
+      {/* ── Date picker modal (RSVP Deadline) ── */}
+      <DatePickerModal
+        visible={deadlineModalOpen}
+        title="Select RSVP Deadline"
+        initial={deadline}
+        onClose={() => setDeadlineModalOpen(false)}
+        onPick={(v) => { setDeadline(v); setDeadlineModalOpen(false); }}
+      />
+
+      {/* ── Time picker modal ── */}
+      <TimePickerModal
+        visible={timeModalOpen}
+        initial={time}
+        onClose={() => setTimeModalOpen(false)}
+        onPick={(v) => { setTime(v); setTimeModalOpen(false); }}
+      />
     </View>
   );
 }
+
+// ════════════════════════════════════════════════════════════════
+//  Date Picker Modal — month grid, no extra deps
+// ════════════════════════════════════════════════════════════════
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const WEEKDAYS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+function fmtDate(y: number, m: number, d: number) {
+  return `${String(d).padStart(2,"0")} ${MONTHS[m]} ${y}`;
+}
+function parseDate(s: string): { y: number; m: number; d: number } | null {
+  if (!s) return null;
+  const parts = s.trim().split(/\s+/);
+  if (parts.length < 3) return null;
+  const d = parseInt(parts[0], 10);
+  const m = MONTHS.indexOf(parts[1]);
+  const y = parseInt(parts[2], 10);
+  if (isNaN(d) || isNaN(y) || m < 0) return null;
+  return { y, m, d };
+}
+
+function DatePickerModal({
+  visible, title, initial, onClose, onPick,
+}: {
+  visible: boolean; title: string; initial: string;
+  onClose: () => void; onPick: (v: string) => void;
+}) {
+  const today = new Date();
+  const init  = parseDate(initial) || { y: today.getFullYear(), m: today.getMonth(), d: today.getDate() };
+  const [year,  setYear]  = React.useState(init.y);
+  const [month, setMonth] = React.useState(init.m);
+  const [day,   setDay]   = React.useState(init.d);
+
+  React.useEffect(() => {
+    if (visible) {
+      const i = parseDate(initial) || { y: today.getFullYear(), m: today.getMonth(), d: today.getDate() };
+      setYear(i.y); setMonth(i.m); setDay(i.d);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const firstDow   = new Date(year, month, 1).getDay();
+  const daysInMo   = new Date(year, month + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array(firstDow).fill(null),
+    ...Array.from({ length: daysInMo }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const prevMonth = () => {
+    if (month === 0) { setMonth(11); setYear(year - 1); }
+    else setMonth(month - 1);
+  };
+  const nextMonth = () => {
+    if (month === 11) { setMonth(0); setYear(year + 1); }
+    else setMonth(month + 1);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={dp.backdrop} onPress={onClose}>
+        <Pressable style={dp.card} onPress={(e) => e.stopPropagation()}>
+          {/* Header */}
+          <View style={dp.head}>
+            <Text style={dp.title}>{title}</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={20} color="#5B7080" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Month / Year nav */}
+          <View style={dp.navRow}>
+            <TouchableOpacity onPress={prevMonth} style={dp.navBtn}>
+              <Ionicons name="chevron-back" size={20} color="#193648" />
+            </TouchableOpacity>
+            <Text style={dp.navLbl}>{MONTHS[month]} {year}</Text>
+            <TouchableOpacity onPress={nextMonth} style={dp.navBtn}>
+              <Ionicons name="chevron-forward" size={20} color="#193648" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Weekday header */}
+          <View style={dp.gridRow}>
+            {WEEKDAYS.map((w) => (
+              <Text key={w} style={dp.dow}>{w}</Text>
+            ))}
+          </View>
+
+          {/* Day cells */}
+          <View style={dp.grid}>
+            {cells.map((d, i) => {
+              if (d === null) return <View key={i} style={dp.cell} />;
+              const selected = d === day;
+              return (
+                <TouchableOpacity key={i} style={[dp.cell, selected && dp.cellActive]} onPress={() => setDay(d)}>
+                  <Text style={[dp.cellTxt, selected && dp.cellTxtActive]}>{d}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Footer */}
+          <View style={dp.footer}>
+            <TouchableOpacity style={dp.cancelBtn} onPress={onClose}>
+              <Text style={dp.cancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={dp.okBtn} onPress={() => onPick(fmtDate(year, month, day))}>
+              <Text style={dp.okTxt}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+//  Time Picker Modal — hour / minute / AM-PM
+// ════════════════════════════════════════════════════════════════
+function parseTime(s: string): { h: number; m: number; ampm: "AM" | "PM" } | null {
+  if (!s) return null;
+  const match = s.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return null;
+  return { h: parseInt(match[1], 10), m: parseInt(match[2], 10), ampm: match[3].toUpperCase() as "AM" | "PM" };
+}
+
+function TimePickerModal({
+  visible, initial, onClose, onPick,
+}: {
+  visible: boolean; initial: string;
+  onClose: () => void; onPick: (v: string) => void;
+}) {
+  const init = parseTime(initial) || { h: 10, m: 0, ampm: "AM" as const };
+  const [hour,   setHour]   = React.useState(init.h);
+  const [minute, setMinute] = React.useState(init.m);
+  const [ampm,   setAmpm]   = React.useState<"AM" | "PM">(init.ampm);
+
+  React.useEffect(() => {
+    if (visible) {
+      const i = parseTime(initial) || { h: 10, m: 0, ampm: "AM" as const };
+      setHour(i.h); setMinute(i.m); setAmpm(i.ampm);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const HOURS   = Array.from({ length: 12 }, (_, i) => i + 1);
+  const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);   // 5-minute intervals
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={dp.backdrop} onPress={onClose}>
+        <Pressable style={dp.card} onPress={(e) => e.stopPropagation()}>
+          <View style={dp.head}>
+            <Text style={dp.title}>Select Time</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={20} color="#5B7080" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={tp.preview}>
+            <Text style={tp.previewTxt}>
+              {String(hour).padStart(2,"0")}:{String(minute).padStart(2,"0")} {ampm}
+            </Text>
+          </View>
+
+          <View style={tp.cols}>
+            <ScrollView style={tp.col}>
+              {HOURS.map((h) => (
+                <TouchableOpacity key={h} style={[tp.opt, hour===h && tp.optActive]} onPress={() => setHour(h)}>
+                  <Text style={[tp.optTxt, hour===h && tp.optTxtActive]}>{h}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <ScrollView style={tp.col}>
+              {MINUTES.map((m) => (
+                <TouchableOpacity key={m} style={[tp.opt, minute===m && tp.optActive]} onPress={() => setMinute(m)}>
+                  <Text style={[tp.optTxt, minute===m && tp.optTxtActive]}>{String(m).padStart(2,"0")}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={tp.col}>
+              {(["AM","PM"] as const).map((p) => (
+                <TouchableOpacity key={p} style={[tp.opt, ampm===p && tp.optActive]} onPress={() => setAmpm(p)}>
+                  <Text style={[tp.optTxt, ampm===p && tp.optTxtActive]}>{p}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={dp.footer}>
+            <TouchableOpacity style={dp.cancelBtn} onPress={onClose}>
+              <Text style={dp.cancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={dp.okBtn}
+              onPress={() => onPick(`${String(hour).padStart(2,"0")}:${String(minute).padStart(2,"0")} ${ampm}`)}>
+              <Text style={dp.okTxt}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ── Date / Time picker styles ───────────────────────────────────
+const dp = StyleSheet.create({
+  backdrop:{ flex:1, backgroundColor:"rgba(13,31,45,0.55)", justifyContent:"center", alignItems:"center", padding:18 },
+  card:    { width:"100%", maxWidth:340, backgroundColor:"#FFFFFF", borderRadius:18, padding:18 },
+  head:    { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:12 },
+  title:   { fontSize:15, fontWeight:"800", color:"#0D1F2D" },
+  navRow:  { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:8 },
+  navBtn:  { width:34, height:34, borderRadius:9, backgroundColor:"#EEF3F7", justifyContent:"center", alignItems:"center" },
+  navLbl:  { fontSize:14, fontWeight:"700", color:"#0D1F2D" },
+  gridRow: { flexDirection:"row", marginTop:8, marginBottom:6 },
+  dow:     { flex:1, textAlign:"center", fontSize:11, fontWeight:"700", color:"#5B7080" },
+  grid:    { flexDirection:"row", flexWrap:"wrap" },
+  cell:    { width:`${100/7}%`, aspectRatio:1, justifyContent:"center", alignItems:"center", padding:2 },
+  cellActive:{ },
+  cellTxt: { fontSize:13, color:"#0D1F2D" },
+  cellTxtActive:{ color:"#fff", fontWeight:"800", backgroundColor:"#193648", width:34, height:34, borderRadius:17, textAlign:"center", lineHeight:34, overflow:"hidden" },
+  footer:  { flexDirection:"row", gap:10, marginTop:14 },
+  cancelBtn:{ flex:1, paddingVertical:12, borderRadius:10, borderWidth:1, borderColor:"#E2E8F0", alignItems:"center" },
+  cancelTxt:{ fontSize:13, fontWeight:"700", color:"#5B7080" },
+  okBtn:   { flex:1, paddingVertical:12, borderRadius:10, backgroundColor:"#193648", alignItems:"center" },
+  okTxt:   { fontSize:13, fontWeight:"800", color:"#fff" },
+});
+
+const tp = StyleSheet.create({
+  preview: { alignItems:"center", paddingVertical:12, marginBottom:10, backgroundColor:"#EEF3F7", borderRadius:12 },
+  previewTxt:{ fontSize:22, fontWeight:"900", color:"#193648", letterSpacing:1 },
+  cols:    { flexDirection:"row", gap:8, height:200 },
+  col:     { flex:1, backgroundColor:"#F7FAFC", borderRadius:10, paddingVertical:6 },
+  opt:     { paddingVertical:10, alignItems:"center", borderRadius:6, marginHorizontal:6 },
+  optActive:{ backgroundColor:"#193648" },
+  optTxt:  { fontSize:14, fontWeight:"600", color:"#0D1F2D" },
+  optTxtActive:{ color:"#fff", fontWeight:"800" },
+});
 
 // ════════════════════════════════════════════════════════════════
 const s = StyleSheet.create({

@@ -1,13 +1,14 @@
-import { Ionicons } from "@expo/vector-icons";
-import { createDrawerNavigator, DrawerContentComponentProps } from "@react-navigation/drawer";
+import { Ionicons, MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { createDrawerNavigator, DrawerContentComponentProps, DrawerContentScrollView, DrawerItemList } from "@react-navigation/drawer";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
-  Animated, Dimensions, Image, Modal, Platform,
+  Animated, Dimensions, Easing, Image, Modal, Platform, Pressable,
   ScrollView, StatusBar, StyleSheet, Text,
-  TouchableOpacity, View, RefreshControl,
+  TouchableOpacity, Vibration, View, RefreshControl,
 } from "react-native";
 
 import { AIChatbotScreen, CXbotFloatingButton } from "./AIChatbotScreen";
@@ -22,45 +23,41 @@ import { InvitationsScreen } from "./InvitationsScreen";
 import { MyPostsScreen, EditPostScreen } from "./Mypostsscreen";
 import { EventCreationScreen } from "./EventCreationScreen";
 import { EventsManageScreen } from "./EventsManageScreen";
+import socket from "../studentscreens/utils/Socket";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import {
-  API_INT, API_MOU, API_PROJ, C, SBadge,
+  API_INT, API_MOU, API_PROJ, BASE, C, SBadge,
   ToastProvider, UserProvider, fmtDate,
-  sharedStyles, useUser, width,
+  sharedStyles, useIndustryLogo, useUser, width,
 } from "./shared";
 
 const { height } = Dimensions.get("window");
+const SCREEN_WIDTH = width;
 
-// ── THEME — exactly matching the student dashboard screenshot ────
+// ── THEME — exactly matching the student dashboard look ────────
 const THEME = {
-  // Dark navy used in header & hero (matches screenshot top section)
   navy:      "#0D1B2A",
   navyMid:   "#122333",
   navyLight: "#1A3045",
-  // Page background — light cool gray (matches screenshot body)
-  bg:        "#F0F2F5",
+  bg:        "#F0F4F8",
   card:      "#FFFFFF",
-  // Teal accent (matches the CX logo box border tint & active states)
   teal:      "#1A6B72",
   tealLight: "#E8F4F5",
-  // Supporting accents
   accent:    "#2A5068",
   steel:     "#5B8FA8",
-  // Text
   textPri:   "#0D1B2A",
   textSec:   "#5B7080",
   textMute:  "#9BB0BC",
-  // Status colours
   green:     "#27AE60",
   amber:     "#E67E22",
   red:       "#E74C3C",
-  // Borders
   border:    "#E3ECF0",
-  // Header bg (same as navy — matches screenshot)
   headerBg:  "#193648",
+  iconBg:    "#EEF3F7",
 };
 
-// ─── MOCK NOTIFICATIONS ──────────────────────────────────────────
+// ─── INITIAL MOCK NOTIFICATIONS (preserved) ────────────────────
 const INITIAL_NOTIFICATIONS = [
   { _id:"n1", icon:"people",           color:THEME.teal,   bg:THEME.tealLight, title:"New Application",    body:"Ayesha Tariq applied for Frontend Intern",        time:"2m ago",  read:false },
   { _id:"n2", icon:"document-text",    color:THEME.green,  bg:"#E8F6EE",       title:"MOU Status Updated", body:"Your MOU with NUCES moved to Review stage",       time:"1h ago",  read:false },
@@ -69,10 +66,99 @@ const INITIAL_NOTIFICATIONS = [
   { _id:"n5", icon:"people",           color:THEME.red,    bg:"#FDEBEA",       title:"Application Accepted",body:"Hassan Ali Mir was accepted for AI Project",     time:"2d ago",  read:true  },
 ];
 
-// ─── NOTIFICATION PANEL ──────────────────────────────────────────
-function NotificationPanel({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+// ─── REAL-TIME NOTIFICATION TOAST OVERLAY ────────────────────────
+type Notif = { _id?:string; title:string; message:string; type?:string };
+
+const TYPE_ICON: Record<string, { icon: string; color: string }> = {
+  application: { icon: "briefcase-check", color: "#2563EB" },
+  event:       { icon: "calendar-star",   color: "#7C3AED" },
+  deadline:    { icon: "clock-alert",     color: "#DC2626" },
+  general:     { icon: "bell-ring",       color: "#059669" },
+};
+
+const TOP_OFFSET = Platform.OS === "android" ? (StatusBar.currentHeight ?? 24) + 8 : 50;
+
+function NotificationOverlay({ onIncoming }: { onIncoming?: (n: Notif) => void }) {
+  const nav = useNavigation<any>();
+  const [current, setCurrent] = useState<Notif | null>(null);
+  const translateY = useRef(new Animated.Value(-160)).current;
+  const opacity   = useRef(new Animated.Value(0)).current;
+  const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const hide = () => {
+    if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    Animated.parallel([
+      Animated.timing(translateY, { toValue: -160, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(opacity,    { toValue: 0,    duration: 200, useNativeDriver: true }),
+    ]).start(() => setCurrent(null));
+  };
+
+  const show = (notif: Notif) => {
+    setCurrent(notif);
+    try { Vibration.vibrate(Platform.OS === "android" ? [0, 80, 60, 80] : 250); } catch {}
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(()=>{});
+    translateY.setValue(-160); opacity.setValue(0);
+    Animated.parallel([
+      Animated.spring(translateY, { toValue: 0, tension: 80, friction: 10, useNativeDriver: true }),
+      Animated.timing(opacity,    { toValue: 1, duration: 220, useNativeDriver: true }),
+    ]).start();
+    if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    dismissTimer.current = setTimeout(hide, 4200);
+  };
+
+  useEffect(() => {
+    const handler = (data: any) => {
+      if (!data) return;
+      const n: Notif = {
+        _id: data._id,
+        title: data.title || "Notification",
+        message: data.message || "",
+        type: data.type || "general",
+      };
+      show(n);
+      onIncoming?.(n);
+    };
+    socket.on("newNotification", handler);
+    return () => {
+      socket.off("newNotification", handler);
+      if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    };
+  }, []);
+
+  if (!current) return null;
+  const cfg = TYPE_ICON[current.type || "general"] || TYPE_ICON.general;
+
+  return (
+    <Animated.View pointerEvents="box-none" style={[ov.wrap, { opacity, transform: [{ translateY }] }]}>
+      <Pressable onPress={() => { hide(); }} style={ov.banner} android_ripple={{ color: "#1E3A4A" }}>
+        <View style={[ov.iconBg, { backgroundColor: cfg.color + "22" }]}>
+          <MaterialCommunityIcons name={cfg.icon as any} size={22} color={cfg.color} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={ov.title} numberOfLines={1}>{current.title}</Text>
+          <Text style={ov.body}  numberOfLines={2}>{current.message}</Text>
+        </View>
+        <Pressable hitSlop={10} onPress={hide} style={ov.closeBtn}>
+          <MaterialCommunityIcons name="close" size={16} color="#9CA3AF" />
+        </Pressable>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+// ─── NOTIFICATION SLIDE-IN PANEL (preserved) ─────────────────────
+function NotificationPanel({
+  visible,
+  onClose,
+  notes,
+  setNotes,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  notes: any[];
+  setNotes: (n: any[]) => void;
+}) {
   const slideAnim = useRef(new Animated.Value(-width * 0.88)).current;
-  const [notes, setNotes] = useState(INITIAL_NOTIFICATIONS);
   const unread = notes.filter((n) => !n.read).length;
 
   useEffect(() => {
@@ -135,32 +221,48 @@ function NotificationPanel({ visible, onClose }: { visible: boolean; onClose: ()
 // ─── DASHBOARD ───────────────────────────────────────────────────
 function DashboardScreen() {
   const nav = useNavigation<any>();
-  const { user, ax } = useUser();
-  const [counts, setCounts] = useState({ mous:0, internships:0, projects:0, pending:0 });
+  const { user, refreshUser, ax, logo, setLogo } = useUser();
+  // Independent of context — listens directly to the LOGO_EVENT bus and
+  // re-reads AsyncStorage. Survives any Drawer/Stack propagation lag.
+  const liveLogo = useIndustryLogo();
+  const [counts, setCounts] = useState({ mous:0, posts:0, events:0, pending:0 });
   const [recentMous, setRecentMous] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [unreadCount] = useState(INITIAL_NOTIFICATIONS.filter((n)=>!n.read).length);
+  const [notes, setNotes] = useState<any[]>(INITIAL_NOTIFICATIONS);
+  const unreadCount = notes.filter((n)=>!n.read).length;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+
+  // ── Profile (logo, name, email) is fetched centrally by UserProvider.
+  // Use the shared refresher so every screen reading useUser() updates together.
+  const loadProfile = async () => { await refreshUser?.(); };
 
   const loadData = async () => {
     const a = ax();
     const headers = { "x-industry-id": user?._id, "x-company-name": user?.name };
     try {
-      const [m, postsRes] = await Promise.all([
+      const [m, postsRes, eventsRes] = await Promise.all([
         a.get(`${API_MOU}/mine`, { headers }).catch(()=>({ data:[] })),
         a.get("/api/industry/posts/mine", { headers }).catch(()=>({ data:[] })),
+        a.get("/api/industry/events/mine", { headers }).catch(()=>({ data:[] })),
       ]);
-      const mous = m.data || [];
-      const allPosts = postsRes.data || [];
-      const pending = mous.filter((x:any)=>
+      const mous      = m.data || [];
+      const allPosts  = postsRes.data || [];
+      const allEvents = Array.isArray(eventsRes.data) ? eventsRes.data : (eventsRes.data?.events || []);
+      // Sirf published events count mein — hidden / drafts skip
+      const liveEvents = allEvents.filter((e:any) => e.status === "published");
+      const pending    = mous.filter((x:any)=>
         ["Sent to Industry Laison Incharge","Changes Proposed"].includes(x.status)
       ).length;
-      const internshipCount = allPosts.filter((x:any) => x.type === "Internship").length;
-      const projectCount = allPosts.filter((x:any) => x.type === "Project").length;
-      setCounts({ mous:mous.length, internships:internshipCount, projects:projectCount, pending });
+      setCounts({
+        mous:    mous.length,
+        // Posts = sab kuch jo aap ne create kiya: Internship + Project + Workshop + Events
+        posts:   allPosts.length + liveEvents.length,
+        events:  liveEvents.length,
+        pending,
+      });
       setRecentMous(mous.slice(0,3));
       setPosts(allPosts);
     } catch(e:any) {
@@ -168,15 +270,56 @@ function DashboardScreen() {
     }
   };
 
+  // ── Real-time WebSocket connection (keyed by industry email) ──
+  useEffect(() => {
+    if (!user?.email) return;
+
+    // Force a fresh connection so a stale singleton (e.g. from a previous
+    // student session) doesn't block the industry email from registering.
+    try { socket.disconnect(); } catch {}
+    socket.connect(BASE, user.email);
+
+    const handleNewNotification = (data: any) => {
+      const newNote = {
+        _id: data?._id || `rt-${Date.now()}`,
+        icon: "notifications",
+        color: THEME.teal,
+        bg: THEME.tealLight,
+        title: data?.title || "New Notification",
+        body: data?.message || "",
+        time: "Just now",
+        read: false,
+      };
+      setNotes((prev) => [newNote, ...prev]);
+    };
+
+    socket.on("newNotification", handleNewNotification);
+    return () => { socket.off("newNotification", handleNewNotification); };
+  }, [user?.email]);
+
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim,  { toValue:1, duration:700, useNativeDriver:true }),
       Animated.timing(slideAnim, { toValue:0, duration:600, useNativeDriver:true }),
     ]).start();
+    loadProfile();
     loadData();
+    // Pull cached logo too (covers the case where context lags)
+    AsyncStorage.getItem("industryLogo").then((cached: string | null) => {
+      if (cached) setLogo?.(cached);
+    }).catch(() => {});
+    // Re-fetch when the dashboard regains focus (e.g. user just saved profile / event)
+    const unsub = (nav as any).addListener?.("focus", () => {
+      loadProfile();
+      loadData();
+      AsyncStorage.getItem("industryLogo").then((cached: string | null) => {
+        if (cached) setLogo?.(cached);
+      }).catch(() => {});
+    });
+    return unsub;
   }, []);
 
-  const onRefresh = async () => { setRefreshing(true); await loadData(); setRefreshing(false); };
+  const onRefresh = async () => { setRefreshing(true); await Promise.all([loadProfile(), loadData()]); setRefreshing(false); };
   const initials  = (n:string) => n?.split(" ").map((w:string)=>w[0]).slice(0,2).join("").toUpperCase()||"CX";
 
   const typeColor = (t:string) =>
@@ -189,188 +332,182 @@ function DashboardScreen() {
     if(h<1) return "Just now"; if(h<24) return `${h}h ago`; return `${Math.floor(h/24)}d ago`;
   };
 
+  // ── Quick actions: 4 (matches student layout) ──
   const QUICK_ACTIONS = [
-    { icon:"search",               label:"Browse\nOpportunities",  screen:"PostOpportunity",     color:"#193648"},
-    { icon:"sparkles",             label:"AI\nRecommend",          screen:"AIRecommend",         color: "#193648" },
-    { icon:"people",               label:"My\nApplications",       screen:"StudentApplications", color:"#193648" },
-    { icon:"calendar",              label:"Events",                 screen:"EventCreation",       color:"#193648"  },
-    { icon:"mail-unread",          label:"Invitations",            screen:"Invitations",         color:"#193648"  },
-    { icon:"document-text",        label:"MOU\nManagement",        screen:"MoUs",                color:"#193648"  },
-    { icon:"calendar-number",      label:"My\nEvents",             screen:"EventsManage",        color:"#193648"},
-    { icon:"newspaper",            label:"My\nPosts",              screen:"MyPosts",             color:"#193648"   },
+    { icon:"search",    label:"Browse Opportunities",  desc:"Find & post internships",   screen:"PostOpportunity" },
+    { icon:"sparkles",  label:"AI Recommend",          desc:"Personalized suggestions",  screen:"AIRecommend" },
+    { icon:"people",    label:"My Applications",       desc:"Track applicant status",    screen:"StudentApplications" },
+    { icon:"calendar",  label:"Events",                desc:"Job fairs & seminars",      screen:"EventCreation" },
+  ];
+
+  // ── More features list (matches student style) ──
+  const MORE_FEATURES = [
+    { icon:"mail-unread-outline",     title:"Invitations",     desc:"University requests",  screen:"Invitations" },
+    { icon:"document-text-outline",   title:"MOU Management",  desc:"Manage agreements",     screen:"MoUs" },
+    { icon:"calendar-number-outline", title:"My Events",       desc:"View your events",      screen:"EventsManage" },
+    { icon:"newspaper-outline",       title:"My Posts",        desc:"View & manage posts",   screen:"MyPosts" },
+    { icon:"person-circle-outline",   title:"My Profile",      desc:"Update company info",   screen:"Profile" },
   ];
 
   const getGreeting = () => {
     const h = new Date().getHours();
-    if(h<12) return "Good Morning";
-    if(h<17) return "Good Afternoon";
-    return "Good Night";
+    if (h >= 20 || h < 3)  return "Good Night";
+    if (h >= 3  && h < 12) return "Good Morning";
+    if (h >= 12 && h < 17) return "Good Afternoon";
+    return "Good Evening";
   };
 
   return (
     <View style={{ flex:1, backgroundColor:THEME.bg }}>
-      {/* Status bar light — matches screenshot white text on dark header */}
       <StatusBar barStyle="light-content" backgroundColor={THEME.headerBg} />
-      <NotificationPanel visible={notifOpen} onClose={() => setNotifOpen(false)} />
+      <NotificationPanel visible={notifOpen} onClose={() => setNotifOpen(false)} notes={notes} setNotes={setNotes} />
 
-      {/* ── Top Navigation Bar — dark navy, matches screenshot exactly ── */}
+      {/* ── Top Navigation Bar (matches student: menu → logo → … → bell + avatar) ── */}
       <View style={d.header}>
-        {/* CX logo box — leftmost position */}
-        <View style={d.logoBox}>
-          <Image
-            source={require("../../assets/images/logo.png")}
-            style={{ width: 40, height: 40 }}
-          />
-        </View>
-
-        {/* Hamburger menu — right after logo box */}
         <TouchableOpacity onPress={()=>nav.openDrawer()} style={d.menuBtn}>
           <Ionicons name="menu" size={26} color="#fff"/>
         </TouchableOpacity>
 
+        <View style={d.logoBox}>
+          <Image
+            source={require("../../assets/images/logo.png")}
+            style={{ width: 36, height: 36 }}
+            resizeMode="contain"
+          />
+        </View>
+
         <View style={{ flex:1 }}/>
 
-        <View style={{ flexDirection:"row", alignItems:"center", gap:10 }}>
-          {/* Bell icon — outline, white, matches screenshot */}
+        <View style={{ flexDirection:"row", alignItems:"center", gap:8 }}>
           <TouchableOpacity onPress={()=>setNotifOpen(true)} style={d.headerIconBtn}>
-            <Ionicons name="notifications-outline" size={24} color="#fff"/>
+            <Ionicons name="notifications-outline" size={22} color="#fff"/>
             {unreadCount>0 && (
               <View style={d.badge}>
-                <Text style={d.badgeTxt}>{unreadCount}</Text>
+                <Text style={d.badgeTxt}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
               </View>
             )}
           </TouchableOpacity>
-          {/* Avatar circle — matches screenshot grey circle */}
+
           <TouchableOpacity onPress={()=>nav.navigate("Profile")} style={d.avatarBtn}>
-            {user?.logo
-              ? <Image source={{uri:user.logo}} style={d.avatarImg}/>
-              : <Ionicons name="person-circle" size={36} color="rgba(255,255,255,0.55)"/>}
+            {(() => {
+              const src = liveLogo || logo || user?.logo;
+              return src
+                ? <Image key={src.slice(0,32)} source={{uri: src}} style={d.avatarImg}/>
+                : <Image source={{ uri: "https://cdn-icons-png.flaticon.com/512/149/149071.png" }} style={d.avatarImg}/>;
+            })()}
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom:100}}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom:110}}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.teal}/>}>
         <Animated.View style={{opacity:fadeAnim, transform:[{translateY:slideAnim}]}}>
 
-          {/* ── Hero Section — dark navy with rounded bottom corners, matches screenshot ── */}
+          {/* ── Hero — same dark navy treatment as student ── */}
           <View style={d.heroSection}>
-            {/* Greeting pill + Messages button row */}
             <View style={d.heroTopRow}>
-              {/* "Good Night" pill — semi-transparent, green dot, matches screenshot */}
-              <View style={d.greetingPill}>
-                <View style={d.onlineDot}/>
-                <Text style={d.greetingTxt}>{getGreeting()}</Text>
+              <View style={d.heroContent}>
+                <View style={d.greetingPill}>
+                  <View style={d.greetingDot}/>
+                  <Text style={d.greetingBadge}>{getGreeting()}</Text>
+                </View>
+                <Text style={d.nameText} numberOfLines={1}>
+                  {user?.name?.split(" ")[0] || "Industry"}
+                </Text>
+                <Text style={d.heroSubText}>
+                  Empowering talent connections — manage MOUs, opportunities & events.
+                </Text>
               </View>
-             
             </View>
 
-            {/* Company name — large bold white, matches "amna" in screenshot */}
-            <Text style={d.heroName} numberOfLines={1}>{user?.name||"Industry Partner"}</Text>
-            {user?.industry
-              ? <Text style={d.heroSub}>{user.industry} · Empowering talent connections</Text>
-              : <Text style={d.heroSub}>Your industry portal for talent & collaboration</Text>}
-
-            {/* Stat strip — 4 columns with dividers, matches screenshot exactly */}
-            <View style={d.heroStats}>
+            {/* ── Stat strip (matches student layout) ── */}
+            <View style={d.heroStatsRow}>
               {[
-                { n:counts.mous,        lbl:"MOUs"       },
-                { n:counts.internships, lbl:"Internships" },
-                { n:counts.projects,    lbl:"Projects"    },
-                { n:counts.pending,     lbl:"Pending"     },
-              ].map((s,i)=>(
+                { n:counts.mous,    lbl:"MOUs",    screen:"MoUs"         },
+                { n:counts.posts,   lbl:"Posts",   screen:"MyPosts"      },
+                { n:counts.events,  lbl:"Events",  screen:"EventsManage" },
+                { n:counts.pending, lbl:"Pending", screen:"MoUs"         },
+              ].map((stat,i,arr)=>(
                 <React.Fragment key={i}>
-                  {i>0 && <View style={d.statDivider}/>}
-                  <View style={d.heroStatItem}>
-                    <Text style={[d.heroStatN, s.lbl==="Pending"&&counts.pending>0&&{color:"#FF6B6B"}]}>{s.n}</Text>
-                    <Text style={d.heroStatLbl}>{s.lbl}</Text>
-                  </View>
+                  <TouchableOpacity
+                    style={d.heroStat}
+                    onPress={()=>nav.navigate(stat.screen)}
+                    activeOpacity={0.7}>
+                    <Text style={d.heroStatNum}>{stat.n}</Text>
+                    <Text style={d.heroStatLbl}>{stat.lbl}</Text>
+                  </TouchableOpacity>
+                  {i < arr.length - 1 && <View style={d.heroStatDivider}/>}
                 </React.Fragment>
               ))}
             </View>
           </View>
 
-          {/* ── Icon Stat Cards — white cards overlapping hero bottom, matches screenshot ── */}
-          <View style={d.iconCardsRow}>
-            {[
-              { n:counts.mous,        lbl:"MOUs",        icon:"document-text-outline" },
-              { n:counts.internships, lbl:"Internships", icon:"briefcase-outline"     },
-              { n:counts.projects,    lbl:"Projects",    icon:"flask-outline"         },
-              { n:counts.pending,     lbl:"Pending",     icon:"time-outline"          },
-            ].map((s,i)=>(
-              <View key={i} style={d.iconCard}>
-                {/* Icon in slightly tinted bg circle — matches screenshot style */}
-                <View style={d.iconCardCircle}>
-                  <Ionicons name={s.icon as any} size={24} color={
-                    s.lbl==="Pending" && counts.pending>0 ? THEME.red : THEME.textSec
-                  }/>
-                </View>
-                <Text style={[d.iconCardN, s.lbl==="Pending"&&counts.pending>0&&{color:THEME.red}]}>{s.n}</Text>
-                <Text style={d.iconCardLbl}>{s.lbl.toUpperCase()}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* ── Profile Completion CTA — white card, dark icon box, matches screenshot ── */}
-          <TouchableOpacity style={d.ctaCard} onPress={()=>nav.navigate("Profile")} activeOpacity={0.88}>
-            <View style={d.ctaIconBox}>
-              <Ionicons name="document-attach-outline" size={22} color="#fff"/>
-            </View>
-            <View style={{flex:1, marginLeft:14}}>
-              <Text style={d.ctaTitle}>Complete Your Profile</Text>
-              <Text style={d.ctaSub}>Add company details to attract top talent ✨</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={"#193648"}/>
-          </TouchableOpacity>
-
-          {/* ── Pending MOU Alert ── */}
+          {/* ── Pending MOU alert (when applicable) ── */}
           {counts.pending>0 && (
-            <TouchableOpacity onPress={()=>nav.navigate("MoUs")} style={d.alertCard} activeOpacity={0.88}>
-              <View style={d.alertInner}>
-                <Ionicons name="alert-circle" size={18} color={THEME.red}/>
-                <Text style={d.alertTxt}>{counts.pending} MOU{counts.pending>1?"s":""} need your attention</Text>
-                <Ionicons name="chevron-forward" size={14} color={THEME.red}/>
+            <TouchableOpacity onPress={()=>nav.navigate("MoUs")} style={d.alertBanner} activeOpacity={0.85}>
+              <View style={d.alertLeft}>
+                <View style={d.alertIconBg}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#fff"/>
+                </View>
+                <View style={{ marginLeft:12, flex:1 }}>
+                  <Text style={d.alertTitle}>{counts.pending} MOU{counts.pending>1?"s":""} Need Attention</Text>
+                  <Text style={d.alertSub}>Tap to review pending agreements ✨</Text>
+                </View>
               </View>
+              <MaterialCommunityIcons name="arrow-right" size={18} color={THEME.headerBg}/>
             </TouchableOpacity>
           )}
 
-          {/* ── Quick Actions section header ── */}
-          <View style={d.secHeader}>
-            <Text style={d.secTitle}>Quick Actions</Text>
+          {/* ── Quick Actions ── */}
+          <View style={d.section}>
+            <View style={d.sectionHeader}>
+              <Text style={d.sectionTitle}>Quick Actions</Text>
+              <View style={d.sectionAccent}/>
+            </View>
+            <View style={d.actionsGrid}>
+              {QUICK_ACTIONS.map((a,i)=>(
+                <TouchableOpacity key={i} style={d.actionCard}
+                  onPress={()=>nav.navigate(a.screen)} activeOpacity={0.85}>
+                  <View style={d.actionIconBg}>
+                    <Ionicons name={a.icon as any} size={24} color={THEME.headerBg}/>
+                  </View>
+                  <Text style={d.actionTitle} numberOfLines={1}>{a.label}</Text>
+                  <Text style={d.actionDesc} numberOfLines={2}>{a.desc}</Text>
+                  <View style={d.actionArrow}>
+                    <MaterialCommunityIcons name="arrow-right" size={12} color={THEME.headerBg}/>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
-          {/* ── 2-column Quick Actions grid — white cards, matches screenshot style exactly ── */}
-          <View style={d.actionsGrid}>
-            {QUICK_ACTIONS.map((a,i)=>(
-              <TouchableOpacity key={i} style={d.actionCard} onPress={()=>nav.navigate(a.screen)} activeOpacity={0.82}>
-                {/* Arrow in top-right — light gray circle like screenshot */}
-                <View style={d.actionArrow}>
-                  <Ionicons name="arrow-forward" size={14} color={THEME.textMute}/>
+          {/* ── More Features ── */}
+          <View style={d.section}>
+            <View style={d.sectionHeader}>
+              <Text style={d.sectionTitle}>More Features</Text>
+              <View style={d.sectionAccent}/>
+            </View>
+            {MORE_FEATURES.map((f,i)=>(
+              <TouchableOpacity key={i} style={d.featureRow}
+                onPress={()=>nav.navigate(f.screen)} activeOpacity={0.85}>
+                <View style={d.featureIcon}>
+                  <Ionicons name={f.icon as any} size={22} color={THEME.headerBg}/>
                 </View>
-                {/* Icon box — light bg, dark icon — matches screenshot */}
-                <View style={d.actionIconBox}>
-                  <Ionicons name={a.icon as any} size={28} color={THEME.textPri}/>
+                <View style={{ flex:1 }}>
+                  <Text style={d.featureTitle}>{f.title}</Text>
+                  <Text style={d.featureDesc} numberOfLines={1}>{f.desc}</Text>
                 </View>
-                <Text style={d.actionLabel}>{a.label.replace("\n"," ")}</Text>
-                <Text style={d.actionSub}>{
-                  a.screen==="PostOpportunity"    ? "Find & post internships" :
-                  a.screen==="AIRecommend"        ? "Personalized suggestions" :
-                  a.screen==="StudentApplications"? "Track applicant status" :
-                  a.screen==="EventCreation"      ? "Job fairs & seminars" :
-                  a.screen==="Invitations"        ? "University requests" :
-                  a.screen==="MoUs"               ? "Manage agreements" :
-                  a.screen==="EventsManage"       ? "View your events" :
-                                                    "View & manage"
-                }</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.headerBg}/>
               </TouchableOpacity>
             ))}
           </View>
 
           {/* ── Recent MOUs ── */}
           {recentMous.length>0 && (
-            <>
-              <View style={d.secHeader}>
-                <Text style={d.secTitle}>Recent MOUs</Text>
+            <View style={d.section}>
+              <View style={d.sectionHeader}>
+                <Text style={d.sectionTitle}>Recent MOUs</Text>
+                <View style={d.sectionAccent}/>
                 <TouchableOpacity onPress={()=>nav.navigate("MoUs")}>
                   <Text style={d.seeAll}>View all</Text>
                 </TouchableOpacity>
@@ -378,7 +515,7 @@ function DashboardScreen() {
               {recentMous.map((m)=>(
                 <TouchableOpacity key={m._id} style={d.mouCard}
                   onPress={()=>nav.navigate("MouDetail",{mouId:m._id})} activeOpacity={0.88}>
-                  <View style={[d.mouStripe, {backgroundColor:THEME.teal}]}/>
+                  <View style={[d.mouStripe, {backgroundColor:THEME.headerBg}]}/>
                   <View style={{flex:1, marginLeft:14, paddingVertical:14}}>
                     <Text style={d.mouTitle} numberOfLines={1}>{m.title||m.university}</Text>
                     <Text style={d.mouSub}>{m.collaborationType}</Text>
@@ -389,138 +526,162 @@ function DashboardScreen() {
                   </View>
                 </TouchableOpacity>
               ))}
-            </>
+            </View>
           )}
 
           {/* ── Your Posts ── */}
-          <View style={d.secHeader}>
-            <Text style={d.secTitle}>Your Posts</Text>
-            <TouchableOpacity onPress={()=>nav.navigate("MyPosts")}>
-              <Text style={d.seeAll}>View all</Text>
-            </TouchableOpacity>
-          </View>
+          <View style={d.section}>
+            <View style={d.sectionHeader}>
+              <Text style={d.sectionTitle}>Your Posts</Text>
+              <View style={d.sectionAccent}/>
+              <TouchableOpacity onPress={()=>nav.navigate("MyPosts")}>
+                <Text style={d.seeAll}>View all</Text>
+              </TouchableOpacity>
+            </View>
 
-          {posts.length===0 ? (
-            <TouchableOpacity style={d.emptyCard} onPress={()=>nav.navigate("PostOpportunity")}>
-              <View style={[d.emptyIcon, {backgroundColor:THEME.tealLight}]}>
-                <Ionicons name="add-circle-outline" size={30} color={THEME.teal}/>
-              </View>
-              <Text style={d.emptyTxt}>Post your first opportunity</Text>
-              <Text style={d.emptySub}>Internships • Projects • Workshops</Text>
-            </TouchableOpacity>
-          ) : (
-            posts.map((post)=>{
-              const tc=typeColor(post.type);
-              return (
-                <View key={post._id} style={d.postCard}>
-                  <View style={d.postCardHead}>
-                    <View style={[d.postAvatar, {backgroundColor:THEME.teal}]}>
-                      {user?.logo
-                        ? <Image source={{uri:user.logo}} style={{width:40,height:40,borderRadius:20}}/>
-                        : <Text style={d.postAvatarTxt}>{initials(user?.name||"CX")}</Text>}
+            {posts.length===0 ? (
+              <TouchableOpacity style={d.emptyCard} onPress={()=>nav.navigate("PostOpportunity")}>
+                <View style={[d.emptyIcon, {backgroundColor:THEME.iconBg}]}>
+                  <Ionicons name="add-circle-outline" size={30} color={THEME.headerBg}/>
+                </View>
+                <Text style={d.emptyTxt}>Post your first opportunity</Text>
+                <Text style={d.emptySub}>Internships • Projects • Workshops</Text>
+              </TouchableOpacity>
+            ) : (
+              posts.slice(0,3).map((post)=>{
+                const tc=typeColor(post.type);
+                return (
+                  <View key={post._id} style={d.postCard}>
+                    <View style={d.postCardHead}>
+                      <View style={[d.postAvatar, {backgroundColor:THEME.headerBg}]}>
+                        {(() => {
+                          const src = liveLogo || logo || user?.logo;
+                          return src
+                            ? <Image key={src.slice(0,32)} source={{uri: src}} style={{width:40,height:40,borderRadius:20}}/>
+                            : <Text style={d.postAvatarTxt}>{initials(user?.name||"CX")}</Text>;
+                        })()}
+                      </View>
+                      <View style={{flex:1, marginLeft:10}}>
+                        <Text style={d.postOrg}>{user?.name||"Your Company"}</Text>
+                        <Text style={d.postWhen}>{timeAgo(post.createdAt || post.postedAt)}</Text>
+                      </View>
+                      <View style={[d.typeTag, {backgroundColor:tc.bg}]}>
+                        <View style={[d.typeDot, {backgroundColor:tc.dot}]}/>
+                        <Text style={[d.typeTagTxt, {color:tc.txt}]}>{post.type}</Text>
+                      </View>
                     </View>
-                    <View style={{flex:1, marginLeft:10}}>
-                      <Text style={d.postOrg}>{user?.name||"Your Company"}</Text>
-                      <Text style={d.postWhen}>{timeAgo(post.createdAt || post.postedAt)}</Text>
-                    </View>
-                    <View style={[d.typeTag, {backgroundColor:tc.bg}]}>
-                      <View style={[d.typeDot, {backgroundColor:tc.dot}]}/>
-                      <Text style={[d.typeTagTxt, {color:tc.txt}]}>{post.type}</Text>
+                    {post.poster ? (
+                      <Image source={{uri: post.poster}} style={[d.postBanner, {width:"100%"}]} resizeMode="cover"/>
+                    ) : (
+                      <LinearGradient colors={tc.grad} style={d.postBanner} start={{x:0,y:0}} end={{x:1,y:1}}>
+                        <View style={d.bannerC1}/><View style={d.bannerC2}/>
+                        <Ionicons name={post.type==="Internship"?"briefcase":post.type==="Workshop"?"school":"flask"}
+                          size={36} color="rgba(255,255,255,0.25)" style={{marginBottom:8}}/>
+                        <Text style={d.bannerTitle}>{post.title}</Text>
+                        <View style={{flexDirection:"row",gap:16,marginTop:6}}>
+                          <View style={{flexDirection:"row",alignItems:"center",gap:4}}>
+                            <Ionicons name="time-outline" size={11} color="rgba(255,255,255,0.7)"/>
+                            <Text style={d.bannerMeta}>{post.duration}</Text>
+                          </View>
+                          <View style={{flexDirection:"row",alignItems:"center",gap:4}}>
+                            <Ionicons name="cash-outline" size={11} color="rgba(255,255,255,0.7)"/>
+                            <Text style={d.bannerMeta}>{post.stipend}</Text>
+                          </View>
+                        </View>
+                      </LinearGradient>
+                    )}
+                    <View style={d.postBody}>
+                      <Text style={d.postTitle}>{post.title}</Text>
+                      <Text style={d.postDesc} numberOfLines={2}>{post.description}</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginTop:10}}>
+                        {(post.skills||[]).map((sk:string,idx:number)=>(
+                          <View key={idx} style={d.skillPill}>
+                            <Text style={d.skillPillTxt}>{sk}</Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                      <View style={d.postFoot}>
+                        <View style={{flexDirection:"row",alignItems:"center",gap:5}}>
+                          <Ionicons name="people-outline" size={14} color={THEME.textSec}/>
+                          <Text style={d.postFootTxt}>{post.applicants} applicants</Text>
+                        </View>
+                        <TouchableOpacity style={d.viewAppsBtn} onPress={()=>nav.navigate("StudentApplications")}>
+                          <Text style={d.viewAppsTxt}>View Applications</Text>
+                          <Ionicons name="arrow-forward" size={12} color={THEME.headerBg}/>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
-                  {post.poster ? (
-                    <Image source={{uri: post.poster}} style={[d.postBanner, {width:"100%"}]} resizeMode="cover"/>
-                  ) : (
-                    <LinearGradient colors={tc.grad} style={d.postBanner} start={{x:0,y:0}} end={{x:1,y:1}}>
-                      <View style={d.bannerC1}/><View style={d.bannerC2}/>
-                      <Ionicons name={post.type==="Internship"?"briefcase":post.type==="Workshop"?"school":"flask"}
-                        size={36} color="rgba(255,255,255,0.25)" style={{marginBottom:8}}/>
-                      <Text style={d.bannerTitle}>{post.title}</Text>
-                      <View style={{flexDirection:"row",gap:16,marginTop:6}}>
-                        <View style={{flexDirection:"row",alignItems:"center",gap:4}}>
-                          <Ionicons name="time-outline" size={11} color="rgba(255,255,255,0.7)"/>
-                          <Text style={d.bannerMeta}>{post.duration}</Text>
-                        </View>
-                        <View style={{flexDirection:"row",alignItems:"center",gap:4}}>
-                          <Ionicons name="cash-outline" size={11} color="rgba(255,255,255,0.7)"/>
-                          <Text style={d.bannerMeta}>{post.stipend}</Text>
-                        </View>
-                      </View>
-                    </LinearGradient>
-                  )}
-                  <View style={d.postBody}>
-                    <Text style={d.postTitle}>{post.title}</Text>
-                    <Text style={d.postDesc} numberOfLines={2}>{post.description}</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginTop:10}}>
-                      {(post.skills||[]).map((sk:string,idx:number)=>(
-                        <View key={idx} style={d.skillPill}>
-                          <Text style={d.skillPillTxt}>{sk}</Text>
-                        </View>
-                      ))}
-                    </ScrollView>
-                    <View style={d.postFoot}>
-                      <View style={{flexDirection:"row",alignItems:"center",gap:5}}>
-                        <Ionicons name="people-outline" size={14} color={THEME.textSec}/>
-                        <Text style={d.postFootTxt}>{post.applicants} applicants</Text>
-                      </View>
-                      <TouchableOpacity style={d.viewAppsBtn} onPress={()=>nav.navigate("StudentApplications")}>
-                        <Text style={d.viewAppsTxt}>View Applications</Text>
-                        <Ionicons name="arrow-forward" size={12} color={THEME.teal}/>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              );
-            })
-          )}
-
-          {/* ── Company Card ── */}
-          <View style={d.coCard}>
-            <LinearGradient colors={["#193648", "#193648"]} style={d.coCardGrad}
-              start={{x:0,y:0}} end={{x:1,y:1}}>
-              <View style={d.coDecor}/>
-              <View style={{flexDirection:"row", alignItems:"center"}}>
-                <View style={d.coLogo}>
-                  {user?.logo
-                    ? <Image source={{uri:user.logo}} style={{width:54,height:54,borderRadius:15}}/>
-                    : <Text style={d.coLogoTxt}>{initials(user?.name||"CX")}</Text>}
-                </View>
-                <View style={{flex:1, marginLeft:14}}>
-                  <Text style={d.coName}>{user?.name||"Your Company"}</Text>
-                  <Text style={d.coSub}>{user?.industry}</Text>
-                  {user?.address&&<Text style={d.coAddr}>📍 {user.address}</Text>}
-                </View>
-                <TouchableOpacity onPress={()=>nav.navigate("Profile")} style={d.coEditBtn}>
-                  <Ionicons name="pencil" size={13} color={THEME.tealLight}/>
-                  <Text style={d.coEditTxt}>Edit</Text>
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
+                );
+              })
+            )}
           </View>
+
+          {/* ── AI Badge (matches student bottom card) ── */}
+          <TouchableOpacity style={d.aiBadge} onPress={()=>nav.navigate("AIChatbot")} activeOpacity={0.85}>
+            <Image source={require("../../assets/images/logo.png")} style={d.aiBadgeLogo}/>
+            <View style={{ flex:1 }}>
+              <Text style={d.aiText}>Powered by CollaXion AI</Text>
+              <Text style={d.aiSubText}>Tap to chat with CXbot 🤖</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.6)"/>
+          </TouchableOpacity>
 
         </Animated.View>
       </ScrollView>
 
-      {/* ── CXbot Floating Button — circular, matches screenshot bottom-right ── */}
+      {/* ── Real-time toast banner overlay ── */}
+      <NotificationOverlay />
+
+      {/* ── CXbot Floating Button ── */}
       <CXbotFloatingButton />
     </View>
   );
 }
 
-// ─── CUSTOM DRAWER ───────────────────────────────────────────────
+// ─── CUSTOM DRAWER (exact mirror of student drawer) ──
 function CustomDrawer(props: DrawerContentComponentProps) {
-  const { user, setUser } = useUser();
+  const { user, refreshUser, logo, setLogo } = useUser();
+  const liveLogo = useIndustryLogo();
   const drawerNav = props.navigation;
   const initials = (n:string) => n?.split(" ").map((w)=>w[0]).slice(0,2).join("").toUpperCase()||"CX";
 
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(-12)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim,  { toValue:1, duration:300, useNativeDriver:true }),
+      Animated.spring(slideAnim, { toValue:0, tension:90, friction:11, useNativeDriver:true }),
+    ]).start();
+    // Pull the latest profile + cached logo every time the drawer mounts.
+    refreshUser?.();
+    AsyncStorage.getItem("industryLogo").then((cached: string | null) => {
+      if (cached) setLogo?.(cached);
+    }).catch(() => {});
+  }, []);
+
+  // Subscribe: every time the drawer opens, re-read AsyncStorage so an
+  // edit made in ProfileScreen propagates here even if context lags.
+  useEffect(() => {
+    const unsub = (drawerNav as any).addListener?.("drawerOpen", () => {
+      AsyncStorage.getItem("industryLogo").then((cached: string | null) => {
+        if (cached) setLogo?.(cached);
+      }).catch(() => {});
+      refreshUser?.();
+    });
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleLogout = () => {
     Alert.alert(
-      "Logout",
-      "Are you sure you want to logout?",
+      "Sign Out",
+      "Are you sure?",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Logout",
+          text: "Sign Out",
           style: "destructive",
           onPress: () => {
             drawerNav.closeDrawer();
@@ -534,124 +695,150 @@ function CustomDrawer(props: DrawerContentComponentProps) {
     );
   };
 
-  const ITEMS = [
-    { screen:"Dashboard",           icon:"grid-outline",            label:"Dashboard",        color:THEME.teal   },
-    { screen:"PostOpportunity",     icon:"add-circle-outline",      label:"Post Opportunity", color:THEME.teal   },
-    { screen:"StudentApplications", icon:"people-outline",          label:"Applications",     color:THEME.green  },
-    { screen:"Invitations",         icon:"mail-outline",            label:"Invitations",      color:THEME.accent },
-    { screen:"EventCreation",       icon:"calendar-outline",        label:"Create Event",     color:THEME.red    },
-    { screen:"MoUs",                icon:"document-text-outline",   label:"MOU Management",   color:THEME.steel  },
-    { screen:"InternshipsMain",     icon:"briefcase-outline",       label:"Internships",      color:THEME.amber  },
-    { screen:"ManageProjects",      icon:"flask-outline",           label:"Projects",         color:THEME.accent },
-    { screen:"AIChatbot",           icon:"sparkles-outline",        label:"CXbot AI",         color:THEME.amber  },
-    { screen:"Profile",             icon:"person-circle-outline",   label:"My Profile",       color:THEME.steel  },
-    { screen:"MyPosts",             icon:"newspaper-outline",       label:"My Posts",         color:THEME.amber  },
-    { screen:"EventsManage",        icon:"calendar-number-outline", label:"My Events",        color:THEME.teal   },
-  ];
-
-  const current = props.state?.routes[props.state?.index]?.name;
-
   return (
-    <View style={{flex:1, backgroundColor:THEME.bg}}>
-      <LinearGradient colors={['#193648', '#193648']} style={dr.header}
-        start={{x:0,y:0}} end={{x:1,y:1}}>
-        <View style={dr.decor}/>
-        <View style={dr.topRow}>
-          <View style={{flexDirection:"row", alignItems:"center", gap:10}}>
-            {/* Logo box — white rounded square, unchanged */}
-            <View style={dr.logoBox}>
-              <Image
-                source={require("../../assets/images/logo.png")}
-                style={{ width: 40, height: 40 }}
-              />
-            </View>
-            <Text style={dr.brand}>Colla<Text style={{color:"#ffffff"}}>X</Text>ion</Text>
-          </View>
-          <TouchableOpacity onPress={()=>drawerNav.closeDrawer()} style={dr.closeBtn}>
-            <Ionicons name="close" size={18} color="rgba(255,255,255,0.7)"/>
-          </TouchableOpacity>
-        </View>
+    <DrawerContentScrollView
+      {...props}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={dr.scrollContent}>
+      <StatusBar backgroundColor="#111D26" barStyle="light-content"/>
 
-        <TouchableOpacity style={dr.profileRow}
-          onPress={()=>{ drawerNav.navigate("Profile"); drawerNav.closeDrawer(); }}>
-          <View style={dr.avatar}>
-            {user?.logo
-              ? <Image source={{uri:user.logo}} style={dr.avatarImg}/>
-              : <Text style={dr.avatarTxt}>{initials(user?.name||"CX")}</Text>}
-          </View>
-          <View style={{flex:1, marginLeft:12}}>
-            <Text style={dr.uName} numberOfLines={1}>{user?.name||"Partner"}</Text>
-            <View style={{flexDirection:"row", alignItems:"center", gap:5, marginTop:3}}>
-              <View style={dr.onlineDot}/>
-              <Text style={dr.uSub}>{user?.industry||"Industry Partner"}</Text>
+      {/* ── Dark profile top section ── */}
+      <Animated.View
+        style={[dr.profileCard, { opacity:fadeAnim, transform:[{translateY:slideAnim}] }]}>
+        <TouchableOpacity
+          onPress={()=>{ drawerNav.navigate("Profile"); drawerNav.closeDrawer(); }}
+          activeOpacity={0.7}
+          style={dr.avatarTouch}>
+          <View style={dr.avatarWrapper}>
+            {(() => {
+              const src = liveLogo || logo || user?.logo;
+              return src
+                ? <Image key={src.slice(0,32)} source={{uri: src}} style={dr.avatar}/>
+                : <View style={[dr.avatar, dr.avatarFallback]}>
+                    <Text style={dr.avatarTxt}>{initials(user?.name||"CX")}</Text>
+                  </View>;
+            })()}
+            <View style={dr.cameraBadge}>
+              <MaterialCommunityIcons name="camera" size={12} color="#fff"/>
             </View>
           </View>
-          <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.3)"/>
         </TouchableOpacity>
-      </LinearGradient>
 
-      <ScrollView showsVerticalScrollIndicator={false} style={{flex:1}}>
-        <View style={{paddingHorizontal:14, paddingTop:16}}>
-          {ITEMS.map((item,i)=>{
-            const active = current===item.screen;
-            return (
-              <TouchableOpacity key={i}
-                style={[dr.item, active && {backgroundColor:item.color+"12", borderColor:item.color+"30"}]}
-                onPress={()=>{ drawerNav.navigate(item.screen); drawerNav.closeDrawer(); }}>
-                <View style={[dr.itemIcon, {backgroundColor: active ? item.color+"20" : "#EEF2F5"}]}>
-                  <Ionicons name={item.icon as any} size={18} color={active ? item.color : THEME.textSec}/>
-                </View>
-                <Text style={[dr.itemLbl, active && {color:item.color, fontWeight:"700"}]}>{item.label}</Text>
-                {active && <View style={[dr.activePip, {backgroundColor:item.color}]}/>}
-              </TouchableOpacity>
-            );
-          })}
+        <Text style={dr.studentName} numberOfLines={1}>{user?.name||"Industry Partner"}</Text>
+        <Text style={dr.studentEmail} numberOfLines={1}>{user?.email||"loading..."}</Text>
+
+        <View style={dr.onlinePill}>
+          <View style={dr.onlineDot}/>
+          <Text style={dr.onlineText}>Active</Text>
         </View>
+      </Animated.View>
 
-        <View style={{paddingHorizontal:14, paddingTop:8, paddingBottom:8}}>
-          <TouchableOpacity style={dr.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
-            <View style={dr.logoutIconBox}>
-              <Ionicons name="log-out-outline" size={20} color={THEME.red}/>
+      {/* ── Divider between dark and white ── */}
+      <View style={dr.sep}/>
+
+      {/* ── White section (drawer items rendered by DrawerItemList) ── */}
+      <View style={dr.whiteSection}>
+        <Animated.View style={{ opacity:fadeAnim }}>
+          <DrawerItemList {...props}/>
+        </Animated.View>
+
+        <View style={dr.sepWhite}/>
+
+        <Animated.View style={{ opacity:fadeAnim }}>
+          <TouchableOpacity style={dr.logoutRow} onPress={handleLogout} activeOpacity={0.8}>
+            <View style={dr.logoutIcon}>
+              <MaterialIcons name="logout" color="#EF4444" size={17}/>
             </View>
-            <Text style={dr.logoutTxt}>Logout</Text>
+            <Text style={dr.logoutTxt}>Sign Out</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
 
-        <View style={dr.footer}>
-          <Text style={dr.footerBrand}>CollaXion v2.0</Text>
-          <Text style={dr.footerSub}>Industry Portal</Text>
-        </View>
-      </ScrollView>
-    </View>
+        <Animated.View style={[dr.footer, { opacity:fadeAnim }]}>
+          <Image source={require("../../assets/images/logo.png")}
+            style={dr.footerLogo} resizeMode="contain"/>
+          <Text style={dr.footerBrand}>CollaXion • Where Collaboration Meets Innovation</Text>
+        </Animated.View>
+      </View>
+    </DrawerContentScrollView>
   );
 }
 
 // ─── DRAWER NAVIGATOR ────────────────────────────────────────────
 const Drawer = createDrawerNavigator();
 
+// Active colour helper — exact mirror of student's `ac()` function
+const ac = (color: string) => ({
+  drawerActiveTintColor: color,
+  drawerActiveBackgroundColor: color + "18",
+  drawerInactiveTintColor: "#555",
+});
+
 function IndustryDrawer() {
+  const drawerWidth = Math.min(Math.round(SCREEN_WIDTH * 0.78), 295);
   return (
     <Drawer.Navigator
       drawerContent={(props)=><CustomDrawer {...props}/>}
-      screenOptions={{ headerShown:false, drawerStyle:{ width:width*0.82 } }}>
-      <Drawer.Screen name="Dashboard"           component={DashboardScreen}/>
-      <Drawer.Screen name="PostOpportunity"     component={PostOpportunityScreen}/>
-      <Drawer.Screen name="StudentApplications" component={StudentApplicationsScreen}/>
-      <Drawer.Screen name="Invitations"         component={InvitationsScreen}/>
-      <Drawer.Screen name="EventCreation"       component={EventCreationScreen}/>
-      <Drawer.Screen name="MoUs"                component={MoUScreen}/>
-      <Drawer.Screen name="InternshipsMain"     component={InternshipsMainScreen}/>
-      <Drawer.Screen name="ManageProjects"      component={ManageProjectsScreen}/>
-      <Drawer.Screen name="MessagesMain"        component={MessagesScreen}/>
-      <Drawer.Screen name="AIChatbot"           component={AIChatbotScreen}/>
-      <Drawer.Screen name="Profile"             component={ProfileScreen}/>
-      <Drawer.Screen name="CreateMoU"           component={CreateMoUScreen}         options={{drawerItemStyle:{display:"none"}}}/>
-      <Drawer.Screen name="PostNewInternship"   component={PostNewInternshipScreen} options={{drawerItemStyle:{display:"none"}}}/>
-      <Drawer.Screen name="PostNewProject"      component={PostNewProjectScreen}    options={{drawerItemStyle:{display:"none"}}}/>
-      <Drawer.Screen name="MyPosts"             component={MyPostsScreen}/>
-      <Drawer.Screen name="EditPost"            component={EditPostScreen}          options={{drawerItemStyle:{display:"none"}}}/>
-      <Drawer.Screen name="EventsManage"        component={EventsManageScreen}/>
-      <Drawer.Screen name="ChatScreen"          component={ChatScreen}              options={{drawerItemStyle:{display:"none"}}}/>
+      screenOptions={{
+        headerShown:false,
+        drawerStyle: { backgroundColor: "#111D26", width: drawerWidth },
+        drawerLabelStyle: { fontSize: 14, fontWeight: "600", marginLeft: -4 },
+        drawerItemStyle: { borderRadius: 10, marginHorizontal: 10, marginVertical: 1 },
+      }}>
+      <Drawer.Screen name="Dashboard" component={DashboardScreen}
+        options={{ ...ac("#193648"), drawerLabel: "Dashboard",
+          drawerIcon: ({ color, size }) => <MaterialIcons name="dashboard" color={color} size={size}/> }}/>
+
+      <Drawer.Screen name="PostOpportunity" component={PostOpportunityScreen}
+        options={{ ...ac("#193648"), drawerLabel: "Post Opportunity",
+          drawerIcon: ({ color, size }) => <MaterialCommunityIcons name="plus-circle-outline" color={color} size={size}/> }}/>
+
+      <Drawer.Screen name="StudentApplications" component={StudentApplicationsScreen}
+        options={{ ...ac("#193648"), drawerLabel: "Applications",
+          drawerIcon: ({ color, size }) => <MaterialIcons name="work-history" color={color} size={size}/> }}/>
+
+      <Drawer.Screen name="Invitations" component={InvitationsScreen}
+        options={{ ...ac("#193648"), drawerLabel: "Invitations",
+          drawerIcon: ({ color, size }) => <MaterialCommunityIcons name="email-outline" color={color} size={size}/> }}/>
+
+      <Drawer.Screen name="EventCreation" component={EventCreationScreen}
+        options={{ ...ac("#193648"), drawerLabel: "Create Event",
+          drawerIcon: ({ color, size }) => <MaterialCommunityIcons name="calendar-star" color={color} size={size}/> }}/>
+
+      <Drawer.Screen name="MoUs" component={MoUScreen}
+        options={{ ...ac("#193648"), drawerLabel: "MOU Management",
+          drawerIcon: ({ color, size }) => <MaterialCommunityIcons name="file-document-outline" color={color} size={size}/> }}/>
+
+      <Drawer.Screen name="InternshipsMain" component={InternshipsMainScreen}
+        options={{ ...ac("#193648"), drawerLabel: "Internships",
+          drawerIcon: ({ color, size }) => <MaterialCommunityIcons name="briefcase-search" color={color} size={size}/> }}/>
+
+      <Drawer.Screen name="ManageProjects" component={ManageProjectsScreen}
+        options={{ ...ac("#193648"), drawerLabel: "Projects",
+          drawerIcon: ({ color, size }) => <MaterialCommunityIcons name="flask-outline" color={color} size={size}/> }}/>
+
+      <Drawer.Screen name="AIChatbot" component={AIChatbotScreen}
+        options={{ ...ac("#193648"), drawerLabel: "CXbot AI",
+          drawerIcon: ({ color, size }) => <MaterialIcons name="psychology" color={color} size={size}/> }}/>
+
+      <Drawer.Screen name="Profile" component={ProfileScreen}
+        options={{ ...ac("#193648"), drawerLabel: "My Profile",
+          drawerIcon: ({ color, size }) => <MaterialIcons name="person" color={color} size={size}/> }}/>
+
+      <Drawer.Screen name="MyPosts" component={MyPostsScreen}
+        options={{ ...ac("#193648"), drawerLabel: "My Posts",
+          drawerIcon: ({ color, size }) => <MaterialCommunityIcons name="newspaper-variant-outline" color={color} size={size}/> }}/>
+
+      <Drawer.Screen name="EventsManage" component={EventsManageScreen}
+        options={{ ...ac("#193648"), drawerLabel: "My Events",
+          drawerIcon: ({ color, size }) => <MaterialCommunityIcons name="calendar-month" color={color} size={size}/> }}/>
+
+      {/* Hidden screens */}
+      <Drawer.Screen name="MessagesMain"      component={MessagesScreen}          options={{ drawerItemStyle:{ height:0 } }}/>
+      <Drawer.Screen name="CreateMoU"         component={CreateMoUScreen}         options={{ drawerItemStyle:{ height:0 } }}/>
+      <Drawer.Screen name="PostNewInternship" component={PostNewInternshipScreen} options={{ drawerItemStyle:{ height:0 } }}/>
+      <Drawer.Screen name="PostNewProject"    component={PostNewProjectScreen}    options={{ drawerItemStyle:{ height:0 } }}/>
+      <Drawer.Screen name="EditPost"          component={EditPostScreen}          options={{ drawerItemStyle:{ height:0 } }}/>
+      <Drawer.Screen name="ChatScreen"        component={ChatScreen}              options={{ drawerItemStyle:{ height:0 } }}/>
     </Drawer.Navigator>
   );
 }
@@ -673,7 +860,23 @@ export default function IndustryDashboard() {
   );
 }
 
-// ─── NOTIFICATION STYLES ─────────────────────────────────────────
+// ─── REAL-TIME OVERLAY STYLES ────────────────────────────────────
+const ov = StyleSheet.create({
+  wrap: { position:"absolute", top:TOP_OFFSET, left:12, right:12, zIndex:9999, elevation:30 },
+  banner: {
+    flexDirection:"row", alignItems:"center", backgroundColor:"#fff",
+    borderRadius:14, paddingVertical:12, paddingHorizontal:14, gap:12,
+    shadowColor:"#000", shadowOffset:{width:0,height:6}, shadowOpacity:0.18, shadowRadius:14,
+    borderWidth:1, borderColor:"#EEF1F4",
+  },
+  iconBg:   { width:38, height:38, borderRadius:19, justifyContent:"center", alignItems:"center" },
+  title:    { fontSize:14, fontWeight:"800", color:"#111827" },
+  body:     { fontSize:12.5, color:"#4B5563", marginTop:2 },
+  closeBtn: { width:24, height:24, borderRadius:12, backgroundColor:"#F3F4F6",
+              justifyContent:"center", alignItems:"center" },
+});
+
+// ─── NOTIFICATION PANEL STYLES ───────────────────────────────────
 const nS = StyleSheet.create({
   panel: {
     width:width*0.86, height:"100%", backgroundColor:THEME.bg,
@@ -700,200 +903,137 @@ const nS = StyleSheet.create({
   cardTime:  { fontSize:11, color:THEME.textMute, marginTop:4, fontWeight:"500" },
 });
 
-// ─── DASHBOARD STYLES ────────────────────────────────────────────
+// ─── DASHBOARD STYLES — mirrored from student dashboard ──────────
 const d = StyleSheet.create({
-
-  // ── Header — dark navy, matches screenshot top bar exactly ──
+  // ── Header (dark navy, menu → logo → … → bell + avatar) ──
   header: {
     flexDirection:"row",
     alignItems:"center",
-    backgroundColor:'#193648' ,          // deep navy — matches screenshot
+    backgroundColor:THEME.headerBg,
     paddingTop: Platform.OS==="ios" ? 52 : 38,
     paddingBottom:14,
-    paddingHorizontal:16,
+    paddingHorizontal:14,
     gap:10,
   },
   menuBtn: { width:36, height:36, justifyContent:"center", alignItems:"center" },
-
-  // White rounded square logo box — UNCHANGED as instructed
   logoBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 32, height: 32, borderRadius: 8,
     backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "center", alignItems: "center",
+    overflow:"hidden",
   },
-  headerTitle: { fontSize:18, fontWeight:"800", color:"#fff" },
   headerIconBtn: {
-    width:40, height:40, borderRadius:20,
+    width:36, height:36, borderRadius:10,
+    backgroundColor:"rgba(255,255,255,0.1)",
     justifyContent:"center", alignItems:"center",
   },
-  // Red notification badge
   badge: {
-    position:"absolute", top:4, right:4,
-    width:16, height:16, borderRadius:8,
+    position:"absolute", top:-3, right:-3,
+    minWidth:16, height:16, borderRadius:8,
     backgroundColor: THEME.red,
     justifyContent:"center", alignItems:"center",
     borderWidth:1.5, borderColor: THEME.headerBg,
+    paddingHorizontal:3,
   },
   badgeTxt: { fontSize:9, fontWeight:"900", color:"#fff" },
-  // Avatar — no border, just icon like screenshot
   avatarBtn: {
-    width:36, height:36, borderRadius:18,
-    justifyContent:"center", alignItems:"center", overflow:"hidden",
+    width:32, height:32, borderRadius:16,
+    borderWidth:2, borderColor:"rgba(255,255,255,0.3)",
+    overflow:"hidden",
   },
-  avatarImg: { width:36, height:36, borderRadius:18 },
+  avatarImg: { width:"100%", height:"100%" },
 
-  // ── Hero — dark navy with rounded bottom, matches screenshot ──
+  // ── Hero (mirrors student) ──
   heroSection: {
     backgroundColor: THEME.headerBg,
-    paddingHorizontal:20,
-    paddingTop:16,
-    paddingBottom:32,                         // extra bottom for card overlap
-    borderBottomLeftRadius:30,
-    borderBottomRightRadius:30,
+    paddingHorizontal: SCREEN_WIDTH * 0.05,
+    paddingTop: 24,
+    paddingBottom: 25,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    marginBottom: 15,
+    elevation: 10,
+    shadowColor: "#193648",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
   },
-  heroTopRow: {
-    flexDirection:"row", alignItems:"center",
-    justifyContent:"space-between", marginBottom:16,
-  },
-  // "Good Night" pill — semi-transparent white, matches screenshot
+  heroTopRow: { flexDirection:"row", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20 },
+  heroContent: { flex:1, paddingRight:10 },
   greetingPill: {
-    flexDirection:"row", alignItems:"center", gap:6,
-    backgroundColor:"rgba(255,255,255,0.1)",
-    paddingHorizontal:13, paddingVertical:7, borderRadius:20,
-  },
-  onlineDot: { width:7, height:7, borderRadius:4, backgroundColor:"#2ECC71" },
-  greetingTxt: { fontSize:13, color:"rgba(255,255,255,0.9)", fontWeight:"600" },
-  // "Messages" button — semi-transparent, badge
-  msgBtn: {
-    flexDirection:"row", alignItems:"center", gap:6,
-    backgroundColor:"rgba(255,255,255,0.13)",
-    paddingHorizontal:13, paddingVertical:8, borderRadius:22,
-  },
-  msgTxt:      { fontSize:13, color:"#fff", fontWeight:"700" },
-  msgBadge:    {
-    width:18, height:18, borderRadius:9,
-    backgroundColor: THEME.red,
-    justifyContent:"center", alignItems:"center",
-  },
-  msgBadgeTxt: { fontSize:9, fontWeight:"900", color:"#fff" },
-  // Large bold white name — matches "amna" in screenshot
-  heroName:    { fontSize:32, fontWeight:"900", color:"#fff", marginBottom:5 },
-  heroSub:     { fontSize:13, color:"rgba(255,255,255,0.5)", lineHeight:18 },
-
-  // Stat strip — frosted dark bg, 4 columns with thin dividers
-  heroStats: {
     flexDirection:"row", alignItems:"center",
-    backgroundColor:"rgba(255,255,255,0.07)",
-    borderRadius:20, marginTop:22,
-    paddingVertical:18, paddingHorizontal:8,
-  },
-  heroStatItem: { flex:1, alignItems:"center" },
-  heroStatN:    { fontSize:22, fontWeight:"900", color:"#fff" },
-  heroStatLbl:  { fontSize:10, color:"rgba(255,255,255,0.45)", marginTop:3, fontWeight:"600" },
-  statDivider:  { width:1, height:32, backgroundColor:"rgba(255,255,255,0.12)" },
-
-  // ── Icon Stat Cards — white, overlap hero bottom edge (matches screenshot) ──
-  iconCardsRow: {
-    flexDirection:"row",
-    gap:10,
-    paddingHorizontal:14,
-    marginTop:-20,                            // pull up to overlap hero
-    marginBottom:16,
-  },
-  iconCard: {
-    flex:1,
-    backgroundColor: THEME.card,
-    borderRadius:20,
-    paddingVertical:18,
-    alignItems:"center",
-    shadowColor:"#000", shadowOpacity:0.07, shadowRadius:10, elevation:4,
-    borderWidth:1, borderColor: THEME.border,
-  },
-  // Small icon container inside each card
-  iconCardCircle: {
-    width:44, height:44, borderRadius:22,
-    backgroundColor:"#F0F2F5",
-    justifyContent:"center", alignItems:"center",
+    backgroundColor:"rgba(255,255,255,0.1)",
+    alignSelf:"flex-start",
+    paddingHorizontal:10, paddingVertical:4, borderRadius:20,
     marginBottom:8,
   },
-  iconCardN:   { fontSize:20, fontWeight:"900", color:THEME.textPri },
-  iconCardLbl: {
-    fontSize:9, color:THEME.textSec,
-    marginTop:2, fontWeight:"700", letterSpacing:0.5,
-  },
+  greetingDot:    { width:6, height:6, borderRadius:3, backgroundColor:"#34D399", marginRight:6 },
+  greetingBadge:  { color:"rgba(255,255,255,0.9)", fontSize:11, fontWeight:"600" },
+  nameText:       { color:"#fff", fontSize:SCREEN_WIDTH*0.065, fontWeight:"800", marginBottom:4 },
+  heroSubText:    { color:"rgba(255,255,255,0.6)", fontSize:12, lineHeight:18 },
 
-  // ── CTA Card — white, dark icon box left, chevron right (matches screenshot) ──
-  ctaCard: {
-    marginHorizontal:14, marginBottom:14,
-    backgroundColor: THEME.card,
-    borderRadius:20,
+  heroStatsRow: {
+    flexDirection:"row",
+    backgroundColor:"rgba(255,255,255,0.08)",
+    borderRadius:20, paddingVertical:15, paddingHorizontal:10,
+  },
+  heroStat:        { flex:1, alignItems:"center" },
+  heroStatNum:     { color:"#fff", fontSize:18, fontWeight:"800" },
+  heroStatLbl:     { color:"rgba(255,255,255,0.5)", fontSize:10, marginTop:2 },
+  heroStatDivider: { width:1, backgroundColor:"rgba(255,255,255,0.1)", height:"70%", alignSelf:"center" },
+
+  // ── Alert Banner ──
+  alertBanner: {
+    marginHorizontal:16, marginBottom:20,
+    backgroundColor:"#fff", borderRadius:16,
+    padding:15,
     flexDirection:"row", alignItems:"center",
-    paddingHorizontal:16, paddingVertical:18,
-    borderWidth:1, borderColor: THEME.border,
-    shadowColor:"#000", shadowOpacity:0.04, shadowRadius:6, elevation:2,
+    borderLeftWidth:4, borderLeftColor:THEME.headerBg,
+    elevation:2,
   },
-  ctaIconBox: {
-    width:46, height:46, borderRadius:14,
-    backgroundColor: "#193648",
-    justifyContent:"center", alignItems:"center",
-  },
-  ctaTitle: { fontSize:15, fontWeight:"800", color:THEME.textPri },
-  ctaSub:   { fontSize:12, color:THEME.textSec, marginTop:3 },
+  alertLeft:    { flex:1, flexDirection:"row", alignItems:"center" },
+  alertIconBg:  { width:36, height:36, borderRadius:10, backgroundColor:THEME.headerBg, justifyContent:"center", alignItems:"center" },
+  alertTitle:   { fontSize:14, fontWeight:"700", color:THEME.headerBg },
+  alertSub:     { fontSize:11, color:"#6B7280", marginTop:2 },
 
-  // ── Alert ──
-  alertCard:  { marginHorizontal:14, marginBottom:14 },
-  alertInner: {
+  // ── Section / Headers ──
+  section:        { marginHorizontal:16, marginBottom:25 },
+  sectionHeader:  { flexDirection:"row", alignItems:"center", marginBottom:15 },
+  sectionTitle:   { fontSize:16, fontWeight:"800", color:"#111827", marginRight:10 },
+  sectionAccent:  { flex:1, height:1, backgroundColor:"#E5E7EB" },
+  seeAll:         { fontSize:13, color:THEME.headerBg, fontWeight:"700", marginLeft:10 },
+
+  // ── Quick Actions Grid (white cards, light bg icon, arrow top-right) ──
+  actionsGrid: { flexDirection:"row", flexWrap:"wrap", justifyContent:"space-between" },
+  actionCard:  {
+    width: (SCREEN_WIDTH - 44) / 2,
+    backgroundColor: "#fff", borderRadius: 20,
+    padding: 16, marginBottom: 12,
+    elevation: 3,
+    shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10,
+  },
+  actionIconBg: { width:44, height:44, borderRadius:12, backgroundColor:THEME.iconBg,
+                  justifyContent:"center", alignItems:"center", marginBottom:12 },
+  actionTitle:  { fontSize:13, fontWeight:"700", color:THEME.headerBg, marginBottom:4 },
+  actionDesc:   { fontSize:11, color:"#6B7280", lineHeight:15 },
+  actionArrow:  { position:"absolute", top:15, right:15, width:22, height:22, borderRadius:6,
+                  backgroundColor:THEME.iconBg, justifyContent:"center", alignItems:"center" },
+
+  // ── Feature Rows (list with icon → text → chevron) ──
+  featureRow: {
     flexDirection:"row", alignItems:"center",
-    backgroundColor:"#FDEBEA",
-    borderRadius:14, paddingHorizontal:14, paddingVertical:13, gap:10,
-    borderWidth:1, borderColor:"#F5C6C2",
+    backgroundColor:"#fff", borderRadius:16,
+    padding:12, marginBottom:10,
+    elevation:1,
   },
-  alertTxt: { flex:1, fontSize:13, color:THEME.red, fontWeight:"700" },
-
-  // ── Section header ──
-  secHeader: {
-    flexDirection:"row", justifyContent:"space-between", alignItems:"center",
-    paddingHorizontal:16, paddingTop:20, paddingBottom:12,
-  },
-  secTitle: { fontSize:17, fontWeight:"800", color:THEME.textPri },
-  seeAll:   { fontSize:13, color:THEME.teal, fontWeight:"700" },
-
-  // ── Quick Actions 2-col grid — white cards, matches screenshot style ──
-  actionsGrid: {
-    paddingHorizontal:14, flexDirection:"row", flexWrap:"wrap", gap:12, marginBottom:4,
-  },
-  actionCard: {
-    width: (width - 28 - 12) / 2,
-    backgroundColor: THEME.card,
-    borderRadius:22,
-    padding:18,
-    borderWidth:1, borderColor: THEME.border,
-    shadowColor:"#000", shadowOpacity:0.05, shadowRadius:8, elevation:2,
-    position:"relative",
-  },
-  // Arrow circle top-right — light gray, matches screenshot
-  actionArrow: {
-    position:"absolute", top:14, right:14,
-    width:30, height:30, borderRadius:15,
-    backgroundColor:"#F0F2F5",
-    justifyContent:"center", alignItems:"center",
-  },
-  // Icon box — light bg square — matches screenshot
-  actionIconBox: {
-    width:50, height:50, borderRadius:14,
-    backgroundColor:"#F0F2F5",
-    justifyContent:"center", alignItems:"center",
-    marginBottom:12,
-  },
-  actionLabel: { fontSize:14, fontWeight:"800", color:THEME.textPri, marginBottom:4 },
-  actionSub:   { fontSize:11, color:THEME.textSec, lineHeight:15 },
+  featureIcon:   { width:42, height:42, borderRadius:12, backgroundColor:THEME.iconBg,
+                   justifyContent:"center", alignItems:"center", marginRight:12 },
+  featureTitle:  { fontSize:14, fontWeight:"700", color:"#111827" },
+  featureDesc:   { fontSize:11, color:"#6B7280", marginTop:2 },
 
   // ── MOU cards ──
   mouCard: {
-    marginHorizontal:14, marginBottom:10,
+    marginBottom:10,
     backgroundColor: THEME.card, borderRadius:16,
     flexDirection:"row", alignItems:"center", overflow:"hidden",
     borderWidth:1, borderColor: THEME.border,
@@ -906,7 +1046,7 @@ const d = StyleSheet.create({
 
   // ── Empty state ──
   emptyCard: {
-    marginHorizontal:14, backgroundColor:THEME.card, borderRadius:20, padding:32,
+    backgroundColor:THEME.card, borderRadius:20, padding:32,
     alignItems:"center", borderWidth:2, borderColor:THEME.border, borderStyle:"dashed",
   },
   emptyIcon: { width:60, height:60, borderRadius:30, justifyContent:"center", alignItems:"center", marginBottom:12 },
@@ -915,7 +1055,7 @@ const d = StyleSheet.create({
 
   // ── Post cards ──
   postCard: {
-    marginHorizontal:14, marginBottom:14,
+    marginBottom:14,
     backgroundColor:THEME.card, borderRadius:20, overflow:"hidden",
     borderWidth:1, borderColor:THEME.border,
     shadowColor:"#000", shadowOpacity:0.05, shadowRadius:8, elevation:3,
@@ -926,93 +1066,114 @@ const d = StyleSheet.create({
   postOrg:      { fontSize:13, fontWeight:"700", color:THEME.textPri },
   postWhen:     { fontSize:11, color:THEME.textMute, marginTop:1 },
   typeTag:      { flexDirection:"row", alignItems:"center", gap:5,
-    paddingHorizontal:10, paddingVertical:5, borderRadius:20 },
+                  paddingHorizontal:10, paddingVertical:5, borderRadius:20 },
   typeDot:      { width:6, height:6, borderRadius:3 },
   typeTagTxt:   { fontSize:11, fontWeight:"700" },
   postBanner:   { height:155, justifyContent:"flex-end", paddingHorizontal:16, paddingBottom:14, overflow:"hidden" },
   bannerC1:     { position:"absolute", width:140, height:140, borderRadius:70,
-    backgroundColor:"rgba(255,255,255,0.06)", top:-35, right:-35 },
+                  backgroundColor:"rgba(255,255,255,0.06)", top:-35, right:-35 },
   bannerC2:     { position:"absolute", width:80, height:80, borderRadius:40,
-    backgroundColor:"rgba(255,255,255,0.04)", bottom:-20, left:-15 },
+                  backgroundColor:"rgba(255,255,255,0.04)", bottom:-20, left:-15 },
   bannerTitle:  { fontSize:17, fontWeight:"800", color:"#fff" },
   bannerMeta:   { fontSize:11, color:"rgba(255,255,255,0.75)", fontWeight:"600" },
   postBody:     { padding:14 },
   postTitle:    { fontSize:15, fontWeight:"700", color:THEME.textPri },
   postDesc:     { fontSize:13, color:THEME.textSec, marginTop:5, lineHeight:18 },
-  skillPill:    { backgroundColor:THEME.tealLight, borderRadius:20, paddingHorizontal:10, paddingVertical:4,
-    marginRight:7, borderWidth:1, borderColor:"#BDE0E2" },
-  skillPillTxt: { fontSize:11, fontWeight:"700", color:THEME.teal },
+  skillPill:    { backgroundColor:THEME.iconBg, borderRadius:20, paddingHorizontal:10, paddingVertical:4,
+                  marginRight:7, borderWidth:1, borderColor:"#DCE4EC" },
+  skillPillTxt: { fontSize:11, fontWeight:"700", color:THEME.headerBg },
   postFoot:     { flexDirection:"row", alignItems:"center", justifyContent:"space-between",
-    marginTop:12, paddingTop:12, borderTopWidth:1, borderColor:THEME.border },
+                  marginTop:12, paddingTop:12, borderTopWidth:1, borderColor:THEME.border },
   postFootTxt:  { fontSize:12, color:THEME.textSec, fontWeight:"600" },
-  viewAppsBtn:  { flexDirection:"row", alignItems:"center", gap:4, backgroundColor:THEME.tealLight,
-    paddingHorizontal:12, paddingVertical:7, borderRadius:20 },
-  viewAppsTxt:  { fontSize:12, color:THEME.teal, fontWeight:"700" },
+  viewAppsBtn:  { flexDirection:"row", alignItems:"center", gap:4, backgroundColor:THEME.iconBg,
+                  paddingHorizontal:12, paddingVertical:7, borderRadius:20 },
+  viewAppsTxt:  { fontSize:12, color:THEME.headerBg, fontWeight:"700" },
 
-  // ── Company Card ──
-  coCard:    { margin:14, borderRadius:20, overflow:"hidden" },
-  coCardGrad:{ padding:18, overflow:"hidden" },
-  coDecor:   { position:"absolute", width:200, height:200, borderRadius:100,
-    backgroundColor:"#193648", top:-60, right:-60 },
-  coLogo:    { width:54, height:54, borderRadius:15, backgroundColor:"rgba(255,255,255,0.12)",
-    justifyContent:"center", alignItems:"center", overflow:"hidden",
-    borderWidth:1, borderColor:"rgba(255,255,255,0.15)" },
-  coLogoTxt: { fontSize:17, fontWeight:"900", color:"#fff" },
-  coName:    { fontSize:14, fontWeight:"800", color:"#fff" },
-  coSub:     { fontSize:12, color:"rgba(255,255,255,0.5)", marginTop:2 },
-  coAddr:    { fontSize:11, color:"rgba(255,255,255,0.35)", marginTop:2 },
-  coEditBtn: { flexDirection:"row", alignItems:"center", gap:4,
-    backgroundColor:"#84898b", paddingHorizontal:12, paddingVertical:8, borderRadius:20 },
-  coEditTxt: { fontSize:12, color:THEME.tealLight, fontWeight:"700" },
+  // ── AI Badge ──
+  aiBadge: {
+    flexDirection:"row", alignItems:"center",
+    backgroundColor:THEME.headerBg,
+    marginHorizontal:16, padding:16, borderRadius:20, marginBottom:12,
+    shadowColor:THEME.headerBg, shadowOffset:{width:0, height:4}, shadowOpacity:0.25, shadowRadius:10, elevation:5,
+  },
+  aiBadgeLogo: { width:38, height:38, borderRadius:12, marginRight:12, backgroundColor:"rgba(255,255,255,0.15)" },
+  aiText:      { color:"#fff", fontSize:14, fontWeight:"700" },
+  aiSubText:   { color:"rgba(255,255,255,0.55)", fontSize:11, marginTop:2 },
 });
 
-// ─── DRAWER STYLES ───────────────────────────────────────────────
+// ─── DRAWER STYLES — mirrors student drawer (dark profile + white items) ──
+const STATUS_H = Platform.OS === "android" ? (StatusBar.currentHeight ?? 24) : 44;
+const isSmallScreen = height < 680;
+const AVATAR = isSmallScreen ? 64 : 76;
+
 const dr = StyleSheet.create({
-  header:     {
-    paddingTop:Platform.OS==="ios"?56:44, paddingHorizontal:18, paddingBottom:20, overflow:"hidden",
+  scrollContent: { flexGrow:1, backgroundColor:"#193648", paddingBottom:0 },
+
+  // ── Dark profile section ──
+  profileCard: {
+    alignItems:"center",
+    paddingTop: STATUS_H + (isSmallScreen ? 12 : 20),
+    paddingBottom: isSmallScreen ? 14 : 20,
+    paddingHorizontal:16,
+    backgroundColor:"#193648",
   },
-  decor:      { position:"absolute", width:180, height:180, borderRadius:90,
-    backgroundColor:"rgba(255,255,255,0.03)", top:-50, right:-50 },
-  topRow:     { flexDirection:"row", justifyContent:"space-between", alignItems:"center", marginBottom:16 },
-  // White rounded square logo box — UNCHANGED
-  logoBox:    {
-    width:36, height:36, borderRadius:10, backgroundColor:"#fff",
+  avatarTouch: { marginBottom: isSmallScreen ? 8 : 12, zIndex:10 },
+  avatarWrapper: { position:"relative", width:AVATAR, height:AVATAR },
+  avatar: {
+    width:AVATAR, height:AVATAR, borderRadius:AVATAR/2,
+    borderWidth:2.5, borderColor:"#f0f2f5",
+    backgroundColor:"#1E3A4A",
+  },
+  avatarFallback: { justifyContent:"center", alignItems:"center" },
+  avatarTxt: { fontSize:24, fontWeight:"900", color:"#fff" },
+  cameraBadge: {
+    position:"absolute", bottom:2, right:2,
+    width:24, height:24, borderRadius:12,
+    backgroundColor:"#193648",
+    justifyContent:"center", alignItems:"center",
+    borderWidth:2, borderColor:"#111D26",
+  },
+  studentName:  { color:"#fff", fontSize:16, fontWeight:"700", marginBottom:3 },
+  studentEmail: { color:"rgba(255,255,255,0.42)", fontSize:12, marginBottom:12 },
+  onlinePill: {
+    flexDirection:"row", alignItems:"center",
+    backgroundColor:"rgba(52,211,153,0.1)",
+    paddingHorizontal:10, paddingVertical:4, borderRadius:20,
+  },
+  onlineDot:  { width:6, height:6, borderRadius:3, backgroundColor:"#72da6f", marginRight:5 },
+  onlineText: { color:"#eef0f0", fontSize:11, fontWeight:"600" },
+
+  sep: { height:1, backgroundColor:"#193648", marginHorizontal:0, marginVertical:0 },
+
+  // ── White section ──
+  whiteSection: {
+    flex:1, backgroundColor:"#ffffff",
+    paddingTop:8, paddingBottom:12,
+  },
+  item: {
+    flexDirection:"row", alignItems:"center",
+    paddingVertical:11, paddingHorizontal:14,
+    borderRadius:10, marginHorizontal:10, marginVertical:1,
+  },
+  itemActive:    { backgroundColor:"#19364818" },
+  itemLbl:       { fontSize:14, fontWeight:"600", color:"#555" },
+  itemLblActive: { color:"#193648", fontWeight:"700" },
+
+  sepWhite: { height:1, backgroundColor:"#F0F0F0", marginHorizontal:14, marginVertical:8 },
+
+  logoutRow: {
+    flexDirection:"row", alignItems:"center", gap:12,
+    marginHorizontal:10, paddingVertical:12, paddingHorizontal:14,
+    borderRadius:10, backgroundColor:"rgba(239,68,68,0.07)",
+  },
+  logoutIcon: {
+    width:28, height:28, borderRadius:8,
+    backgroundColor:"rgba(239,68,68,0.12)",
     justifyContent:"center", alignItems:"center",
   },
-  logoTxt:    { fontSize:12, fontWeight:"900", color:"#fff" },
-  brand:      { fontSize:17, fontWeight:"800", color:"#fff" },
-  closeBtn:   { width:32, height:32, borderRadius:16, backgroundColor:"rgba(255,255,255,0.1)",
-    justifyContent:"center", alignItems:"center" },
-  profileRow: { flexDirection:"row", alignItems:"center", backgroundColor:"rgba(255,255,255,0.08)",
-    borderRadius:14, padding:12 },
-  avatar:     { width:46, height:46, borderRadius:23, backgroundColor:THEME.teal,
-    justifyContent:"center", alignItems:"center", overflow:"hidden",
-    borderWidth:2, borderColor:"rgba(255,255,255,0.2)" },
-  avatarImg:  { width:46, height:46, borderRadius:23 },
-  avatarTxt:  { fontSize:16, fontWeight:"900", color:"#fff" },
-  onlineDot:  { width:7, height:7, borderRadius:4, backgroundColor:"#2ECC71" },
-  uName:      { fontSize:14, fontWeight:"800", color:"#fff" },
-  uSub:       { fontSize:11, color:"rgba(255,255,255,0.45)", fontWeight:"500" },
-  item:       { flexDirection:"row", alignItems:"center", paddingVertical:11, paddingHorizontal:10,
-    borderRadius:14, marginBottom:3, gap:10, borderWidth:1, borderColor:"transparent" },
-  itemIcon:   { width:38, height:38, borderRadius:12, justifyContent:"center", alignItems:"center" },
-  itemLbl:    { flex:1, fontSize:14, fontWeight:"600", color:THEME.textSec },
-  activePip:  { width:6, height:6, borderRadius:3 },
-  logoutBtn: {
-    flexDirection:"row", alignItems:"center", gap:10,
-    paddingVertical:12, paddingHorizontal:12,
-    borderRadius:14, marginBottom:4,
-    backgroundColor:"#FEF0EE",
-    borderWidth:1, borderColor:"#F9D0CB",
-  },
-  logoutIconBox: {
-    width:38, height:38, borderRadius:12,
-    backgroundColor:"#FDEBE8",
-    justifyContent:"center", alignItems:"center",
-  },
-  logoutTxt: { fontSize:14, fontWeight:"700", color:THEME.red },
-  footer:     { margin:14, marginTop:8, padding:14,
-    borderTopWidth:1, borderColor:THEME.border, borderRadius:10 },
-  footerBrand:{ fontSize:12, fontWeight:"700", color:THEME.textSec },
-  footerSub:  { fontSize:11, color:THEME.textMute, marginTop:2 },
+  logoutTxt: { color:"#EF4444", fontWeight:"700", fontSize:14 },
+
+  footer:      { alignItems:"center", gap:5, paddingVertical:18 },
+  footerLogo:  { width:24, height:24, borderRadius:6 },
+  footerBrand: { color:"rgba(0,0,0,0.25)", fontSize:10 },
 });
