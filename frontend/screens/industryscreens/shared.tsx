@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import React, {
   createContext, useCallback, useContext,
@@ -90,12 +91,13 @@ export const API_PROJ = `${BASE}/api/industry/projects`;
 // ─── STATUS CONFIG ───────────────────────────────────────────────
 export const SC: Record<string, { c: string; bg: string; lbl: string }> = {
   Draft:                        { c: "#64748b", bg: "#f1f5f9", lbl: "Draft" },
-  "Sent to Industry laison Incharge": { c: "#d97706", bg: "#fffbeb", lbl: "Sent to Us" },
-  "Changes Proposed":           { c: "#7c3aed", bg: "#f5f3ff", lbl: "Changes Proposed" },
+  "Sent to Industry":           { c: "#c2410c", bg: "#fff7ed", lbl: "Sent to Us" },
+  "Sent to Industry laison Incharge": { c: "#c2410c", bg: "#fff7ed", lbl: "Sent to Us" },
+  "Changes Proposed":           { c: "#c2410c", bg: "#fff7ed", lbl: "Changes Proposed" },
   "Industry Responded":         { c: "#0891b2", bg: "#ecfeff", lbl: "Responded" },
-  "Approved by Industry":       { c: "#059669", bg: "#ecfdf5", lbl: "We Approved ✓" },
-  "Approved by University":     { c: "#0284c7", bg: "#e0f2fe", lbl: "Uni Approved" },
-  "Mutually Approved":          { c: "#16a34a", bg: "#dcfce7", lbl: "Mutually Approved ✓" },
+  "Approved by Industry":       { c: "#15803d", bg: "#ffffff", lbl: "We Approved ✓" },
+  "Approved by University":     { c: "#0284c7", bg: "#ffffff", lbl: "Uni Approved" },
+  "Mutually Approved":          { c: "#15803d", bg: "#ffffff", lbl: "Mutually Approved ✓" },
   Rejected:                     { c: "#dc2626", bg: "#fef2f2", lbl: "Rejected" },
 };
 
@@ -146,6 +148,9 @@ export const bldPayload = (m: any) => ({
   sentAt: m.sentAt, industryResponseAt: m.industryResponseAt,
   proposedChanges: m.proposedChanges || [], changeLog: m.changeLog || [],
   scheduledMeeting: m.scheduledMeeting || null,
+  pdf: m.pdf || null,
+  universitySignature: m.universitySignature || null,
+  industrySignature:   m.industrySignature   || null,
 });
 
 // ─── USER CONTEXT ────────────────────────────────────────────────
@@ -300,7 +305,7 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
 export const SBadge = ({ status }: { status: string }) => {
   const s = SC[status] || { c: C.textLight, bg: C.bg, lbl: status };
   return (
-    <View style={[sharedStyles.badge, { backgroundColor: s.bg }]}>
+    <View style={[sharedStyles.badge, { backgroundColor: s.bg, borderColor: s.c + "35" }]}>
       <Text style={[sharedStyles.badgeTxt, { color: s.c }]}>{s.lbl}</Text>
     </View>
   );
@@ -316,12 +321,11 @@ export const Header = ({
   back?: boolean;
   right?: React.ReactNode;
 }) => {
-  const { useNavigation } = require("@react-navigation/native");
-  const nav = useNavigation();
+  const nav = useNavigation<any>();
   return (
     <View style={sharedStyles.hdr}>
       <TouchableOpacity
-        onPress={() => (back ? nav.goBack() : nav.openDrawer())}
+        onPress={() => (back ? nav.goBack() : nav.openDrawer?.())}
         style={sharedStyles.hdrBtn}>
         <Ionicons name={back ? "arrow-back" : "menu-outline"} size={24} color={C.navy} />
       </TouchableOpacity>
@@ -373,7 +377,9 @@ export const InfoCard = ({
 }) => (
   <View style={sharedStyles.infoCardWrap}>
     <View style={sharedStyles.infoCardHead}>
-      <Ionicons name={icon as any} size={16} color={C.teal} />
+      <View style={sharedStyles.infoCardIcon}>
+        <Ionicons name={icon as any} size={15} color={C.teal} />
+      </View>
       <Text style={sharedStyles.infoCardTitle}>{title}</Text>
     </View>
     {children}
@@ -406,58 +412,97 @@ export const sharedStyles = StyleSheet.create({
   hdr: {
     backgroundColor: C.white,
     paddingTop: Platform.OS === "ios" ? 52 : 42,
-    paddingBottom: 14, paddingHorizontal: 16,
+    paddingBottom: 14, paddingHorizontal: 14,
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    elevation: 2, borderBottomWidth: 1, borderColor: C.border,
+    borderBottomWidth: 1, borderColor: C.border,
+    shadowColor: C.navy, shadowOpacity: 0.05, shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
-  hdrTitle:  { flex: 1, fontSize: 17, fontWeight: "700", color: C.navy, marginHorizontal: 12 },
-  hdrBtn:    { width: 40, height: 40, justifyContent: "center", alignItems: "center" },
+  hdrTitle:  { flex: 1, fontSize: 17, fontWeight: "800", color: C.navy, marginHorizontal: 10, letterSpacing: 0.3 },
+  hdrBtn:    { width: 40, height: 40, justifyContent: "center", alignItems: "center", borderRadius: 12 },
   hdrAction: {
-    width: 38, height: 38, borderRadius: 19, backgroundColor: C.teal,
+    width: 40, height: 40, borderRadius: 12, backgroundColor: C.teal,
     justifyContent: "center", alignItems: "center",
+    shadowColor: C.teal, shadowOpacity: 0.3, shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 }, elevation: 3,
   },
 
-  badge:    { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  badgeTxt: { fontSize: 10, fontWeight: "700" },
+  badge:    {
+    paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20,
+    borderWidth: 1, borderColor: "transparent",
+  },
+  badgeTxt: { fontSize: 10.5, fontWeight: "800", letterSpacing: 0.4 },
 
   fieldLbl: {
-    fontSize: 12, fontWeight: "700", color: C.navy,
-    marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5,
+    fontSize: 11.5, fontWeight: "800", color: C.navy,
+    marginBottom: 7, textTransform: "uppercase", letterSpacing: 0.7,
   },
   fieldInput: {
     backgroundColor: C.white, borderWidth: 1.5, borderColor: C.border,
-    borderRadius: 12, padding: 13, fontSize: 14, color: C.text, marginTop: 4,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
+    fontSize: 14, color: C.text, marginTop: 4,
   },
 
-  saveBtn:    { backgroundColor: C.navy, padding: 16, borderRadius: 14, alignItems: "center", justifyContent: "center", flexDirection: "row" },
-  saveBtnTxt: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  saveBtn: {
+    backgroundColor: C.teal, padding: 15, borderRadius: 14,
+    alignItems: "center", justifyContent: "center", flexDirection: "row",
+    shadowColor: C.teal, shadowOpacity: 0.28, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 }, elevation: 3,
+  },
+  saveBtnTxt: { color: "#fff", fontSize: 14.5, fontWeight: "800", letterSpacing: 0.3 },
 
-  infoCardWrap: { backgroundColor: C.white, borderRadius: 14, padding: 16, marginBottom: 12, elevation: 1 },
+  infoCardWrap: {
+    backgroundColor: C.white, borderRadius: 16, paddingVertical: 18, paddingHorizontal: 18,
+    marginBottom: 14, borderWidth: 1, borderColor: C.border,
+    shadowColor: C.navy, shadowOpacity: 0.06, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 }, elevation: 2,
+  },
   infoCardHead: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    marginBottom: 12, paddingBottom: 10,
-    borderBottomWidth: 1, borderColor: C.border,
+    flexDirection: "row", alignItems: "center", gap: 12,
+    marginBottom: 14, paddingBottom: 12,
+    borderBottomWidth: 1, borderColor: C.navyMid + "22",
   },
-  infoCardTitle: { fontSize: 14, fontWeight: "800", color: C.navy },
-  infoRow:       { flexDirection: "row", justifyContent: "space-between", paddingVertical: 7 },
-  infoRowLbl:    { fontSize: 12, color: C.textLight, fontWeight: "600" },
-  infoRowVal:    { fontSize: 13, color: C.navy, fontWeight: "700", maxWidth: "58%", textAlign: "right" },
-  infoText:      { fontSize: 13, color: C.text, lineHeight: 20 },
+  infoCardIcon: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: C.navyMid + "12",
+    justifyContent: "center", alignItems: "center",
+    borderWidth: 1, borderColor: C.navyMid + "30",
+  },
+  infoCardTitle: { fontSize: 14, fontWeight: "800", color: C.navy, letterSpacing: 0.4 },
+  infoRow: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    paddingVertical: 11, gap: 12,
+  },
+  infoRowLbl: {
+    fontSize: 11.5, color: C.textMid, fontWeight: "800",
+    letterSpacing: 0.6, textTransform: "uppercase", flex: 0,
+  },
+  infoRowVal: { fontSize: 13.5, color: C.navy, fontWeight: "700", flex: 1, textAlign: "right" },
+  infoText:   { fontSize: 13.5, color: C.text, lineHeight: 22 },
 
   emptyState: { alignItems: "center", paddingVertical: 60 },
   emptyTitle: { fontSize: 17, fontWeight: "700", color: C.textLight, marginTop: 14 },
   emptySub:   { fontSize: 13, color: C.textLight, marginTop: 6 },
 
-  overlay:     { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  overlay:     { flex: 1, backgroundColor: "rgba(15,34,54,0.55)", justifyContent: "flex-end" },
   sheet:       {
-    backgroundColor: C.white, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    backgroundColor: C.white, borderTopLeftRadius: 30, borderTopRightRadius: 30,
     maxHeight: "92%", paddingBottom: Platform.OS === "ios" ? 34 : 16,
+    shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 16,
+    shadowOffset: { width: 0, height: -6 }, elevation: 10,
   },
-  sheetHandle: { width: 36, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: "center", marginTop: 10 },
-  sheetHead:   {
+  sheetHandle: {
+    width: 44, height: 5, backgroundColor: C.border, borderRadius: 3,
+    alignSelf: "center", marginTop: 10,
+  },
+  sheetHead: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    padding: 20, borderBottomWidth: 1, borderColor: C.border,
+    paddingHorizontal: 22, paddingTop: 16, paddingBottom: 14,
+    borderBottomWidth: 1, borderColor: C.border,
   },
-  sheetTitle: { fontSize: 16, fontWeight: "800", color: C.navy, flex: 1 },
-  sheetFoot:  { flexDirection: "row", gap: 12, padding: 16, borderTopWidth: 1, borderColor: C.border },
+  sheetTitle: { fontSize: 17, fontWeight: "800", color: C.navy, flex: 1, letterSpacing: 0.3 },
+  sheetFoot: {
+    flexDirection: "row", gap: 12, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14,
+    borderTopWidth: 1, borderColor: C.border, backgroundColor: C.bg + "60",
+  },
 });

@@ -57,17 +57,44 @@ const THEME = {
   iconBg:    "#EEF3F7",
 };
 
-// ─── INITIAL MOCK NOTIFICATIONS (preserved) ────────────────────
-const INITIAL_NOTIFICATIONS = [
-  { _id:"n1", icon:"people",           color:THEME.teal,   bg:THEME.tealLight, title:"New Application",    body:"Ayesha Tariq applied for Frontend Intern",        time:"2m ago",  read:false },
-  { _id:"n2", icon:"document-text",    color:THEME.green,  bg:"#E8F6EE",       title:"MOU Status Updated", body:"Your MOU with NUCES moved to Review stage",       time:"1h ago",  read:false },
-  { _id:"n3", icon:"mail-unread",      color:THEME.accent, bg:"#E8EEF3",       title:"Invitation Received",body:"QAU invited you to a collaboration workshop",     time:"3h ago",  read:true  },
-  { _id:"n4", icon:"checkmark-circle", color:THEME.amber,  bg:"#FDF3E7",       title:"Event Approved",     body:"Your AI Summit event was published successfully", time:"1d ago",  read:true  },
-  { _id:"n5", icon:"people",           color:THEME.red,    bg:"#FDEBEA",       title:"Application Accepted",body:"Hassan Ali Mir was accepted for AI Project",     time:"2d ago",  read:true  },
-];
+// ─── NOTIFICATION TYPE → UI STYLE MAP ───────────────────────────
+const NOTE_STYLE: Record<string, { icon: string; color: string; bg: string }> = {
+  mou:         { icon: "document-text",    color: THEME.teal,   bg: THEME.tealLight },
+  application: { icon: "people",           color: THEME.accent, bg: "#E8EEF3" },
+  invitation:  { icon: "mail-unread",      color: THEME.amber,  bg: "#FDF3E7" },
+  event:       { icon: "calendar",         color: THEME.green,  bg: "#E8F6EE" },
+  general:     { icon: "notifications",    color: THEME.teal,   bg: THEME.tealLight },
+};
+
+const timeAgoShort = (iso?: string) => {
+  if (!iso) return "Just now";
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "Just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+};
+
+const mapNote = (raw: any) => {
+  const cfg = NOTE_STYLE[raw?.type] || NOTE_STYLE.general;
+  return {
+    _id:   raw?._id || `rt-${Date.now()}-${Math.random()}`,
+    icon:  cfg.icon,
+    color: cfg.color,
+    bg:    cfg.bg,
+    title: raw?.title || "Notification",
+    body:  raw?.message || "",
+    time:  timeAgoShort(raw?.createdAt),
+    read:  !!raw?.isRead,
+    meta:  raw?.meta || null,
+    raw,
+  };
+};
 
 // ─── REAL-TIME NOTIFICATION TOAST OVERLAY ────────────────────────
-type Notif = { _id?:string; title:string; message:string; type?:string };
+type Notif = { _id?:string; title:string; message:string; type?:string; meta?: any };
 
 const TYPE_ICON: Record<string, { icon: string; color: string }> = {
   application: { icon: "briefcase-check", color: "#2563EB" },
@@ -114,6 +141,7 @@ function NotificationOverlay({ onIncoming }: { onIncoming?: (n: Notif) => void }
         title: data.title || "Notification",
         message: data.message || "",
         type: data.type || "general",
+        meta: data.meta || data.raw?.meta,
       };
       show(n);
       onIncoming?.(n);
@@ -128,9 +156,17 @@ function NotificationOverlay({ onIncoming }: { onIncoming?: (n: Notif) => void }
   if (!current) return null;
   const cfg = TYPE_ICON[current.type || "general"] || TYPE_ICON.general;
 
+  const onPressBanner = () => {
+    const mouId = current.meta?.mouId;
+    hide();
+    if (mouId) {
+      try { nav.navigate("MouDetail", { mouId }); } catch {}
+    }
+  };
+
   return (
     <Animated.View pointerEvents="box-none" style={[ov.wrap, { opacity, transform: [{ translateY }] }]}>
-      <Pressable onPress={() => { hide(); }} style={ov.banner} android_ripple={{ color: "#1E3A4A" }}>
+      <Pressable onPress={onPressBanner} style={ov.banner} android_ripple={{ color: "#1E3A4A" }}>
         <View style={[ov.iconBg, { backgroundColor: cfg.color + "22" }]}>
           <MaterialCommunityIcons name={cfg.icon as any} size={22} color={cfg.color} />
         </View>
@@ -151,12 +187,16 @@ function NotificationPanel({
   visible,
   onClose,
   notes,
-  setNotes,
+  onMarkAllRead,
+  onMarkOneRead,
+  onOpenNote,
 }: {
   visible: boolean;
   onClose: () => void;
   notes: any[];
-  setNotes: (n: any[]) => void;
+  onMarkAllRead: () => void;
+  onMarkOneRead: (id: string) => void;
+  onOpenNote?: (note: any) => void;
 }) {
   const slideAnim = useRef(new Animated.Value(-width * 0.88)).current;
   const unread = notes.filter((n) => !n.read).length;
@@ -183,8 +223,7 @@ function NotificationPanel({
               </TouchableOpacity>
             </View>
             {unread > 0 && (
-              <TouchableOpacity onPress={() => setNotes(notes.map((n) => ({ ...n, read:true })))}
-                style={nS.markAllBtn}>
+              <TouchableOpacity onPress={onMarkAllRead} style={nS.markAllBtn}>
                 <Ionicons name="checkmark-done" size={13} color="rgba(255,255,255,0.8)" />
                 <Text style={nS.markAllTxt}>Mark all as read</Text>
               </TouchableOpacity>
@@ -192,10 +231,19 @@ function NotificationPanel({
           </LinearGradient>
 
           <ScrollView style={{ flex:1, backgroundColor:THEME.bg }} showsVerticalScrollIndicator={false}>
+            {notes.length === 0 && (
+              <View style={{ alignItems: "center", paddingVertical: 60, paddingHorizontal: 24 }}>
+                <Ionicons name="notifications-off-outline" size={42} color={THEME.textMute} />
+                <Text style={{ fontSize: 14, fontWeight: "700", color: THEME.textPri, marginTop: 12 }}>You&apos;re all caught up</Text>
+                <Text style={{ fontSize: 12, color: THEME.textSec, marginTop: 4, textAlign: "center" }}>
+                  Updates from the Industry Liaison and platform events will appear here.
+                </Text>
+              </View>
+            )}
             {notes.map((n) => (
               <TouchableOpacity key={n._id}
                 style={[nS.card, !n.read && nS.cardUnread]}
-                onPress={() => setNotes(notes.map((x) => x._id===n._id ? { ...x, read:true } : x))}>
+                onPress={() => { onMarkOneRead(n._id); onOpenNote?.(n); }}>
                 <View style={[nS.iconBox, { backgroundColor: n.bg }]}>
                   <Ionicons name={n.icon as any} size={18} color={n.color} />
                 </View>
@@ -228,8 +276,32 @@ function DashboardScreen() {
   const [posts, setPosts] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notes, setNotes] = useState<any[]>(INITIAL_NOTIFICATIONS);
+  const [notes, setNotes] = useState<any[]>([]);
   const unreadCount = notes.filter((n)=>!n.read).length;
+
+  const loadNotifications = async () => {
+    if (!user?.email) return;
+    try {
+      const r = await ax().get(`/api/industry/notifications/${encodeURIComponent(user.email)}`);
+      const list = Array.isArray(r.data) ? r.data : [];
+      setNotes(list.map(mapNote));
+    } catch (e: any) {
+      console.log("loadNotifications error:", e?.response?.status);
+    }
+  };
+
+  const markAllRead = async () => {
+    if (!user?.email) return;
+    setNotes((prev) => prev.map((n) => ({ ...n, read: true })));
+    try { await ax().patch(`/api/industry/notifications/${encodeURIComponent(user.email)}/read-all`); } catch {}
+  };
+
+  const markOneRead = async (id: string) => {
+    setNotes((prev) => prev.map((n) => n._id === id ? { ...n, read: true } : n));
+    if (typeof id === "string" && !id.startsWith("rt-")) {
+      try { await ax().patch(`/api/industry/notifications/${id}/read`); } catch {}
+    }
+  };
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -272,20 +344,14 @@ function DashboardScreen() {
   useEffect(() => {
     if (!user?.email) return;
     try { socket.disconnect(); } catch {}
-    socket.connect(BASE, user.email);
+    socket.connect(BASE, user.email, user?.name, "industry");
 
     const handleNewNotification = (data: any) => {
-      const newNote = {
-        _id: data?._id || `rt-${Date.now()}`,
-        icon: "notifications",
-        color: THEME.teal,
-        bg: THEME.tealLight,
-        title: data?.title || "New Notification",
-        body: data?.message || "",
-        time: "Just now",
-        read: false,
-      };
-      setNotes((prev) => [newNote, ...prev]);
+      const note = mapNote({ ...data, isRead: false, createdAt: data?.createdAt || new Date().toISOString() });
+      setNotes((prev) => {
+        if (note._id && prev.some((p) => p._id === note._id)) return prev;
+        return [note, ...prev];
+      });
     };
 
     socket.on("newNotification", handleNewNotification);
@@ -302,6 +368,7 @@ function DashboardScreen() {
     const refreshAll = () => {
       loadProfile();
       loadData();
+      loadNotifications();
       AsyncStorage.getItem("industryLogo").then((cached: string | null) => {
         if (cached) setLogo?.(cached);
       }).catch(() => {});
@@ -355,7 +422,19 @@ function DashboardScreen() {
   return (
     <View style={{ flex:1, backgroundColor:THEME.bg }}>
       <StatusBar barStyle="light-content" backgroundColor={THEME.headerBg} />
-      <NotificationPanel visible={notifOpen} onClose={() => setNotifOpen(false)} notes={notes} setNotes={setNotes} />
+      <NotificationPanel
+        visible={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        notes={notes}
+        onMarkAllRead={markAllRead}
+        onMarkOneRead={markOneRead}
+        onOpenNote={(n) => {
+          const mouId = n?.meta?.mouId;
+          if (!mouId) return;
+          setNotifOpen(false);
+          try { nav.navigate("MouDetail", { mouId }); } catch {}
+        }}
+      />
 
       {/* ── Top Navigation Bar ── */}
       <View style={d.header}>

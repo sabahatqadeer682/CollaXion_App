@@ -47,6 +47,24 @@ const logSchema = new mongoose.Schema({
   field: String, oldValue: String, newValue: String,
 }, { _id: false });
 
+const pdfSchema = new mongoose.Schema({
+  url:      { type: String, default: "" },          // https URL or data: URI
+  name:     { type: String, default: "MOU.pdf" },
+  mimeType: { type: String, default: "application/pdf" },
+  sentBy:   { type: String, default: "" },          // e.g. "Industry Liaison Incharge"
+  sentAt:   { type: String, default: null },
+  size:     { type: Number, default: 0 },
+}, { _id: false });
+
+// Digital signature: either a drawn image (dataUrl) or a typed cursive (text).
+const signatureSchema = new mongoose.Schema({
+  mode:     { type: String, default: "type" },     // "draw" | "type"
+  dataUrl:  { type: String, default: "" },          // base64 image when drawn
+  text:     { type: String, default: "" },          // typed signature text
+  signedBy: { type: String, default: "" },          // printed name
+  signedAt: { type: String, default: null },
+}, { _id: false });
+
 const mouSchema = new mongoose.Schema({
   title:             { type: String, required: true },
   university:        { type: String, required: true },
@@ -76,8 +94,8 @@ const mouSchema = new mongoose.Schema({
 
   status: {
     type: String, default: "Draft",
-    enum: ["Draft","Sent to Industry","Changes Proposed","Approved by Industry",
-           "Approved by University","Mutually Approved","Rejected"],
+    enum: ["Draft","Sent to Industry","Changes Proposed","Industry Responded",
+           "Approved by Industry","Approved by University","Mutually Approved","Rejected"],
   },
 
   sentAt:              { type: String, default: null },
@@ -87,6 +105,10 @@ const mouSchema = new mongoose.Schema({
   industryStamp:       { type: stampSchema, default: null },
   scheduledMeeting:    { type: meetingSchema, default: null },
   changeLog:           { type: [logSchema], default: [] },
+  pdf:                 { type: pdfSchema, default: null },
+  universitySignature: { type: signatureSchema, default: null },
+  industrySignature:   { type: signatureSchema, default: null },
+  pdfHtml:             { type: String, default: "" },   // optional cached HTML
 
   universityLogo: { type: String, default: "" },
   industryLogo:   { type: String, default: "" },

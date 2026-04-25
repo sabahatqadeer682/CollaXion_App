@@ -23,6 +23,7 @@ import chatRoutes from "./student/routes/chat.routes.js";
 import Message from "./student/models/Message.js";
 import industryApplicationRoutes from "./industry/routes/Industryapplicationroutes.js";
 import industryAuthRoutes from "./industry/routes/industryAuthRoutes.js";
+import industryNotificationRoutes from "./industry/routes/IndustryNotificationRoutes.js";
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -37,6 +38,13 @@ const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 
 // email -> Set of open WebSocket connections
 const clients = new Map();
+// industry name (lowercased) -> Set of { ws, email }
+const industryClients = new Map();
+// Every industry-side WS connection (regardless of name/email) — used for
+// "fan out to ALL industry users" broadcasts.
+const industryAllClients = new Set(); // entries: { ws, email, industry }
+
+const normIndustry = (s) => (s || "").trim().toLowerCase();
 
 const broadcast = (email, payload) => {
     const targets = clients.get(email);
@@ -47,16 +55,73 @@ const broadcast = (email, payload) => {
     });
 };
 
-// Make broadcast available to REST route handlers
+// Find any connected industry user that matches the given industry NAME.
+// Returns the first matching email (so we can persist a notification keyed
+// by email even when the liaison didn't fill industryContact.email).
+const findEmailByIndustry = (industryName) => {
+    const set = industryClients.get(normIndustry(industryName));
+    if (!set || set.size === 0) return "";
+    for (const entry of set) return entry.email; // first match
+    return "";
+};
+
+// Broadcast to all WS connections registered under the industry NAME.
+const broadcastToIndustry = (industryName, payload) => {
+    const set = industryClients.get(normIndustry(industryName));
+    if (!set) return 0;
+    const msg = JSON.stringify(payload);
+    let n = 0;
+    set.forEach(({ ws }) => {
+        if (ws.readyState === 1) { ws.send(msg); n++; }
+    });
+    return n;
+};
+
+// Fan out to EVERY connected industry-side client.
+const broadcastToAllIndustry = (payload) => {
+    const msg = JSON.stringify(payload);
+    let n = 0;
+    industryAllClients.forEach(({ ws }) => {
+        if (ws.readyState === 1) { ws.send(msg); n++; }
+    });
+    return n;
+};
+
+// All currently-connected industry emails (deduped, non-empty).
+const listIndustryEmails = () => {
+    const set = new Set();
+    industryAllClients.forEach(({ email }) => { if (email) set.add(email); });
+    return [...set];
+};
+
+// Make broadcast helpers available to REST route handlers
 app.locals.broadcast = broadcast;
+app.locals.broadcastToIndustry = broadcastToIndustry;
+app.locals.broadcastToAllIndustry = broadcastToAllIndustry;
+app.locals.findEmailByIndustry = findEmailByIndustry;
+app.locals.listIndustryEmails = listIndustryEmails;
 
 wss.on("connection", (ws, req) => {
     const url = new URL(req.url, "http://localhost");
     const email = url.searchParams.get("email") || "";
-    console.log("WS connected:", email);
+    const industry = url.searchParams.get("industry") || "";
+    const role = url.searchParams.get("role") || "";
+    console.log("WS connected:", email, industry ? `(${industry})` : "", role ? `[${role}]` : "");
 
     if (!clients.has(email)) clients.set(email, new Set());
     clients.get(email).add(ws);
+
+    if (industry) {
+        const key = normIndustry(industry);
+        if (!industryClients.has(key)) industryClients.set(key, new Set());
+        industryClients.get(key).add({ ws, email });
+    }
+
+    // Treat any connection that identifies as industry (via role or
+    // industry param) as belonging to the global industry channel.
+    const isIndustrySide = role === "industry" || !!industry;
+    const allEntry = { ws, email, industry };
+    if (isIndustrySide) industryAllClients.add(allEntry);
 
     ws.on("message", async (raw) => {
         try {
@@ -98,6 +163,17 @@ wss.on("connection", (ws, req) => {
             set.delete(ws);
             if (set.size === 0) clients.delete(email);
         }
+        if (industry) {
+            const key = normIndustry(industry);
+            const iset = industryClients.get(key);
+            if (iset) {
+                for (const entry of iset) {
+                    if (entry.ws === ws) { iset.delete(entry); break; }
+                }
+                if (iset.size === 0) industryClients.delete(key);
+            }
+        }
+        if (isIndustrySide) industryAllClients.delete(allEntry);
         console.log("WS disconnected:", email);
     });
 
@@ -115,7 +191,10 @@ app.use("/uploads/profile", express.static("uploads/profile"));
 app.use("/uploads/cv", express.static("uploads/cv"));
 
 app.use("/api/industry/auth", industryAuthRoutes);   // must be before /api/industry/*
+app.use("/api/industry/notifications", industryNotificationRoutes);
 app.use("/api/industry/mous", mouRoutes);
+// Alias for the web admin (Industry Liaison Incharge) which posts to /api/mous
+app.use("/api/mous", mouRoutes);
 app.use("/api/industries", industryRoutes);
 app.use("/api/industry/posts", postRoutes);
 app.use("/api/industry/events", eventRoutes);
