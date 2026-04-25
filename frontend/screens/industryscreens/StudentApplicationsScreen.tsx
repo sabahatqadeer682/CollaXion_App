@@ -95,7 +95,8 @@ const initials = (name = "") =>
 
 const resolveImgUri = (path?: string) => {
   if (!path) return null;
-  return path.startsWith("http") ? path : `${CONSTANT.API_BASE_URL}${path}`;
+  if (path.startsWith("http") || path.startsWith("data:")) return path;
+  return `${CONSTANT.API_BASE_URL}${path}`;
 };
 
 // ─── Status / Type configs ────────────────────────────────────────────────────
