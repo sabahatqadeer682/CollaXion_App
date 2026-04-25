@@ -645,8 +645,6 @@
 //   actionTxt:  { fontSize: 13, fontWeight: "700", color: "#64748B" },
 //   actionDivider: { width: 1, backgroundColor: "#F1F5F9", marginVertical: 8 },
 // });
-
-
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -713,7 +711,7 @@ export function EditPostScreen({ route }: { route: any }) {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.5, aspect: [16, 9],
-      base64: true,                       // native base64 — reliable on RN
+      base64: true,
     });
     if (!res.canceled) {
       const a = res.assets[0];
@@ -738,7 +736,7 @@ export function EditPostScreen({ route }: { route: any }) {
       await ax().put(`/api/industry/posts/${post._id}`, {
         title, description: desc, stipend, duration,
         seats, deadline, location, mode, skills,
-        poster,                          // already a data URI from the picker
+        poster,
       }, { headers });
       Alert.alert("Saved! ✅", "Post update ho gayi.", [
         { text: "OK", onPress: () => nav.goBack() }
@@ -911,7 +909,7 @@ export function EditPostScreen({ route }: { route: any }) {
   );
 }
 
-// MY POSTS SCREEN — sections: Internship / Project / Workshop / Events ─
+// MY POSTS SCREEN
 export function MyPostsScreen() {
   const nav          = useNavigation<any>();
   const { user, ax } = useUser();
@@ -938,8 +936,9 @@ export function MyPostsScreen() {
     finally { setLoading(false); setRefreshing(false); }
   }, [user]);
 
+  // ── FIX 3: Reliable focus listener — no optional chaining, proper cleanup
   useEffect(() => {
-    const unsubscribe = (nav as any).addListener?.("focus", () => fetchPosts());
+    const unsubscribe = nav.addListener("focus", () => fetchPosts());
     return unsubscribe;
   }, [nav, fetchPosts]);
 
@@ -966,7 +965,6 @@ export function MyPostsScreen() {
     } catch { Alert.alert("Error", "Toggle nahi ho saka."); }
   };
 
-  // ── group posts by type — events become their own section ──
   const sections: { type:"Internship"|"Project"|"Workshop"|"Events"; icon:any; data:any[] }[] = [
     { type:"Internship", icon:"briefcase-outline",       data: posts.filter(p => p.type==="Internship") },
     { type:"Project",    icon:"flask-outline",           data: posts.filter(p => p.type==="Project")    },
@@ -976,7 +974,6 @@ export function MyPostsScreen() {
 
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#193648" /></View>;
 
-  // Renders an Event card (Seminar / Job Fair / Workshop / Tech Talk / Hackathon / Networking)
   const renderEventCard = (ev: any) => {
     const tc = TYPE_CONFIG.Events;
     const validBanner =
@@ -984,7 +981,6 @@ export function MyPostsScreen() {
       (ev.banner.startsWith("data:") || /^https?:\/\//i.test(ev.banner));
     return (
       <View key={ev._id} style={s.card}>
-        {/* Banner */}
         {validBanner ? (
           <Image key={ev.banner.slice(0,32)} source={{ uri: ev.banner }} style={s.banner} resizeMode="cover" />
         ) : (
@@ -1049,7 +1045,6 @@ export function MyPostsScreen() {
     );
   };
 
-  // Renders one post card — used by every section
   const renderCard = (post: any) => {
     const tc = TYPE_CONFIG[post.type] || TYPE_CONFIG.Internship;
     return (
@@ -1144,7 +1139,6 @@ export function MyPostsScreen() {
 
   return (
     <View style={{ flex:1, backgroundColor:"#F0F4F8" }}>
-      {/* ── Header — solid navy matching dashboard ── */}
       <View style={s.header}>
         <View style={s.headerTopRow}>
           <TouchableOpacity onPress={() => nav.goBack()} style={s.backBtn}>
@@ -1160,7 +1154,6 @@ export function MyPostsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Filter chips — All / Internship / Project / Workshop */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -1211,7 +1204,6 @@ export function MyPostsScreen() {
             const ctaScreen = isEvents ? "EventCreation" : "PostOpportunity";
             return (
               <View key={sec.type} style={{ marginBottom:24 }}>
-                {/* Section header */}
                 <View style={s.secHead}>
                   <View style={[s.secIcon, { backgroundColor: tc.bg }]}>
                     <Ionicons name={sec.icon} size={18} color={tc.text} />
@@ -1225,7 +1217,6 @@ export function MyPostsScreen() {
                   <View style={s.secAccent} />
                 </View>
 
-                {/* Section body */}
                 {sec.data.length===0 ? (
                   <TouchableOpacity style={s.secEmpty} onPress={() => nav.navigate(ctaScreen)}>
                     <View style={[s.secEmptyIcon, { backgroundColor: tc.bg }]}>
@@ -1298,7 +1289,6 @@ const es = StyleSheet.create({
 const s = StyleSheet.create({
   center:{ flex:1, justifyContent:"center", alignItems:"center", backgroundColor:"#F0F4F8" },
 
-  // ── Header — matches industry dashboard ──
   header:{
     paddingTop:Platform.OS==="ios"?56:42,
     paddingHorizontal:18, paddingBottom:18,
@@ -1312,7 +1302,6 @@ const s = StyleSheet.create({
   newBtn:{ flexDirection:"row", alignItems:"center", gap:5, backgroundColor:"rgba(255,255,255,0.18)", paddingHorizontal:14, paddingVertical:8, borderRadius:20 },
   newBtnTxt:{ fontSize:13, fontWeight:"700", color:"#fff" },
 
-  // ── Filter chips ──
   filterChip:{
     flexDirection:"row", alignItems:"center", gap:6,
     paddingHorizontal:14, paddingVertical:7, borderRadius:20,
@@ -1327,7 +1316,6 @@ const s = StyleSheet.create({
   filterBadgeTxt:{ fontSize:10, fontWeight:"900", color:"#fff" },
   filterBadgeTxtActive:{ color:"#fff" },
 
-  // ── Section header ──
   secHead:{ flexDirection:"row", alignItems:"center", marginBottom:12, marginTop:4, gap:10 },
   secIcon:{ width:34, height:34, borderRadius:10, justifyContent:"center", alignItems:"center" },
   secTitle:{ fontSize:16, fontWeight:"800", color:"#0D1B2A" },
@@ -1335,7 +1323,6 @@ const s = StyleSheet.create({
   secCountTxt:{ fontSize:11, fontWeight:"800", color:"#193648" },
   secAccent:{ flex:1, height:1, backgroundColor:"#E3ECF0", marginLeft:6 },
 
-  // ── Section empty state ──
   secEmpty:{
     flexDirection:"row", alignItems:"center", gap:12,
     backgroundColor:"#FFFFFF",
@@ -1346,7 +1333,6 @@ const s = StyleSheet.create({
   secEmptyTxt:{ fontSize:13, fontWeight:"800", color:"#0D1B2A" },
   secEmptySub:{ fontSize:11, color:"#5B7080", marginTop:2 },
 
-  // ── Global empty state ──
   empty:{ alignItems:"center", paddingTop:80 },
   emptyIcon:{ width:72, height:72, borderRadius:36, backgroundColor:"#EEF3F7", justifyContent:"center", alignItems:"center", marginBottom:16 },
   emptyTitle:{ fontSize:18, fontWeight:"800", color:"#0D1B2A" },
@@ -1354,7 +1340,6 @@ const s = StyleSheet.create({
   emptyBtn:{ marginTop:20, flexDirection:"row", alignItems:"center", gap:6, backgroundColor:"#193648", paddingHorizontal:20, paddingVertical:12, borderRadius:20 },
   emptyBtnTxt:{ fontSize:14, fontWeight:"700", color:"#fff" },
 
-  // ── Card ──
   card:{ backgroundColor:"#fff", borderRadius:20, marginBottom:14, overflow:"hidden", elevation:3, shadowColor:"#000", shadowOpacity:0.06, shadowRadius:10, borderWidth:1, borderColor:"#E3ECF0" },
   cardInactive:{ opacity:0.65 },
   inactiveBanner:{ flexDirection:"row", alignItems:"center", gap:6, backgroundColor:"#F0F4F8", paddingHorizontal:14, paddingVertical:8 },

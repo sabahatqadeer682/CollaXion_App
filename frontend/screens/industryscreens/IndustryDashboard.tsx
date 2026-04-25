@@ -222,8 +222,6 @@ function NotificationPanel({
 function DashboardScreen() {
   const nav = useNavigation<any>();
   const { user, refreshUser, ax, logo, setLogo } = useUser();
-  // Independent of context — listens directly to the LOGO_EVENT bus and
-  // re-reads AsyncStorage. Survives any Drawer/Stack propagation lag.
   const liveLogo = useIndustryLogo();
   const [counts, setCounts] = useState({ mous:0, posts:0, events:0, pending:0 });
   const [recentMous, setRecentMous] = useState<any[]>([]);
@@ -235,8 +233,6 @@ function DashboardScreen() {
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
-  // ── Profile (logo, name, email) is fetched centrally by UserProvider.
-  // Use the shared refresher so every screen reading useUser() updates together.
   const loadProfile = async () => { await refreshUser?.(); };
 
   const loadData = async () => {
@@ -251,31 +247,30 @@ function DashboardScreen() {
       const mous      = m.data || [];
       const allPosts  = postsRes.data || [];
       const allEvents = Array.isArray(eventsRes.data) ? eventsRes.data : (eventsRes.data?.events || []);
-      // Sirf published events count mein — hidden / drafts skip
       const liveEvents = allEvents.filter((e:any) => e.status === "published");
       const pending    = mous.filter((x:any)=>
         ["Sent to Industry Laison Incharge","Changes Proposed"].includes(x.status)
       ).length;
       setCounts({
         mous:    mous.length,
-        // Posts = sab kuch jo aap ne create kiya: Internship + Project + Workshop + Events
         posts:   allPosts.length + liveEvents.length,
         events:  liveEvents.length,
         pending,
       });
       setRecentMous(mous.slice(0,3));
-      setPosts(allPosts);
+      // ── FIX 1: Sort newest first so freshly-posted items appear at top immediately
+      const sorted = [...allPosts].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setPosts(sorted);
     } catch(e:any) {
       console.log("loadData error:", e?.response?.status, e?.response?.data);
     }
   };
 
-  // ── Real-time WebSocket connection (keyed by industry email) ──
+  // ── Real-time WebSocket connection ──
   useEffect(() => {
     if (!user?.email) return;
-
-    // Force a fresh connection so a stale singleton (e.g. from a previous
-    // student session) doesn't block the industry email from registering.
     try { socket.disconnect(); } catch {}
     socket.connect(BASE, user.email);
 
@@ -297,27 +292,29 @@ function DashboardScreen() {
     return () => { socket.off("newNotification", handleNewNotification); };
   }, [user?.email]);
 
+  // ── FIX 2: Reliable focus listener — refetches on every navigation return
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim,  { toValue:1, duration:700, useNativeDriver:true }),
       Animated.timing(slideAnim, { toValue:0, duration:600, useNativeDriver:true }),
     ]).start();
-    loadProfile();
-    loadData();
-    // Pull cached logo too (covers the case where context lags)
-    AsyncStorage.getItem("industryLogo").then((cached: string | null) => {
-      if (cached) setLogo?.(cached);
-    }).catch(() => {});
-    // Re-fetch when the dashboard regains focus (e.g. user just saved profile / event)
-    const unsub = (nav as any).addListener?.("focus", () => {
+
+    const refreshAll = () => {
       loadProfile();
       loadData();
       AsyncStorage.getItem("industryLogo").then((cached: string | null) => {
         if (cached) setLogo?.(cached);
       }).catch(() => {});
-    });
-    return unsub;
-  }, []);
+    };
+
+    // Initial load
+    refreshAll();
+
+    // Fires every time you return to dashboard — via drawer tap, back button, anything
+    const unsubFocus = nav.addListener("focus", refreshAll);
+
+    return () => { unsubFocus(); };
+  }, [nav]);
 
   const onRefresh = async () => { setRefreshing(true); await Promise.all([loadProfile(), loadData()]); setRefreshing(false); };
   const initials  = (n:string) => n?.split(" ").map((w:string)=>w[0]).slice(0,2).join("").toUpperCase()||"CX";
@@ -332,7 +329,6 @@ function DashboardScreen() {
     if(h<1) return "Just now"; if(h<24) return `${h}h ago`; return `${Math.floor(h/24)}d ago`;
   };
 
-  // ── Quick actions: 4 (matches student layout) ──
   const QUICK_ACTIONS = [
     { icon:"search",    label:"Browse Opportunities",  desc:"Find & post internships",   screen:"PostOpportunity" },
     { icon:"sparkles",  label:"AI Recommend",          desc:"Personalized suggestions",  screen:"AIRecommend" },
@@ -340,7 +336,6 @@ function DashboardScreen() {
     { icon:"calendar",  label:"Events",                desc:"Job fairs & seminars",      screen:"EventCreation" },
   ];
 
-  // ── More features list (matches student style) ──
   const MORE_FEATURES = [
     { icon:"mail-unread-outline",     title:"Invitations",     desc:"University requests",  screen:"Invitations" },
     { icon:"document-text-outline",   title:"MOU Management",  desc:"Manage agreements",     screen:"MoUs" },
@@ -362,7 +357,7 @@ function DashboardScreen() {
       <StatusBar barStyle="light-content" backgroundColor={THEME.headerBg} />
       <NotificationPanel visible={notifOpen} onClose={() => setNotifOpen(false)} notes={notes} setNotes={setNotes} />
 
-      {/* ── Top Navigation Bar — logo + menu (left) → bell + avatar (right) ── */}
+      {/* ── Top Navigation Bar ── */}
       <View style={d.header}>
         <View style={d.logoBox}>
           <Image
@@ -403,7 +398,7 @@ function DashboardScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.teal}/>}>
         <Animated.View style={{opacity:fadeAnim, transform:[{translateY:slideAnim}]}}>
 
-          {/* ── Hero — same dark navy treatment as student ── */}
+          {/* ── Hero ── */}
           <View style={d.heroSection}>
             <View style={d.heroTopRow}>
               <View style={d.heroContent}>
@@ -420,7 +415,6 @@ function DashboardScreen() {
               </View>
             </View>
 
-            {/* ── Stat strip (matches student layout) ── */}
             <View style={d.heroStatsRow}>
               {[
                 { n:counts.mous,    lbl:"MOUs",    screen:"MoUs"         },
@@ -442,7 +436,7 @@ function DashboardScreen() {
             </View>
           </View>
 
-          {/* ── Pending MOU alert (when applicable) ── */}
+          {/* ── Pending MOU alert ── */}
           {counts.pending>0 && (
             <TouchableOpacity onPress={()=>nav.navigate("MoUs")} style={d.alertBanner} activeOpacity={0.85}>
               <View style={d.alertLeft}>
@@ -617,7 +611,7 @@ function DashboardScreen() {
             )}
           </View>
 
-          {/* ── AI Badge (matches student bottom card) ── */}
+          {/* ── AI Badge ── */}
           <TouchableOpacity style={d.aiBadge} onPress={()=>nav.navigate("AIChatbot")} activeOpacity={0.85}>
             <Image source={require("../../assets/images/logo.png")} style={d.aiBadgeLogo}/>
             <View style={{ flex:1 }}>
@@ -639,7 +633,7 @@ function DashboardScreen() {
   );
 }
 
-// ─── CUSTOM DRAWER (exact mirror of student drawer) ──
+// ─── CUSTOM DRAWER ──
 function CustomDrawer(props: DrawerContentComponentProps) {
   const { user, refreshUser, logo, setLogo } = useUser();
   const liveLogo = useIndustryLogo();
@@ -654,15 +648,12 @@ function CustomDrawer(props: DrawerContentComponentProps) {
       Animated.timing(fadeAnim,  { toValue:1, duration:300, useNativeDriver:true }),
       Animated.spring(slideAnim, { toValue:0, tension:90, friction:11, useNativeDriver:true }),
     ]).start();
-    // Pull the latest profile + cached logo every time the drawer mounts.
     refreshUser?.();
     AsyncStorage.getItem("industryLogo").then((cached: string | null) => {
       if (cached) setLogo?.(cached);
     }).catch(() => {});
   }, []);
 
-  // Subscribe: every time the drawer opens, re-read AsyncStorage so an
-  // edit made in ProfileScreen propagates here even if context lags.
   useEffect(() => {
     const unsub = (drawerNav as any).addListener?.("drawerOpen", () => {
       AsyncStorage.getItem("industryLogo").then((cached: string | null) => {
@@ -671,7 +662,6 @@ function CustomDrawer(props: DrawerContentComponentProps) {
       refreshUser?.();
     });
     return unsub;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLogout = () => {
@@ -702,7 +692,6 @@ function CustomDrawer(props: DrawerContentComponentProps) {
       contentContainerStyle={dr.scrollContent}>
       <StatusBar backgroundColor="#111D26" barStyle="light-content"/>
 
-      {/* ── Dark profile top section ── */}
       <Animated.View
         style={[dr.profileCard, { opacity:fadeAnim, transform:[{translateY:slideAnim}] }]}>
         <TouchableOpacity
@@ -733,10 +722,8 @@ function CustomDrawer(props: DrawerContentComponentProps) {
         </View>
       </Animated.View>
 
-      {/* ── Divider between dark and white ── */}
       <View style={dr.sep}/>
 
-      {/* ── White section (drawer items rendered by DrawerItemList) ── */}
       <View style={dr.whiteSection}>
         <Animated.View style={{ opacity:fadeAnim }}>
           <DrawerItemList {...props}/>
@@ -766,7 +753,6 @@ function CustomDrawer(props: DrawerContentComponentProps) {
 // ─── DRAWER NAVIGATOR ────────────────────────────────────────────
 const Drawer = createDrawerNavigator();
 
-// Active colour helper — exact mirror of student's `ac()` function
 const ac = (color: string) => ({
   drawerActiveTintColor: color,
   drawerActiveBackgroundColor: color + "18",
@@ -903,9 +889,8 @@ const nS = StyleSheet.create({
   cardTime:  { fontSize:11, color:THEME.textMute, marginTop:4, fontWeight:"500" },
 });
 
-// ─── DASHBOARD STYLES — mirrored from student dashboard ──────────
+// ─── DASHBOARD STYLES ──────────────────────────────────────────
 const d = StyleSheet.create({
-  // ── Header (dark navy, menu → logo → … → bell + avatar) ──
   header: {
     flexDirection:"row",
     alignItems:"center",
@@ -948,7 +933,6 @@ const d = StyleSheet.create({
   },
   avatarImg: { width:"100%", height:"100%" },
 
-  // ── Hero (mirrors student) ──
   heroSection: {
     backgroundColor: THEME.headerBg,
     paddingHorizontal: SCREEN_WIDTH * 0.05,
@@ -987,7 +971,6 @@ const d = StyleSheet.create({
   heroStatLbl:     { color:"rgba(255,255,255,0.5)", fontSize:10, marginTop:2 },
   heroStatDivider: { width:1, backgroundColor:"rgba(255,255,255,0.1)", height:"70%", alignSelf:"center" },
 
-  // ── Alert Banner ──
   alertBanner: {
     marginHorizontal:16, marginBottom:20,
     backgroundColor:"#fff", borderRadius:16,
@@ -1001,14 +984,12 @@ const d = StyleSheet.create({
   alertTitle:   { fontSize:14, fontWeight:"700", color:THEME.headerBg },
   alertSub:     { fontSize:11, color:"#6B7280", marginTop:2 },
 
-  // ── Section / Headers ──
   section:        { marginHorizontal:16, marginBottom:25 },
   sectionHeader:  { flexDirection:"row", alignItems:"center", marginBottom:15 },
   sectionTitle:   { fontSize:16, fontWeight:"800", color:"#111827", marginRight:10 },
   sectionAccent:  { flex:1, height:1, backgroundColor:"#E5E7EB" },
   seeAll:         { fontSize:13, color:THEME.headerBg, fontWeight:"700", marginLeft:10 },
 
-  // ── Quick Actions Grid (white cards, light bg icon, arrow top-right) ──
   actionsGrid: { flexDirection:"row", flexWrap:"wrap", justifyContent:"space-between" },
   actionCard:  {
     width: (SCREEN_WIDTH - 44) / 2,
@@ -1024,7 +1005,6 @@ const d = StyleSheet.create({
   actionArrow:  { position:"absolute", top:15, right:15, width:22, height:22, borderRadius:6,
                   backgroundColor:THEME.iconBg, justifyContent:"center", alignItems:"center" },
 
-  // ── Feature Rows (list with icon → text → chevron) ──
   featureRow: {
     flexDirection:"row", alignItems:"center",
     backgroundColor:"#fff", borderRadius:16,
@@ -1036,7 +1016,6 @@ const d = StyleSheet.create({
   featureTitle:  { fontSize:14, fontWeight:"700", color:"#111827" },
   featureDesc:   { fontSize:11, color:"#6B7280", marginTop:2 },
 
-  // ── MOU cards ──
   mouCard: {
     marginBottom:10,
     backgroundColor: THEME.card, borderRadius:16,
@@ -1049,7 +1028,6 @@ const d = StyleSheet.create({
   mouSub:    { fontSize:12, color:THEME.textSec, marginTop:2 },
   mouDate:   { fontSize:11, color:THEME.textMute, marginTop:3 },
 
-  // ── Empty state ──
   emptyCard: {
     backgroundColor:THEME.card, borderRadius:20, padding:32,
     alignItems:"center", borderWidth:2, borderColor:THEME.border, borderStyle:"dashed",
@@ -1058,7 +1036,6 @@ const d = StyleSheet.create({
   emptyTxt:  { fontSize:15, fontWeight:"700", color:THEME.textPri },
   emptySub:  { fontSize:12, color:THEME.textMute, marginTop:4 },
 
-  // ── Post cards ──
   postCard: {
     marginBottom:14,
     backgroundColor:THEME.card, borderRadius:20, overflow:"hidden",
@@ -1094,7 +1071,6 @@ const d = StyleSheet.create({
                   paddingHorizontal:12, paddingVertical:7, borderRadius:20 },
   viewAppsTxt:  { fontSize:12, color:THEME.headerBg, fontWeight:"700" },
 
-  // ── AI Badge ──
   aiBadge: {
     flexDirection:"row", alignItems:"center",
     backgroundColor:THEME.headerBg,
@@ -1106,7 +1082,7 @@ const d = StyleSheet.create({
   aiSubText:   { color:"rgba(255,255,255,0.55)", fontSize:11, marginTop:2 },
 });
 
-// ─── DRAWER STYLES — mirrors student drawer (dark profile + white items) ──
+// ─── DRAWER STYLES ──────────────────────────────────────────────
 const STATUS_H = Platform.OS === "android" ? (StatusBar.currentHeight ?? 24) : 44;
 const isSmallScreen = height < 680;
 const AVATAR = isSmallScreen ? 64 : 76;
@@ -1114,7 +1090,6 @@ const AVATAR = isSmallScreen ? 64 : 76;
 const dr = StyleSheet.create({
   scrollContent: { flexGrow:1, backgroundColor:"#193648", paddingBottom:0 },
 
-  // ── Dark profile section ──
   profileCard: {
     alignItems:"center",
     paddingTop: STATUS_H + (isSmallScreen ? 12 : 20),
@@ -1150,7 +1125,6 @@ const dr = StyleSheet.create({
 
   sep: { height:1, backgroundColor:"#193648", marginHorizontal:0, marginVertical:0 },
 
-  // ── White section ──
   whiteSection: {
     flex:1, backgroundColor:"#ffffff",
     paddingTop:8, paddingBottom:12,

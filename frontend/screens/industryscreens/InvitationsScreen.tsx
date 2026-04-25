@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert, Animated, Dimensions, FlatList, Modal,
@@ -11,15 +10,12 @@ import { useUser } from "./shared";
 
 const { width, height } = Dimensions.get("window");
 
-// ─── COLOR THEME — matches CollaXion industry dashboard ──────────
+// ─── COLOR THEME — solid navy, no gradients ───────────────────────
 const THEME = {
-  headerDark:   "#193648",
-  headerMid:    "#1A3045",
-  headerLight:  "#2A5068",
+  navy:         "#193648",   // primary solid navy (from screenshot)
+  navyMid:      "#1F3F55",   // slightly lighter for stat cards inside header
   bg:           "#F0F4F8",
   cardBg:       "#FFFFFF",
-  primary:      "#193648",
-  primaryLight: "#2A5068",
   textDark:     "#0D1B2A",
   textMid:      "#5B7080",
   textLight:    "#9BB0BC",
@@ -132,17 +128,17 @@ const MOCK_INVITATIONS: Invitation[] = [
   },
 ];
 
-const TYPE_CONFIG: Record<InviteType, { color: string; bg: string; icon: string; grad: readonly [string, string] }> = {
-  MOU:           { color: THEME.primary, bg: THEME.iconBg, icon: "document-text", grad: [THEME.headerDark, THEME.headerLight] },
-  Event:         { color: "#C26B12",     bg: "#FDF3E7",   icon: "calendar",      grad: ["#E67E22", "#C26B12"] },
-  Collaboration: { color: "#5B3A8E",     bg: "#F0E8F8",   icon: "people",        grad: ["#7C3AED", "#5B21B6"] },
-  Workshop:      { color: "#2A5068",     bg: "#E8EEF3",   icon: "school",        grad: [THEME.primaryLight, THEME.headerDark] },
+const TYPE_CONFIG: Record<InviteType, { color: string; bg: string; icon: string }> = {
+  MOU:           { color: THEME.navy,  bg: THEME.iconBg, icon: "document-text" },
+  Event:         { color: "#C26B12",   bg: "#FDF3E7",    icon: "calendar"      },
+  Collaboration: { color: "#5B3A8E",   bg: "#F0E8F8",    icon: "people"        },
+  Workshop:      { color: "#1F3F55",   bg: "#E8EEF3",    icon: "school"        },
 };
 
 const STATUS_CONFIG: Record<InviteStatus, { color: string; bg: string; icon: string }> = {
-  Pending:  { color: THEME.primary,  bg: "#E8EEF3", icon: "time-outline"     },
-  Accepted: { color: "#059669",      bg: "#D1FAE5", icon: "checkmark-circle" },
-  Declined: { color: "#DC2626",      bg: "#FEE2E2", icon: "close-circle"     },
+  Pending:  { color: THEME.navy, bg: "#E8EEF3", icon: "time-outline"     },
+  Accepted: { color: "#059669",  bg: "#D1FAE5", icon: "checkmark-circle" },
+  Declined: { color: "#DC2626",  bg: "#FEE2E2", icon: "close-circle"     },
 };
 
 function timeAgo(iso: string) {
@@ -176,26 +172,27 @@ function InvitationDetailModal({
       <TouchableOpacity style={ms.backdrop} activeOpacity={1} onPress={onClose} />
       <Animated.View style={[ms.sheet, { transform: [{ translateY: slideAnim }] }]}>
         <View style={ms.dragHandle} />
-        <LinearGradient colors={tc.grad} style={ms.sheetHeader} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-          <View style={ms.sheetHeaderDecor} />
+
+        {/* ── Sheet Header — solid navy ── */}
+        <View style={ms.sheetHeader}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <View style={ms.sheetTypeIcon}>
-              <Ionicons name={tc.icon as any} size={22} color="#fff" />
+            <View style={[ms.sheetTypeIcon, { backgroundColor: tc.bg }]}>
+              <Ionicons name={tc.icon as any} size={22} color={tc.color} />
             </View>
             <View>
-              <View style={ms.sheetTypeBadge}>
-                <Text style={ms.sheetTypeBadgeTxt}>{invite.type}</Text>
+              <View style={[ms.sheetTypeBadge, { backgroundColor: tc.bg }]}>
+                <Text style={[ms.sheetTypeBadgeTxt, { color: tc.color }]}>{invite.type}</Text>
               </View>
               <Text style={ms.sheetTimeAgo}>{timeAgo(invite.receivedAt)}</Text>
             </View>
             <View style={{ flex: 1 }} />
             <TouchableOpacity style={ms.closeBtn} onPress={onClose}>
-              <Ionicons name="close" size={18} color="#fff" />
+              <Ionicons name="close" size={18} color="rgba(255,255,255,0.8)" />
             </TouchableOpacity>
           </View>
           <Text style={ms.sheetTitle}>{invite.title}</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
-            <Ionicons name="business-outline" size={13} color="rgba(255,255,255,0.7)" />
+            <Ionicons name="business-outline" size={13} color="rgba(255,255,255,0.6)" />
             <Text style={ms.sheetFromName}>{invite.fromName}</Text>
             <Text style={ms.sheetFromRole}>· {invite.fromRole}</Text>
           </View>
@@ -203,7 +200,7 @@ function InvitationDetailModal({
             <Ionicons name={sc.icon as any} size={12} color={sc.color} />
             <Text style={[ms.statusPillTxt, { color: sc.color }]}>{invite.status}</Text>
           </View>
-        </LinearGradient>
+        </View>
 
         <ScrollView style={ms.sheetBody} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
           {(invite.fromEmail || invite.fromPhone) && (
@@ -333,11 +330,9 @@ function InvitationDetailModal({
                 <Ionicons name="close-circle-outline" size={17} color="#DC2626" />
                 <Text style={ms.declineTxt}>Decline</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={ms.acceptBtnWrap} onPress={() => { onClose(); setTimeout(() => onAccept(invite._id), 300); }}>
-                <LinearGradient colors={tc.grad} style={ms.acceptBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                  <Ionicons name="checkmark-circle-outline" size={17} color="#fff" />
-                  <Text style={ms.acceptTxt}>Accept Invitation</Text>
-                </LinearGradient>
+              <TouchableOpacity style={ms.acceptBtn} onPress={() => { onClose(); setTimeout(() => onAccept(invite._id), 300); }}>
+                <Ionicons name="checkmark-circle-outline" size={17} color="#fff" />
+                <Text style={ms.acceptTxt}>Accept Invitation</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -407,7 +402,8 @@ export function InvitationsScreen() {
     return (
       <Animated.View style={{ opacity: fadeAnim }}>
         <TouchableOpacity style={s.card} onPress={() => openDetail(item)} activeOpacity={0.88}>
-          <LinearGradient colors={tc.grad} style={s.cardStripe} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
+          {/* Top stripe — solid type color */}
+          <View style={[s.cardStripe, { backgroundColor: tc.color }]} />
           <View style={s.cardBody}>
             <View style={s.cardHead}>
               <View style={[s.typeIconBox, { backgroundColor: tc.bg }]}>
@@ -475,11 +471,9 @@ export function InvitationsScreen() {
                   <Ionicons name="close-circle-outline" size={15} color="#DC2626" />
                   <Text style={s.declineBtnTxt}>Decline</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={s.acceptBtnWrap} onPress={() => handleAccept(item._id)}>
-                  <LinearGradient colors={tc.grad} style={s.acceptBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                    <Ionicons name="checkmark-circle-outline" size={15} color="#fff" />
-                    <Text style={s.acceptBtnTxt}>Accept</Text>
-                  </LinearGradient>
+                <TouchableOpacity style={s.acceptBtn} onPress={() => handleAccept(item._id)}>
+                  <Ionicons name="checkmark-circle-outline" size={15} color="#fff" />
+                  <Text style={s.acceptBtnTxt}>Accept</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -500,11 +494,10 @@ export function InvitationsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: THEME.bg }}>
-      <StatusBar barStyle="light-content" backgroundColor={THEME.headerDark} />
+      <StatusBar barStyle="light-content" backgroundColor={THEME.navy} />
 
-      <LinearGradient colors={[THEME.headerDark, THEME.headerMid, THEME.headerLight]} style={s.header}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-        <View style={s.headerDecor} />
+      {/* ── Header — solid navy, no gradient, no decorative circles ── */}
+      <View style={s.header}>
         <View style={s.headerRow}>
           <TouchableOpacity onPress={() => nav.goBack()} style={s.backBtn}>
             <Ionicons name="arrow-back" size={21} color="#fff" />
@@ -524,19 +517,20 @@ export function InvitationsScreen() {
 
         <View style={s.statsRow}>
           {[
-            { lbl: "Total",    n: invites.length,                                   c: "#A8C8E8" },
-            { lbl: "Pending",  n: invites.filter((i) => i.status === "Pending").length,   c: "#BCD4E8" },
-            { lbl: "Accepted", n: invites.filter((i) => i.status === "Accepted").length,  c: "#A5D6A7" },
-            { lbl: "Declined", n: invites.filter((i) => i.status === "Declined").length,  c: "#EF9A9A" },
-          ].map((s2, i) => (
+            { lbl: "Total",    n: invites.length,                                          textColor: "#fff"     },
+            { lbl: "Pending",  n: invites.filter((i) => i.status === "Pending").length,    textColor: "#FFD166"  },
+            { lbl: "Accepted", n: invites.filter((i) => i.status === "Accepted").length,   textColor: "#6EE7B7"  },
+            { lbl: "Declined", n: invites.filter((i) => i.status === "Declined").length,   textColor: "#FCA5A5"  },
+          ].map((st, i) => (
             <View key={i} style={s.statCard}>
-              <Text style={[s.statN, { color: s2.c }]}>{s2.n}</Text>
-              <Text style={s.statLbl}>{s2.lbl}</Text>
+              <Text style={[s.statN, { color: st.textColor }]}>{st.n}</Text>
+              <Text style={s.statLbl}>{st.lbl}</Text>
             </View>
           ))}
         </View>
-      </LinearGradient>
+      </View>
 
+      {/* ── Type filter chips ── */}
       <View style={s.filterBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}>
           {(["All", "MOU", "Event", "Collaboration", "Workshop"] as const).map((f) => (
@@ -550,6 +544,7 @@ export function InvitationsScreen() {
         </ScrollView>
       </View>
 
+      {/* ── Status filter tabs ── */}
       <View style={s.statusFilterRow}>
         {(["All", "Pending", "Accepted", "Declined"] as const).map((sf) => (
           <TouchableOpacity key={sf} style={[s.statusTab, statusF === sf && s.statusTabActive]} onPress={() => setStatusF(sf)}>
@@ -571,7 +566,7 @@ export function InvitationsScreen() {
           data={filtered} keyExtractor={(item) => item._id} renderItem={renderCard}
           contentContainerStyle={{ padding: 16, paddingBottom: 50 }} showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.primary} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.navy} />}
         />
       )}
 
@@ -585,111 +580,134 @@ export function InvitationsScreen() {
 }
 
 const s = StyleSheet.create({
-  header:      { paddingTop: Platform.OS === "ios" ? 56 : 44, paddingHorizontal: 18, paddingBottom: 22, overflow: "hidden" },
-  headerDecor: { position: "absolute", width: 200, height: 200, borderRadius: 100, backgroundColor: "rgba(255,255,255,0.03)", top: -70, right: -60 },
+  // Header — solid navy
+  header:      { backgroundColor: THEME.navy, paddingTop: Platform.OS === "ios" ? 56 : 44, paddingHorizontal: 18, paddingBottom: 22 },
   headerRow:   { flexDirection: "row", alignItems: "center", marginBottom: 18 },
-  backBtn:     { width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.1)", justifyContent: "center", alignItems: "center" },
+  backBtn:     { width: 36, height: 36, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },
   headerTitle: { fontSize: 19, fontWeight: "900", color: "#fff" },
-  headerSub:   { fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 2 },
-  pendingBadge:    { backgroundColor: "#EF4444", paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20 },
-  pendingBadgeTxt: { fontSize: 12, fontWeight: "900", color: "#fff" },
+  headerSub:   { fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 2 },
+  pendingBadge:    { backgroundColor: "#FFD166", paddingHorizontal: 11, paddingVertical: 5, borderRadius: 6 },
+  pendingBadgeTxt: { fontSize: 12, fontWeight: "900", color: THEME.navy },
+
+  // Stats inside header
   statsRow: { flexDirection: "row", gap: 8 },
-  statCard: { flex: 1, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 13, paddingVertical: 11, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)" },
+  statCard: { flex: 1, backgroundColor: THEME.navyMid, borderRadius: 10, paddingVertical: 11, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
   statN:    { fontSize: 18, fontWeight: "900" },
-  statLbl:  { fontSize: 9, color: "rgba(255,255,255,0.45)", marginTop: 2, fontWeight: "600" },
-  filterBar:        { backgroundColor: "#fff", paddingVertical: 10, borderBottomWidth: 1, borderColor: THEME.border },
-  filterChip:       { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#EBF0F5", borderWidth: 1.5, borderColor: THEME.border },
-  filterChipActive: { backgroundColor: THEME.primary, borderColor: THEME.primary },
-  filterChipTxt:    { fontSize: 12, fontWeight: "600", color: THEME.textMid },
+  statLbl:  { fontSize: 9, color: "rgba(255,255,255,0.4)", marginTop: 2, fontWeight: "600" },
+
+  // Filters
+  filterBar:           { backgroundColor: "#fff", paddingVertical: 10, borderBottomWidth: 1, borderColor: THEME.border },
+  filterChip:          { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 6, backgroundColor: "#EBF0F5", borderWidth: 1.5, borderColor: THEME.border },
+  filterChipActive:    { backgroundColor: THEME.navy, borderColor: THEME.navy },
+  filterChipTxt:       { fontSize: 12, fontWeight: "600", color: THEME.textMid },
   filterChipTxtActive: { color: "#fff", fontWeight: "700" },
+
   statusFilterRow: { flexDirection: "row", backgroundColor: "#fff", paddingHorizontal: 14, paddingBottom: 10, gap: 8, borderBottomWidth: 1, borderColor: THEME.border },
-  statusTab:       { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 10, backgroundColor: "#F5F8FB" },
-  statusTabActive: { backgroundColor: THEME.primary },
+  statusTab:       { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 6, backgroundColor: "#F5F8FB" },
+  statusTabActive: { backgroundColor: THEME.navy },
   statusTabTxt:    { fontSize: 12, fontWeight: "600", color: THEME.textMid },
   statusTabTxtActive: { color: "#fff", fontWeight: "700" },
-  card:        { backgroundColor: "#fff", borderRadius: 18, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+
+  // Card
+  card:        { backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", shadowColor: "#193648", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   cardStripe:  { height: 4, width: "100%" },
   cardBody:    { padding: 16 },
   cardHead:    { flexDirection: "row", alignItems: "flex-start", marginBottom: 12 },
-  typeIconBox: { width: 44, height: 44, borderRadius: 13, justifyContent: "center", alignItems: "center" },
-  typeBadge:   { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
+  typeIconBox: { width: 44, height: 44, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  typeBadge:   { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6 },
   typeBadgeTxt:{ fontSize: 11, fontWeight: "700" },
   timeAgoTxt:  { fontSize: 11, color: THEME.textLight, fontWeight: "500" },
-  statusBadgePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20, alignSelf: "flex-start", marginTop: 5 },
+  statusBadgePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, alignSelf: "flex-start", marginTop: 5 },
   statusBadgeTxt:  { fontSize: 11, fontWeight: "700" },
+
   cardTitle:   { fontSize: 16, fontWeight: "800", color: THEME.textDark, marginBottom: 6 },
   fromRow:     { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 10 },
   fromTxt:     { fontSize: 12, fontWeight: "700", color: THEME.textMid },
   fromRole:    { fontSize: 12, color: THEME.textLight },
   cardDesc:    { fontSize: 13, color: THEME.textMid, lineHeight: 20 },
-  detailRow:   { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
-  detailChip:  { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F5F8FB", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: THEME.border, maxWidth: (width - 80) / 2 },
+
+  detailRow:     { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+  detailChip:    { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F5F8FB", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: THEME.border, maxWidth: (width - 80) / 2 },
   detailChipTxt: { fontSize: 11, fontWeight: "600" },
-  tagChip:     { backgroundColor: "#EBF0F5", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginRight: 7 },
-  tagChipTxt:  { fontSize: 11, fontWeight: "600", color: THEME.textMid },
+
+  tagChip:    { backgroundColor: "#EBF0F5", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, marginRight: 7 },
+  tagChipTxt: { fontSize: 11, fontWeight: "600", color: THEME.textMid },
+
   cardFooterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12 },
   deadlineRow:   { flexDirection: "row", alignItems: "center", gap: 5 },
   deadlineTxt:   { fontSize: 12, fontWeight: "700", color: "#DC2626" },
   tapDetailTxt:  { fontSize: 11, fontWeight: "600", color: THEME.textLight },
-  actionRow:     { flexDirection: "row", gap: 10, marginTop: 14 },
-  declineBtn:    { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 11, backgroundColor: "#FEE2E2", borderRadius: 13, borderWidth: 1.5, borderColor: "#FECACA" },
-  declineBtnTxt: { fontSize: 13, fontWeight: "700", color: "#DC2626" },
-  acceptBtnWrap: { flex: 1, borderRadius: 13, overflow: "hidden" },
-  acceptBtn:     { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 11 },
-  acceptBtnTxt:  { fontSize: 13, fontWeight: "700", color: "#fff" },
-  resolvedRow:   { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 12, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12 },
-  resolvedTxt:   { fontSize: 12, fontWeight: "700" },
+
+  actionRow:    { flexDirection: "row", gap: 10, marginTop: 14 },
+  declineBtn:   { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 11, backgroundColor: "#FEE2E2", borderRadius: 8, borderWidth: 1.5, borderColor: "#FECACA" },
+  declineBtnTxt:{ fontSize: 13, fontWeight: "700", color: "#DC2626" },
+  acceptBtn:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 11, backgroundColor: THEME.navy, borderRadius: 8 },
+  acceptBtnTxt: { fontSize: 13, fontWeight: "700", color: "#fff" },
+
+  resolvedRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 12, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8 },
+  resolvedTxt: { fontSize: 12, fontWeight: "700" },
+
   empty:     { flex: 1, justifyContent: "center", alignItems: "center", paddingBottom: 80 },
-  emptyIcon: { width: 76, height: 76, borderRadius: 38, backgroundColor: "#EBF0F5", justifyContent: "center", alignItems: "center", marginBottom: 14 },
+  emptyIcon: { width: 76, height: 76, borderRadius: 12, backgroundColor: "#EBF0F5", justifyContent: "center", alignItems: "center", marginBottom: 14 },
   emptyTxt:  { fontSize: 15, fontWeight: "700", color: THEME.textDark },
   emptySub:  { fontSize: 13, color: THEME.textLight, marginTop: 4 },
 });
 
 const ms = StyleSheet.create({
   backdrop:   { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)" },
-  sheet:      { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: height * 0.92, overflow: "hidden" },
+  sheet:      { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: height * 0.92, overflow: "hidden" },
   dragHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#D0DCE8", alignSelf: "center", marginTop: 12, marginBottom: 4 },
-  sheetHeader:     { padding: 20, paddingBottom: 24, overflow: "hidden" },
-  sheetHeaderDecor:{ position: "absolute", width: 200, height: 200, borderRadius: 100, backgroundColor: "rgba(255,255,255,0.06)", top: -80, right: -60 },
-  sheetTypeIcon:   { width: 46, height: 46, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.18)", justifyContent: "center", alignItems: "center" },
-  sheetTypeBadge:  { backgroundColor: "rgba(255,255,255,0.25)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  sheetTypeBadgeTxt: { fontSize: 11, fontWeight: "700", color: "#fff" },
-  sheetTimeAgo:    { fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 2 },
-  closeBtn:        { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.18)", justifyContent: "center", alignItems: "center" },
+
+  // Sheet header — solid navy
+  sheetHeader:     { backgroundColor: THEME.navy, padding: 20, paddingBottom: 24 },
+  sheetTypeIcon:   { width: 46, height: 46, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  sheetTypeBadge:  { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  sheetTypeBadgeTxt: { fontSize: 11, fontWeight: "700" },
+  sheetTimeAgo:    { fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 2 },
+  closeBtn:        { width: 34, height: 34, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },
   sheetTitle:      { fontSize: 20, fontWeight: "900", color: "#fff", lineHeight: 26 },
   sheetFromName:   { fontSize: 12, fontWeight: "700", color: "rgba(255,255,255,0.85)" },
-  sheetFromRole:   { fontSize: 12, color: "rgba(255,255,255,0.55)" },
-  statusPill:      { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, alignSelf: "flex-start", marginTop: 12 },
+  sheetFromRole:   { fontSize: 12, color: "rgba(255,255,255,0.5)" },
+  statusPill:      { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8, alignSelf: "flex-start", marginTop: 12 },
   statusPillTxt:   { fontSize: 12, fontWeight: "700" },
+
   sheetBody:    { flex: 1 },
   section:      { paddingHorizontal: 20, paddingTop: 20, marginBottom: 4 },
   sectionTitle: { fontSize: 13, fontWeight: "800", color: THEME.textDark, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
-  infoRow:    { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10, padding: 12, backgroundColor: "#F5F8FB", borderRadius: 12, borderWidth: 1, borderColor: THEME.border },
+
+  infoRow:    { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10, padding: 12, backgroundColor: "#F5F8FB", borderRadius: 10, borderWidth: 1, borderColor: THEME.border },
   infoIconBox:{ width: 32, height: 32, borderRadius: 8, justifyContent: "center", alignItems: "center" },
   infoTxt:    { fontSize: 13, color: THEME.textMid, fontWeight: "600" },
+
   detailGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  detailItem: { width: "46%", backgroundColor: "#F5F8FB", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: THEME.border, gap: 4 },
+  detailItem: { width: "46%", backgroundColor: "#F5F8FB", borderRadius: 10, padding: 12, borderWidth: 1, borderColor: THEME.border, gap: 4 },
   detailItemLbl: { fontSize: 10, fontWeight: "700", color: THEME.textLight, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 4 },
   detailItemVal: { fontSize: 13, fontWeight: "700", color: THEME.textDark },
+
   descTxt:    { fontSize: 14, color: THEME.textMid, lineHeight: 22 },
+
   bulletRow:  { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 10 },
   bulletDot:  { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
   bulletTxt:  { flex: 1, fontSize: 13, color: THEME.textMid, lineHeight: 20 },
+
   agendaRow:  { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 10 },
-  agendaNum:  { width: 26, height: 26, borderRadius: 8, justifyContent: "center", alignItems: "center" },
+  agendaNum:  { width: 26, height: 26, borderRadius: 6, justifyContent: "center", alignItems: "center" },
   agendaNumTxt: { fontSize: 12, fontWeight: "800" },
   agendaTxt:  { flex: 1, fontSize: 13, color: THEME.textMid, lineHeight: 20, paddingTop: 4 },
-  tag:     { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+
+  tag:     { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6 },
   tagTxt:  { fontSize: 12, fontWeight: "700" },
-  deadlineBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#FEF2F2", padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: "#FECACA" },
+
+  deadlineBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#FEF2F2", padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: "#FECACA" },
   deadlineLbl: { fontSize: 11, color: "#DC2626", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   deadlineVal: { fontSize: 15, fontWeight: "900", color: "#DC2626" },
-  footer:      { flexDirection: "row", gap: 10, paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1, borderColor: THEME.border, paddingBottom: Platform.OS === "ios" ? 32 : 16, backgroundColor: "#fff" },
-  declineBtn:  { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 20, paddingVertical: 14, backgroundColor: "#FEE2E2", borderRadius: 14, borderWidth: 1.5, borderColor: "#FECACA" },
-  declineTxt:  { fontSize: 14, fontWeight: "700", color: "#DC2626" },
-  acceptBtnWrap: { flex: 1, borderRadius: 14, overflow: "hidden" },
-  acceptBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14 },
-  acceptTxt:   { fontSize: 14, fontWeight: "800", color: "#fff" },
-  resolvedBanner:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14 },
+
+  footer:    { flexDirection: "row", gap: 10, paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1, borderColor: THEME.border, paddingBottom: Platform.OS === "ios" ? 32 : 16, backgroundColor: "#fff" },
+  declineBtn:{ flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 20, paddingVertical: 14, backgroundColor: "#FEE2E2", borderRadius: 10, borderWidth: 1.5, borderColor: "#FECACA" },
+  declineTxt:{ fontSize: 14, fontWeight: "700", color: "#DC2626" },
+  acceptBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, backgroundColor: THEME.navy, borderRadius: 10 },
+  acceptTxt: { fontSize: 14, fontWeight: "800", color: "#fff" },
+
+  resolvedBanner:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 10 },
   resolvedBannerTxt: { fontSize: 14, fontWeight: "700" },
 });

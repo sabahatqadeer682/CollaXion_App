@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { LinearGradient } from "expo-linear-gradient";
 import * as WebBrowser from "expo-web-browser";
 
 import { CONSTANT } from "@/constants/constant";
@@ -28,52 +27,51 @@ import {
 
 const { height } = Dimensions.get("window");
 
-
-const API      = `${CONSTANT.API_BASE_URL}/api/industry`;
+const API = `${CONSTANT.API_BASE_URL}/api/industry`;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type IndustryStatus = "pending" | "approved" | "rejected";
 
 interface ResolvedStudent {
   _id?: string;
-  name:         string;
-  email:        string;
-  department?:  string;
-  semester?:    string;
-  phone?:       string;
-  cgpa?:        string;
-  rollNumber?:  string;
-  cvUrl?:       string;
+  name: string;
+  email: string;
+  department?: string;
+  semester?: string;
+  phone?: string;
+  cgpa?: string;
+  rollNumber?: string;
+  cvUrl?: string;
   profileImage?: string;
 }
 
 interface ResolvedInternship {
-  _id?:           string;
-  title:          string;
-  company:        string;
-  type?:          string;
+  _id?: string;
+  title: string;
+  company: string;
+  type?: string;
   requiredSkills?: string[];
-  description?:   string;
-  deadline?:      string;
+  description?: string;
+  deadline?: string;
 }
 
 interface Application {
-  _id:            string;
-  studentId:      ResolvedStudent;
-  internshipId:   ResolvedInternship;
-  status:         string;
+  _id: string;
+  studentId: ResolvedStudent;
+  internshipId: ResolvedInternship;
+  status: string;
   industryStatus: IndustryStatus;
-  matchScore?:    number;
+  matchScore?: number;
   matchingSkills?: string[];
-  missingSkills?:  string[];
-  appliedAt?:     string;
-  createdAt?:     string;
-  updatedAt?:     string;
-  studentEmail?:  string;
-  cvSnapshot?:    string;
+  missingSkills?: string[];
+  appliedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  studentEmail?: string;
+  cvSnapshot?: string;
   internshipInchargeApproval?: { remarks?: string; approvedAt?: string };
-  industryLiaisonApproval?:    { remarks?: string };
-  industryApproval?:           { remarks?: string; approvedAt?: string };
+  industryLiaisonApproval?: { remarks?: string };
+  industryApproval?: { remarks?: string; approvedAt?: string };
 }
 
 interface Stats {
@@ -86,7 +84,7 @@ const fmt = (iso?: string) => {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
   if (diff === 0) return "Today";
   if (diff === 1) return "Yesterday";
-  if (diff < 7)   return `${diff} days ago`;
+  if (diff < 7) return `${diff} days ago`;
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 };
 
@@ -99,18 +97,25 @@ const resolveImgUri = (path?: string) => {
   return `${CONSTANT.API_BASE_URL}${path}`;
 };
 
+// ─── Color Palette (matching screenshot) ──────────────────────────────────────
+const NAVY = "#0D1B2A";        // primary dark navy
+const NAVY_MID = "#1B2A3B";   // slightly lighter navy for cards in header
+const WHITE = "#FFFFFF";
+const OFF_WHITE = "#F5F7FA";
+const BORDER = "#E8ECF0";
+
 // ─── Status / Type configs ────────────────────────────────────────────────────
 const SC: Record<IndustryStatus, { color: string; bg: string; icon: string; label: string }> = {
-  pending:  { color: "#D97706", bg: "#FEF3C7", icon: "time-outline",         label: "Pending Review"  },
-  approved: { color: "#059669", bg: "#D1FAE5", icon: "checkmark-circle",     label: "Approved"        },
-  rejected: { color: "#DC2626", bg: "#FEE2E2", icon: "close-circle-outline", label: "Rejected"        },
+  pending:  { color: "#B45309", bg: "#FEF3C7", icon: "time-outline",         label: "Pending Review" },
+  approved: { color: "#047857", bg: "#D1FAE5", icon: "checkmark-circle",     label: "Approved"       },
+  rejected: { color: "#B91C1C", bg: "#FEE2E2", icon: "close-circle-outline", label: "Rejected"       },
 };
 
-const TC: Record<string, { color: string; bg: string; grad: readonly [string, string] }> = {
-  Internship: { color: "#0066CC", bg: "#E8F4FF", grad: ["#0066CC", "#004999"] },
-  Project:    { color: "#6A1B9A", bg: "#F3E5F5", grad: ["#6A1B9A", "#4A148C"] },
-  Workshop:   { color: "#E65100", bg: "#FFF3E0", grad: ["#E65100", "#BF360C"] },
-  Research:   { color: "#0E7490", bg: "#ECFEFF", grad: ["#0E7490", "#155E75"] },
+const TC: Record<string, { color: string; bg: string }> = {
+  Internship: { color: "#0D1B2A", bg: "#E8ECF0" },
+  Project:    { color: "#5B21B6", bg: "#EDE9FE" },
+  Workshop:   { color: "#C2410C", bg: "#FFEDD5" },
+  Research:   { color: "#0E7490", bg: "#CFFAFE" },
 };
 const getTC = (type?: string) => TC[type ?? ""] ?? TC.Internship;
 
@@ -118,10 +123,10 @@ const getTC = (type?: string) => TC[type ?? ""] ?? TC.Internship;
 // Detail Modal (bottom sheet)
 // ─────────────────────────────────────────────────────────────────────────────
 interface DetailModalProps {
-  app:           Application | null;
-  onClose:       () => void;
-  onApprove:     (id: string, remarks: string) => void;
-  onReject:      (id: string, remarks: string) => void;
+  app: Application | null;
+  onClose: () => void;
+  onApprove: (id: string, remarks: string) => void;
+  onReject: (id: string, remarks: string) => void;
   actionLoading: boolean;
 }
 
@@ -131,18 +136,18 @@ function DetailModal({ app, onClose, onApprove, onReject, actionLoading }: Detai
 
   useEffect(() => {
     Animated.spring(slideAnim, {
-      toValue:       app ? 0 : height,
+      toValue: app ? 0 : height,
       useNativeDriver: true,
-      tension:       65,
-      friction:      11,
+      tension: 65,
+      friction: 11,
     }).start();
     if (!app) setRemarks("");
   }, [app]);
 
   if (!app) return null;
 
-  const sc  = SC[app.industryStatus] ?? SC.pending;
-  const tc  = getTC(app.internshipId?.type);
+  const sc = SC[app.industryStatus] ?? SC.pending;
+  const tc = getTC(app.internshipId?.type);
   const stu = app.studentId;
   const int = app.internshipId;
   const isPending = app.industryStatus === "pending";
@@ -164,7 +169,7 @@ function DetailModal({ app, onClose, onApprove, onReject, actionLoading }: Detai
       [
         { text: "Cancel", style: "cancel" },
         {
-          text:  isApprove ? "Accept & Email" : "Reject",
+          text: isApprove ? "Accept & Email" : "Reject",
           style: isApprove ? "default" : "destructive",
           onPress: () =>
             isApprove ? onApprove(app._id, remarks) : onReject(app._id, remarks),
@@ -183,9 +188,9 @@ function DetailModal({ app, onClose, onApprove, onReject, actionLoading }: Detai
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
             {/* ── Hero ── */}
-            <LinearGradient colors={["#050D1A", "#0A1628", "#0D2137"]} style={m.hero}>
+            <View style={m.hero}>
               <TouchableOpacity onPress={onClose} style={m.closeBtn}>
-                <Ionicons name="close" size={17} color="rgba(255,255,255,0.6)" />
+                <Ionicons name="close" size={17} color="rgba(255,255,255,0.7)" />
               </TouchableOpacity>
 
               <View style={m.heroAvatar}>
@@ -203,7 +208,7 @@ function DetailModal({ app, onClose, onApprove, onReject, actionLoading }: Detai
                 <Ionicons name={sc.icon as any} size={13} color={sc.color} />
                 <Text style={[m.statusBadgeTxt, { color: sc.color }]}>{sc.label}</Text>
               </View>
-            </LinearGradient>
+            </View>
 
             <View style={m.body}>
 
@@ -227,7 +232,7 @@ function DetailModal({ app, onClose, onApprove, onReject, actionLoading }: Detai
                     val: app.matchScore != null ? `${app.matchScore}%` : "—",
                     key: "Match",
                     color: app.matchScore != null
-                      ? (app.matchScore >= 70 ? "#059669" : "#D97706")
+                      ? (app.matchScore >= 70 ? "#047857" : "#B45309")
                       : undefined,
                   },
                   { val: fmt(app.appliedAt ?? app.createdAt), key: "Applied" },
@@ -263,9 +268,9 @@ function DetailModal({ app, onClose, onApprove, onReject, actionLoading }: Detai
                 <Text style={m.secTitle}>Student Contact</Text>
                 {(
                   [
-                    stu.email      && { icon: "mail-outline",   val: stu.email,                  link: `mailto:${stu.email}` },
-                    stu.phone      && { icon: "call-outline",   val: stu.phone,                  link: `tel:${stu.phone}` },
-                    stu.rollNumber && { icon: "id-card-outline",val: `Roll: ${stu.rollNumber}`,  link: null },
+                    stu.email      && { icon: "mail-outline",    val: stu.email,                 link: `mailto:${stu.email}` },
+                    stu.phone      && { icon: "call-outline",    val: stu.phone,                 link: `tel:${stu.phone}` },
+                    stu.rollNumber && { icon: "id-card-outline", val: `Roll: ${stu.rollNumber}`, link: null },
                   ] as any[]
                 ).filter(Boolean).map((c, i) => (
                   <TouchableOpacity
@@ -275,7 +280,7 @@ function DetailModal({ app, onClose, onApprove, onReject, actionLoading }: Detai
                     activeOpacity={c.link ? 0.7 : 1}
                   >
                     <View style={m.contactIcon}>
-                      <Ionicons name={c.icon} size={15} color="#0066CC" />
+                      <Ionicons name={c.icon} size={15} color={NAVY} />
                     </View>
                     <Text style={m.contactTxt} numberOfLines={1}>{c.val}</Text>
                     {c.link && <Ionicons name="open-outline" size={13} color="#94A3B8" />}
@@ -316,15 +321,14 @@ function DetailModal({ app, onClose, onApprove, onReject, actionLoading }: Detai
               {/* ── CV ── */}
               {(stu.cvUrl || app.cvSnapshot) && (
                 <TouchableOpacity style={m.cvBtn} onPress={openCV} activeOpacity={0.88}>
-                  <LinearGradient colors={["#DC2626", "#B91C1C"]} style={m.cvBtnGrad}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                    <Ionicons name="document-text" size={22} color="#fff" />
+                  <View style={m.cvBtnInner}>
+                    <Ionicons name="document-text" size={22} color={WHITE} />
                     <View style={{ flex: 1 }}>
                       <Text style={m.cvBtnTitle}>View CV / Resume</Text>
                       <Text style={m.cvBtnSub}>Opens PDF in browser</Text>
                     </View>
                     <Ionicons name="open-outline" size={17} color="rgba(255,255,255,0.7)" />
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               )}
 
@@ -346,7 +350,7 @@ function DetailModal({ app, onClose, onApprove, onReject, actionLoading }: Detai
 
                   {actionLoading ? (
                     <View style={{ alignItems: "center", padding: 24 }}>
-                      <ActivityIndicator size="large" color="#059669" />
+                      <ActivityIndicator size="large" color={NAVY} />
                       <Text style={{ color: "#64748B", marginTop: 8, fontSize: 13 }}>
                         Processing...
                       </Text>
@@ -354,18 +358,12 @@ function DetailModal({ app, onClose, onApprove, onReject, actionLoading }: Detai
                   ) : (
                     <View style={m.actionRow}>
                       <TouchableOpacity style={m.rejectBtn} onPress={() => confirm("reject")}>
-                        <Ionicons name="close-circle-outline" size={17} color="#DC2626" />
+                        <Ionicons name="close-circle-outline" size={17} color="#B91C1C" />
                         <Text style={m.rejectBtnTxt}>Reject</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={{ flex: 1 }} onPress={() => confirm("approve")}>
-                        <LinearGradient
-                          colors={["#059669", "#047857"]}
-                          style={m.approveBtn}
-                          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                        >
-                          <Ionicons name="checkmark-circle-outline" size={17} color="#fff" />
-                          <Text style={m.approveBtnTxt}>Accept & Email Student</Text>
-                        </LinearGradient>
+                      <TouchableOpacity style={m.approveBtn} onPress={() => confirm("approve")}>
+                        <Ionicons name="checkmark-circle-outline" size={17} color={WHITE} />
+                        <Text style={m.approveBtnTxt}>Accept & Email Student</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -425,10 +423,10 @@ export function StudentApplicationsScreen() {
   const handleApprove = async (appId: string, remarks: string) => {
     setActionLoading(true);
     try {
-      const res  = await fetch(`${API}/applications/${appId}/approve`, {
-        method:  "PATCH",
+      const res = await fetch(`${API}/applications/${appId}/approve`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ remarks }),
+        body: JSON.stringify({ remarks }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message ?? "Approval failed");
@@ -458,10 +456,10 @@ export function StudentApplicationsScreen() {
   const handleReject = async (appId: string, remarks: string) => {
     setActionLoading(true);
     try {
-      const res  = await fetch(`${API}/applications/${appId}/reject`, {
-        method:  "PATCH",
+      const res = await fetch(`${API}/applications/${appId}/reject`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ remarks }),
+        body: JSON.stringify({ remarks }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message ?? "Rejection failed");
@@ -484,8 +482,8 @@ export function StudentApplicationsScreen() {
 
   // ── Filtered list + available types ───────────────────────────────────────
   const filtered = applications.filter((a) => {
-    const statusOk = filter     === "All" || a.industryStatus === filter;
-    const typeOk   = typeFilter === "All" || a.internshipId?.type === typeFilter;
+    const statusOk = filter === "All" || a.industryStatus === filter;
+    const typeOk = typeFilter === "All" || a.internshipId?.type === typeFilter;
     return statusOk && typeOk;
   });
 
@@ -496,8 +494,8 @@ export function StudentApplicationsScreen() {
 
   // ── Card ───────────────────────────────────────────────────────────────────
   const renderCard = ({ item }: { item: Application }) => {
-    const sc  = SC[item.industryStatus] ?? SC.pending;
-    const tc  = getTC(item.internshipId?.type);
+    const sc = SC[item.industryStatus] ?? SC.pending;
+    const tc = getTC(item.internshipId?.type);
     const stu = item.studentId;
     const int = item.internshipId;
     const isPending = item.industryStatus === "pending";
@@ -505,7 +503,7 @@ export function StudentApplicationsScreen() {
     return (
       <Animated.View style={{ opacity: fadeAnim }}>
         <View style={s.card}>
-          <LinearGradient colors={tc.grad} style={s.cardStripe} />
+          <View style={[s.cardStripe, { backgroundColor: tc.color }]} />
 
           <View style={s.cardInner}>
             {/* Head */}
@@ -570,12 +568,12 @@ export function StudentApplicationsScreen() {
                       s.matchFill,
                       {
                         width: `${item.matchScore}%` as any,
-                        backgroundColor: item.matchScore >= 70 ? "#059669" : "#D97706",
+                        backgroundColor: item.matchScore >= 70 ? "#047857" : "#B45309",
                       },
                     ]}
                   />
                 </View>
-                <Text style={[s.matchPct, { color: item.matchScore >= 70 ? "#059669" : "#D97706" }]}>
+                <Text style={[s.matchPct, { color: item.matchScore >= 70 ? "#047857" : "#B45309" }]}>
                   {item.matchScore}%
                 </Text>
               </View>
@@ -589,7 +587,7 @@ export function StudentApplicationsScreen() {
               </View>
               <TouchableOpacity style={s.reviewBtn} onPress={() => setSelected(item)}>
                 <Text style={s.reviewBtnTxt}>Review</Text>
-                <Ionicons name="chevron-forward" size={12} color="#0066CC" />
+                <Ionicons name="chevron-forward" size={12} color={NAVY} />
               </TouchableOpacity>
             </View>
 
@@ -598,9 +596,9 @@ export function StudentApplicationsScreen() {
               <View style={s.inlineActions}>
                 <TouchableOpacity
                   style={s.inlineReject}
-                  onPress={() => setSelected(item)}   // open modal to add remarks before rejecting
+                  onPress={() => setSelected(item)}
                 >
-                  <Ionicons name="close-circle-outline" size={15} color="#DC2626" />
+                  <Ionicons name="close-circle-outline" size={15} color="#B91C1C" />
                   <Text style={s.inlineRejectTxt}>Reject</Text>
                 </TouchableOpacity>
 
@@ -617,14 +615,10 @@ export function StudentApplicationsScreen() {
                     )
                   }
                 >
-                  <LinearGradient
-                    colors={["#059669", "#047857"]}
-                    style={s.inlineApprove}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  >
-                    <Ionicons name="checkmark-circle-outline" size={15} color="#fff" />
+                  <View style={s.inlineApprove}>
+                    <Ionicons name="checkmark-circle-outline" size={15} color={WHITE} />
                     <Text style={s.inlineApproveTxt}>Accept</Text>
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               </View>
             )}
@@ -636,18 +630,14 @@ export function StudentApplicationsScreen() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <View style={{ flex: 1, backgroundColor: "#F0F4F8" }}>
-      <StatusBar barStyle="light-content" backgroundColor="#050D1A" />
+    <View style={{ flex: 1, backgroundColor: OFF_WHITE }}>
+      <StatusBar barStyle="light-content" backgroundColor={NAVY} />
 
       {/* ── Header ── */}
-      <LinearGradient
-        colors={["#050D1A", "#0A1628", "#0D2137"]}
-        style={s.header}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-      >
+      <View style={s.header}>
         <View style={s.headerRow}>
           <TouchableOpacity onPress={() => nav.goBack()} style={s.backBtn}>
-            <Ionicons name="arrow-back" size={21} color="#fff" />
+            <Ionicons name="arrow-back" size={21} color={WHITE} />
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 14 }}>
             <Text style={s.headerTitle}>Student Applications</Text>
@@ -664,18 +654,18 @@ export function StudentApplicationsScreen() {
 
         <View style={s.statsRow}>
           {[
-            { lbl: "Total",    n: stats.total,    c: "#90CAF9" },
-            { lbl: "Pending",  n: stats.pending,  c: "#FFE082" },
-            { lbl: "Accepted", n: stats.approved, c: "#A5D6A7" },
-            { lbl: "Rejected", n: stats.rejected, c: "#EF9A9A" },
+            { lbl: "Total",    n: stats.total,    textColor: WHITE },
+            { lbl: "Pending",  n: stats.pending,  textColor: "#FFD166" },
+            { lbl: "Accepted", n: stats.approved, textColor: "#6EE7B7" },
+            { lbl: "Rejected", n: stats.rejected, textColor: "#FCA5A5" },
           ].map((st, i) => (
             <View key={i} style={s.statCard}>
-              <Text style={[s.statN, { color: st.c }]}>{st.n}</Text>
+              <Text style={[s.statN, { color: st.textColor }]}>{st.n}</Text>
               <Text style={s.statLbl}>{st.lbl}</Text>
             </View>
           ))}
         </View>
-      </LinearGradient>
+      </View>
 
       {/* ── Status filter chips ── */}
       <View style={s.filterBar}>
@@ -683,7 +673,7 @@ export function StudentApplicationsScreen() {
           contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}>
           {(["All", "pending", "approved", "rejected"] as const).map((f) => {
             const label =
-              f === "All"      ? `All (${stats.total})`       :
+              f === "All"      ? `All (${stats.total})`        :
               f === "pending"  ? `Pending (${stats.pending})`  :
               f === "approved" ? `Accepted (${stats.approved})`:
               `Rejected (${stats.rejected})`;
@@ -720,7 +710,7 @@ export function StudentApplicationsScreen() {
       {/* ── Error banner ── */}
       {!!error && (
         <View style={s.errorBanner}>
-          <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
+          <Ionicons name="alert-circle-outline" size={16} color="#B91C1C" />
           <Text style={s.errorTxt} numberOfLines={2}>{error}</Text>
           <TouchableOpacity onPress={() => fetchApplications()}>
             <Text style={s.retryTxt}>Retry</Text>
@@ -731,7 +721,7 @@ export function StudentApplicationsScreen() {
       {/* ── Content ── */}
       {loading ? (
         <View style={s.centerLoader}>
-          <ActivityIndicator size="large" color="#0066CC" />
+          <ActivityIndicator size="large" color={NAVY} />
           <Text style={s.loadingTxt}>Fetching applications...</Text>
         </View>
       ) : filtered.length === 0 ? (
@@ -762,7 +752,7 @@ export function StudentApplicationsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => { setRefreshing(true); fetchApplications(true); }}
-              tintColor="#0066CC"
+              tintColor={NAVY}
             />
           }
         />
@@ -782,135 +772,146 @@ export function StudentApplicationsScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  // Header
-  header:      { paddingTop: Platform.OS === "ios" ? 56 : 44, paddingHorizontal: 18, paddingBottom: 22, overflow: "hidden" },
+  // Header — solid navy, no gradient
+  header:      { backgroundColor: "#193648", paddingTop: Platform.OS === "ios" ? 56 : 44, paddingHorizontal: 18, paddingBottom: 22 },
   headerRow:   { flexDirection: "row", alignItems: "center", marginBottom: 18 },
-  backBtn:     { width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.09)", justifyContent: "center", alignItems: "center" },
-  headerTitle: { fontSize: 19, fontWeight: "900", color: "#fff" },
+  backBtn:     { width: 36, height: 36, borderRadius: 8, backgroundColor: "rgba(255, 255, 255, 0.38)", justifyContent: "center", alignItems: "center" },
+  headerTitle: { fontSize: 19, fontWeight: "900", color: WHITE },
   headerSub:   { fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 2 },
-  newBadge:    { backgroundColor: "#D97706", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  newBadgeTxt: { fontSize: 11, fontWeight: "900", color: "#fff" },
+  newBadge:    { backgroundColor: "#FFD166", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
+  newBadgeTxt: { fontSize: 11, fontWeight: "900", color: NAVY },
 
-  // Stats
+  // Stats — flat cards inside navy header
   statsRow: { flexDirection: "row", gap: 8 },
-  statCard: { flex: 1, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 13, paddingVertical: 11, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)" },
+  statCard: { flex: 1, backgroundColor: "#69788159", borderRadius: 10, paddingVertical: 11, alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
   statN:    { fontSize: 18, fontWeight: "900" },
   statLbl:  { fontSize: 9, color: "rgba(255,255,255,0.4)", marginTop: 2, fontWeight: "600" },
 
   // Filters
-  filterBar:           { backgroundColor: "#fff", paddingVertical: 10, borderBottomWidth: 1, borderColor: "#F1F5F9" },
-  filterChip:          { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#F1F5F9", borderWidth: 1.5, borderColor: "#E2E8F0" },
-  filterChipActive:    { backgroundColor: "#0A1628", borderColor: "#0A1628" },
+  filterBar:           { backgroundColor: WHITE, paddingVertical: 10, borderBottomWidth: 1, borderColor: BORDER },
+  filterChip:          { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 6, backgroundColor: OFF_WHITE, borderWidth: 1.5, borderColor: BORDER },
+  filterChipActive:    { backgroundColor: "#193648", borderColor: "#193648" },
   filterChipTxt:       { fontSize: 12, fontWeight: "600", color: "#64748B" },
-  filterChipTxtActive: { color: "#fff", fontWeight: "700" },
+  filterChipTxtActive: { color: WHITE, fontWeight: "700" },
 
-  typeRow:          { flexDirection: "row", flexWrap: "wrap", backgroundColor: "#fff", paddingHorizontal: 14, paddingBottom: 10, gap: 8, borderBottomWidth: 1, borderColor: "#F1F5F9" },
-  typeTab:          { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 10, backgroundColor: "#F8FAFC" },
-  typeTabActive:    { backgroundColor: "#0A1628" },
+  typeRow:          { flexDirection: "row", flexWrap: "wrap", backgroundColor: WHITE, paddingHorizontal: 14, paddingBottom: 10, gap: 8, borderBottomWidth: 1, borderColor: BORDER },
+  typeTab:          { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 6, backgroundColor: OFF_WHITE },
+  typeTabActive:    { backgroundColor: "#193648" },
   typeTabTxt:       { fontSize: 12, fontWeight: "600", color: "#64748B" },
-  typeTabTxtActive: { color: "#fff", fontWeight: "700" },
+  typeTabTxtActive: { color: WHITE, fontWeight: "700" },
 
   // Error
   errorBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEE2E2", paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderColor: "#FECACA" },
-  errorTxt:    { flex: 1, fontSize: 13, color: "#DC2626" },
-  retryTxt:    { fontSize: 13, fontWeight: "700", color: "#DC2626", textDecorationLine: "underline" },
+  errorTxt:    { flex: 1, fontSize: 13, color: "#B91C1C" },
+  retryTxt:    { fontSize: 13, fontWeight: "700", color: "#B91C1C", textDecorationLine: "underline" },
 
   // Loading / empty
   centerLoader: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
   loadingTxt:   { fontSize: 14, color: "#64748B" },
   empty:        { flex: 1, justifyContent: "center", alignItems: "center", paddingBottom: 80 },
-  emptyIcon:    { width: 76, height: 76, borderRadius: 38, backgroundColor: "#F1F5F9", justifyContent: "center", alignItems: "center", marginBottom: 14 },
+  emptyIcon:    { width: 76, height: 76, borderRadius: 12, backgroundColor: "#EEF2F7", justifyContent: "center", alignItems: "center", marginBottom: 14 },
   emptyTxt:     { fontSize: 15, fontWeight: "700", color: "#334155" },
   emptySub:     { fontSize: 13, color: "#94A3B8", marginTop: 4, textAlign: "center", paddingHorizontal: 40 },
 
-  // Card
-  card:      { backgroundColor: "#fff", borderRadius: 18, overflow: "hidden", flexDirection: "row", shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
-  cardStripe:{ width: 5, alignSelf: "stretch" },
+  // Card — flat, no shadow drama, clean white
+  card:      { backgroundColor: WHITE, borderRadius: 14, overflow: "hidden", flexDirection: "row", shadowColor: "#0D1B2A", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  cardStripe:{ width: 4, alignSelf: "stretch" },
   cardInner: { flex: 1, padding: 14 },
   cardHead:  { flexDirection: "row", alignItems: "flex-start" },
-  avatar:    { width: 48, height: 48, borderRadius: 24, backgroundColor: "#0066CC", justifyContent: "center", alignItems: "center", overflow: "hidden", borderWidth: 2, borderColor: "#E8F4FF" },
-  avatarImg: { width: 48, height: 48, borderRadius: 24 },
-  avatarTxt: { fontSize: 16, fontWeight: "900", color: "#fff" },
-  studentName:  { fontSize: 14, fontWeight: "800", color: "#0A1628" },
+  avatar:    { width: 48, height: 48, borderRadius: 10, backgroundColor: NAVY, justifyContent: "center", alignItems: "center", overflow: "hidden" },
+  avatarImg: { width: 48, height: 48, borderRadius: 10 },
+  avatarTxt: { fontSize: 16, fontWeight: "900", color: WHITE },
+  studentName:  { fontSize: 14, fontWeight: "800", color: NAVY },
   studentSub:   { fontSize: 12, color: "#475569", marginTop: 2 },
   studentEmail: { fontSize: 11, color: "#94A3B8", marginTop: 1 },
-  statusPill:   { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  statusPill:   { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   statusPillTxt:{ fontSize: 10, fontWeight: "700" },
-  cgpa:         { fontSize: 11, fontWeight: "700", color: "#F59E0B" },
+  cgpa:         { fontSize: 11, fontWeight: "700", color: "#B45309" },
 
   oppRow:    { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 10 },
-  oppTag:    { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  oppTag:    { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
   oppTagTxt: { fontSize: 11, fontWeight: "700" },
-  oppTitle:  { fontSize: 13, fontWeight: "700", color: "#0F172A" },
+  oppTitle:  { fontSize: 13, fontWeight: "700", color: "#193648" },
   oppCompany:{ fontSize: 12, color: "#64748B", marginTop: 2 },
 
-  skillPill:    { backgroundColor: "#EFF6FF", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginRight: 6 },
-  skillPillTxt: { fontSize: 11, fontWeight: "600", color: "#1D4ED8" },
+  skillPill:    { backgroundColor: "#EEF2F7", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, marginRight: 6 },
+  skillPillTxt: { fontSize: 11, fontWeight: "600", color: NAVY },
 
   matchRow:  { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
   matchLabel:{ fontSize: 11, color: "#94A3B8", fontWeight: "600", width: 36 },
-  matchBar:  { flex: 1, height: 5, backgroundColor: "#F1F5F9", borderRadius: 99, overflow: "hidden" },
+  matchBar:  { flex: 1, height: 5, backgroundColor: "#EEF2F7", borderRadius: 99, overflow: "hidden" },
   matchFill: { height: "100%", borderRadius: 99 },
   matchPct:  { fontSize: 11, fontWeight: "700", width: 34, textAlign: "right" },
 
-  cardFoot:    { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderColor: "#F1F5F9" },
+  cardFoot:    { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderColor: BORDER },
   footTime:    { fontSize: 11, color: "#94A3B8" },
   reviewBtn:   { flexDirection: "row", alignItems: "center", gap: 2 },
-  reviewBtnTxt:{ fontSize: 12, fontWeight: "700", color: "#0066CC" },
+  reviewBtnTxt:{ fontSize: 12, fontWeight: "700", color: NAVY },
 
   inlineActions:    { flexDirection: "row", gap: 8, marginTop: 12 },
-  inlineReject:     { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#FEE2E2", borderRadius: 12, borderWidth: 1.5, borderColor: "#FECACA" },
-  inlineRejectTxt:  { fontSize: 12, fontWeight: "700", color: "#DC2626" },
-  inlineApproveWrap:{ flex: 1, borderRadius: 12, overflow: "hidden" },
-  inlineApprove:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 10 },
-  inlineApproveTxt: { fontSize: 12, fontWeight: "700", color: "#fff" },
+  inlineReject:     { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#FEE2E2", borderRadius: 8, borderWidth: 1.5, borderColor: "#FECACA" },
+  inlineRejectTxt:  { fontSize: 12, fontWeight: "700", color: "#B91C1C" },
+  inlineApproveWrap:{ flex: 1, borderRadius: 8, overflow: "hidden" },
+  inlineApprove:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 10, backgroundColor: "#193648", borderRadius: 8 },
+  inlineApproveTxt: { fontSize: 12, fontWeight: "700", color: WHITE },
 });
 
 const m = StyleSheet.create({
-  overlay:    { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
-  sheet:      { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: height * 0.93, overflow: "hidden" },
-  handle:     { width: 42, height: 4, borderRadius: 2, backgroundColor: "#E2E8F0", alignSelf: "center", marginTop: 12 },
-  hero:       { paddingTop: 22, paddingHorizontal: 22, paddingBottom: 26, alignItems: "center" },
-  closeBtn:   { position: "absolute", top: 14, right: 14, width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.1)", justifyContent: "center", alignItems: "center" },
-  heroAvatar: { width: 78, height: 78, borderRadius: 39, backgroundColor: "#0066CC", justifyContent: "center", alignItems: "center", overflow: "hidden", borderWidth: 3, borderColor: "rgba(255,255,255,0.22)", marginBottom: 12 },
-  heroAvatarImg: { width: 78, height: 78, borderRadius: 39 },
-  heroAvatarTxt: { fontSize: 25, fontWeight: "900", color: "#fff" },
-  heroName:   { fontSize: 19, fontWeight: "900", color: "#fff", textAlign: "center" },
-  heroDeg:    { fontSize: 13, color: "rgba(255,255,255,0.6)", marginTop: 4, textAlign: "center" },
-  statusBadge:    { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 13, paddingVertical: 6, borderRadius: 20, marginTop: 12 },
+  overlay: { flex: 1, backgroundColor: "#193648", justifyContent: "flex-end" },
+  sheet:   { backgroundColor: WHITE, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: height * 0.93, overflow: "hidden" },
+  handle:  { width: 40, height: 4, borderRadius: 2, backgroundColor: "#E2E8F0", alignSelf: "center", marginTop: 12 },
+
+  // Hero — solid navy, no gradient
+  hero:       { backgroundColor: "#193648", paddingTop: 22, paddingHorizontal: 22, paddingBottom: 26, alignItems: "center" },
+  closeBtn:   { position: "absolute", top: 14, right: 14, width: 30, height: 30, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },
+  heroAvatar: { width: 78, height: 78, borderRadius: 14, backgroundColor: NAVY_MID, justifyContent: "center", alignItems: "center", overflow: "hidden", borderWidth: 2, borderColor: "rgba(255,255,255,0.15)", marginBottom: 12 },
+  heroAvatarImg: { width: 78, height: 78, borderRadius: 14 },
+  heroAvatarTxt: { fontSize: 25, fontWeight: "900", color: WHITE },
+  heroName:   { fontSize: 19, fontWeight: "900", color: WHITE, textAlign: "center" },
+  heroDeg:    { fontSize: 13, color: "rgba(255,255,255,0.55)", marginTop: 4, textAlign: "center" },
+  statusBadge:    { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 13, paddingVertical: 6, borderRadius: 8, marginTop: 12 },
   statusBadgeTxt: { fontSize: 12, fontWeight: "700" },
+
   body:       { padding: 18 },
-  infoBox:    { borderRadius: 15, padding: 15, marginBottom: 16 },
+  infoBox:    { borderRadius: 12, padding: 15, marginBottom: 16 },
   infoLabel:  { fontSize: 11, fontWeight: "700", opacity: 0.7 },
   infoTitle:  { fontSize: 16, fontWeight: "800", marginTop: 3 },
   infoCompany:{ fontSize: 13, fontWeight: "600", marginTop: 2 },
-  typePill:   { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginTop: 7 },
+  typePill:   { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginTop: 7 },
   typePillTxt:{ fontSize: 11, fontWeight: "700" },
-  statsRow:   { flexDirection: "row", backgroundColor: "#F8FAFC", borderRadius: 15, marginBottom: 18, borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden" },
+
+  statsRow:   { flexDirection: "row", backgroundColor: OFF_WHITE, borderRadius: 12, marginBottom: 18, borderWidth: 1, borderColor: BORDER, overflow: "hidden" },
   statBox:    { flex: 1, padding: 15, alignItems: "center" },
-  statBoxBorder: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: "#E2E8F0" },
-  statVal:    { fontSize: 15, fontWeight: "900", color: "#0A1628" },
+  statBoxBorder: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: BORDER },
+  statVal:    { fontSize: 15, fontWeight: "900", color: NAVY },
   statKey:    { fontSize: 11, color: "#94A3B8", marginTop: 3, fontWeight: "600" },
+
   sec:        { marginBottom: 18 },
-  secTitle:   { fontSize: 13, fontWeight: "800", color: "#0A1628", marginBottom: 9 },
+  secTitle:   { fontSize: 13, fontWeight: "800", color: NAVY, marginBottom: 9 },
   skillsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  skillChip:      { backgroundColor: "#EFF6FF", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: "#BFDBFE" },
-  skillChipTxt:   { fontSize: 12, fontWeight: "700", color: "#1D4ED8" },
+  skillChip:      { backgroundColor: "#EEF2F7", borderRadius: 6, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: BORDER },
+  skillChipTxt:   { fontSize: 12, fontWeight: "700", color: NAVY },
   skillChipMatch: { backgroundColor: "#D1FAE5", borderColor: "#6EE7B7" },
   skillChipMatchTxt: { color: "#065F46" },
-  contactRow:  { flexDirection: "row", alignItems: "center", gap: 9, paddingVertical: 11, borderBottomWidth: 1, borderColor: "#F1F5F9" },
-  contactIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: "#EFF6FF", justifyContent: "center", alignItems: "center" },
+
+  contactRow:  { flexDirection: "row", alignItems: "center", gap: 9, paddingVertical: 11, borderBottomWidth: 1, borderColor: BORDER },
+  contactIcon: { width: 34, height: 34, borderRadius: 8, backgroundColor: "#EEF2F7", justifyContent: "center", alignItems: "center" },
   contactTxt:  { flex: 1, fontSize: 13, color: "#334155", fontWeight: "500" },
-  noteBox:     { backgroundColor: "#F0F4FF", borderRadius: 10, padding: 14, borderWidth: 1, borderColor: "#C7D2FE" },
-  noteBoxTxt:  { fontSize: 13, color: "#3730A3", lineHeight: 20 },
-  cvBtn:      { borderRadius: 15, overflow: "hidden", marginBottom: 18 },
-  cvBtnGrad:  { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 15, gap: 11 },
-  cvBtnTitle: { fontSize: 14, fontWeight: "800", color: "#fff" },
-  cvBtnSub:   { fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 2 },
-  remarksInput: { borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 12, padding: 12, fontSize: 14, color: "#0F172A", minHeight: 80, textAlignVertical: "top", backgroundColor: "#FAFBFC" },
+
+  noteBox:    { backgroundColor: "#F0F4FF", borderRadius: 10, padding: 14, borderWidth: 1, borderColor: "#C7D2FE" },
+  noteBoxTxt: { fontSize: 13, color: "#3730A3", lineHeight: 20 },
+
+  // CV button — solid navy
+  cvBtn:      { borderRadius: 12, overflow: "hidden", marginBottom: 18 },
+  cvBtnInner: { flexDirection: "row", alignItems: "center", backgroundColor: "#193648", paddingHorizontal: 16, paddingVertical: 15, gap: 11, borderRadius: 12 },
+  cvBtnTitle: { fontSize: 14, fontWeight: "800", color: WHITE },
+  cvBtnSub:   { fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 2 },
+
+  remarksInput: { borderWidth: 1.5, borderColor: BORDER, borderRadius: 10, padding: 12, fontSize: 14, color: "#0F172A", minHeight: 80, textAlignVertical: "top", backgroundColor: OFF_WHITE },
+
   actionRow:    { flexDirection: "row", gap: 10, marginBottom: 8 },
-  rejectBtn:    { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 18, paddingVertical: 14, backgroundColor: "#FEE2E2", borderRadius: 13, borderWidth: 1.5, borderColor: "#FECACA" },
-  rejectBtnTxt: { fontSize: 13, fontWeight: "700", color: "#DC2626" },
-  approveBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 13 },
-  approveBtnTxt:{ fontSize: 13, fontWeight: "700", color: "#fff" },
+  rejectBtn:    { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 18, paddingVertical: 14, backgroundColor: "#FEE2E2", borderRadius: 10, borderWidth: 1.5, borderColor: "#FECACA" },
+  rejectBtnTxt: { fontSize: 13, fontWeight: "700", color: "#B91C1C" },
+  approveBtn:   { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 10, backgroundColor: "#193648"},
+  approveBtnTxt:{ fontSize: 13, fontWeight: "700", color: WHITE },
 });

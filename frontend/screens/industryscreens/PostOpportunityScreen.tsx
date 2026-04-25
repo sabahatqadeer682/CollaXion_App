@@ -4,7 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert, Animated, Image, KeyboardAvoidingView, Platform,
+  Alert, Animated, Image, KeyboardAvoidingView, Modal, Platform,
   ScrollView, StatusBar, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
 } from "react-native";
@@ -42,6 +42,203 @@ const SKILL_SUGGESTIONS = [
   "C++", "Java", "Swift", "Kotlin", "DevOps", "Cloud Computing",
 ];
 
+const MONTH_NAMES = [
+  "Jan","Feb","Mar","Apr","May","Jun",
+  "Jul","Aug","Sep","Oct","Nov","Dec",
+];
+const DAY_NAMES = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+// ── Calendar Modal ─────────────────────────────────────────────────
+function CalendarModal({
+  visible,
+  onClose,
+  onConfirm,
+  initialDate,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: (date: Date) => void;
+  initialDate?: Date;
+}) {
+  const today = new Date();
+  const [viewYear, setViewYear]   = useState(initialDate?.getFullYear()  ?? today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initialDate?.getMonth()     ?? today.getMonth());
+  const [selected, setSelected]   = useState<Date | null>(initialDate ?? null);
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  };
+
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  const cells: (number | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const isSelected = (d: number) =>
+    selected !== null &&
+    selected.getFullYear() === viewYear &&
+    selected.getMonth()    === viewMonth &&
+    selected.getDate()     === d;
+
+  const isToday = (d: number) =>
+    today.getFullYear() === viewYear &&
+    today.getMonth()    === viewMonth &&
+    today.getDate()     === d;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={cal.overlay}>
+        <View style={cal.modal}>
+          {/* Title + close */}
+          <View style={cal.titleRow}>
+            <Text style={cal.title}>Select Event Date</Text>
+            <TouchableOpacity onPress={onClose} style={cal.closeBtn}>
+              <Ionicons name="close" size={20} color={T.sub} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Month nav */}
+          <View style={cal.navRow}>
+            <TouchableOpacity onPress={prevMonth} style={cal.navBtn}>
+              <Ionicons name="chevron-back" size={18} color={T.text} />
+            </TouchableOpacity>
+            <Text style={cal.monthLabel}>
+              {MONTH_NAMES[viewMonth]} {viewYear}
+            </Text>
+            <TouchableOpacity onPress={nextMonth} style={cal.navBtn}>
+              <Ionicons name="chevron-forward" size={18} color={T.text} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Day headers */}
+          <View style={cal.weekRow}>
+            {DAY_NAMES.map(d => (
+              <Text key={d} style={cal.dayName}>{d}</Text>
+            ))}
+          </View>
+
+          {/* Date grid */}
+          <View style={cal.grid}>
+            {cells.map((cell, idx) => {
+              if (cell === null) return <View key={`e-${idx}`} style={cal.cell} />;
+              const sel = isSelected(cell);
+              const tod = isToday(cell);
+              return (
+                <TouchableOpacity
+                  key={`d-${idx}`}
+                  style={cal.cell}
+                  onPress={() => setSelected(new Date(viewYear, viewMonth, cell))}
+                  activeOpacity={0.7}>
+                  <View style={[
+                    cal.dateBubble,
+                    sel && cal.dateBubbleSel,
+                    !sel && tod && cal.dateBubbleToday,
+                  ]}>
+                    <Text style={[
+                      cal.dateText,
+                      sel && cal.dateTextSel,
+                      !sel && tod && cal.dateTextToday,
+                    ]}>
+                      {cell}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Actions */}
+          <View style={cal.actions}>
+            <TouchableOpacity style={cal.cancelBtn} onPress={onClose}>
+              <Text style={cal.cancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={cal.okBtn}
+              onPress={() => { if (selected) onConfirm(selected); else onClose(); }}>
+              <Text style={cal.okTxt}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const cal = StyleSheet.create({
+  overlay: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center", alignItems: "center", paddingHorizontal: 20,
+  },
+  modal: {
+    width: "100%", backgroundColor: T.white,
+    borderRadius: 24, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24,
+  },
+  titleRow: {
+    flexDirection: "row", alignItems: "center",
+    justifyContent: "space-between", marginBottom: 18,
+  },
+  title: { fontSize: 17, fontWeight: "800", color: T.text },
+  closeBtn: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: T.iconBg,
+    justifyContent: "center", alignItems: "center",
+  },
+  navRow: {
+    flexDirection: "row", alignItems: "center",
+    justifyContent: "space-between", marginBottom: 16,
+  },
+  navBtn: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: T.iconBg,
+    justifyContent: "center", alignItems: "center",
+  },
+  monthLabel: { fontSize: 16, fontWeight: "800", color: T.text },
+  weekRow: { flexDirection: "row", marginBottom: 8 },
+  dayName: {
+    flex: 1, textAlign: "center",
+    fontSize: 12, fontWeight: "700", color: T.sub,
+  },
+  grid: { flexDirection: "row", flexWrap: "wrap" },
+  cell: {
+    width: `${100 / 7}%` as any,
+    aspectRatio: 1,
+    justifyContent: "center", alignItems: "center",
+    paddingVertical: 2,
+  },
+  dateBubble: {
+    width: 36, height: 36, borderRadius: 18,
+    justifyContent: "center", alignItems: "center",
+  },
+  dateBubbleSel:   { backgroundColor: T.navy },
+  dateBubbleToday: { borderWidth: 1.5, borderColor: T.navy },
+  dateText:      { fontSize: 14, color: T.text, fontWeight: "500" },
+  dateTextSel:   { color: T.white, fontWeight: "800" },
+  dateTextToday: { color: T.navy, fontWeight: "800" },
+  actions: { flexDirection: "row", gap: 10, marginTop: 20 },
+  cancelBtn: {
+    flex: 1, paddingVertical: 15, borderRadius: 14,
+    borderWidth: 1.5, borderColor: T.border,
+    justifyContent: "center", alignItems: "center",
+  },
+  cancelTxt: { fontSize: 14, fontWeight: "700", color: T.sub },
+  okBtn: {
+    flex: 1, paddingVertical: 15, borderRadius: 14,
+    backgroundColor: T.navy,
+    justifyContent: "center", alignItems: "center",
+  },
+  okTxt: { fontSize: 14, fontWeight: "800", color: T.white },
+});
+
+// ── Main Screen ────────────────────────────────────────────────────
 export function PostOpportunityScreen() {
   const nav = useNavigation<any>();
   const { user, ax } = useUser();
@@ -60,6 +257,10 @@ export function PostOpportunityScreen() {
   const [poster, setPoster]         = useState<string | null>(null);
   const [loading, setLoading]       = useState(false);
 
+  // ── Calendar state ──
+  const [calVisible, setCalVisible]     = useState(false);
+  const [deadlineDate, setDeadlineDate] = useState<Date | null>(null);
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
@@ -70,7 +271,7 @@ export function PostOpportunityScreen() {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.5, aspect: [16, 9],
-      base64: true,                       // native base64 — reliable on RN
+      base64: true,
     });
     if (!res.canceled) {
       const a = res.assets[0];
@@ -86,6 +287,15 @@ export function PostOpportunityScreen() {
 
   const removeSkill = (sk: string) => setSkills(skills.filter((s) => s !== sk));
 
+  const handleDeadlineConfirm = (date: Date) => {
+    setDeadlineDate(date);
+    const d = String(date.getDate()).padStart(2, "0");
+    const m = MONTH_NAMES[date.getMonth()];
+    const y = date.getFullYear();
+    setDeadline(`${d} ${m} ${y}`);
+    setCalVisible(false);
+  };
+
   const handlePost = async () => {
     if (!title.trim() || !description.trim()) {
       Alert.alert("Required", "Title aur description zaroori hain.");
@@ -100,7 +310,7 @@ export function PostOpportunityScreen() {
       const payload = {
         type, title: title.trim(), description: description.trim(),
         skills, stipend, duration, seats, deadline, location, mode,
-        poster,                          // already a data URI from the picker
+        poster,
       };
       const response = await ax().post("/api/industry/posts", payload);
       console.log("✅ Post created:", response.data?._id);
@@ -130,6 +340,14 @@ export function PostOpportunityScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
       <StatusBar barStyle="light-content" backgroundColor={T.header} />
+
+      {/* ── Calendar Modal ── */}
+      <CalendarModal
+        visible={calVisible}
+        onClose={() => setCalVisible(false)}
+        onConfirm={handleDeadlineConfirm}
+        initialDate={deadlineDate ?? undefined}
+      />
 
       {/* ── Header ── */}
       <View style={s.header}>
@@ -266,11 +484,19 @@ export function PostOpportunityScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.sectionLabel}>Deadline</Text>
-                <View style={s.inputBox}>
+                {/* ── Tappable — opens calendar modal ── */}
+                <TouchableOpacity
+                  style={s.inputBox}
+                  onPress={() => setCalVisible(true)}
+                  activeOpacity={0.8}>
                   <Ionicons name="calendar-outline" size={18} color={T.muted} />
-                  <TextInput style={s.input} placeholder="30 Jun 2026"
-                    placeholderTextColor={T.placeholder} value={deadline} onChangeText={setDeadline} />
-                </View>
+                  <Text style={[
+                    s.input,
+                    { paddingVertical: 13, color: deadline ? T.text : T.placeholder },
+                  ]}>
+                    {deadline || "30 Jun 2026"}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -508,21 +734,39 @@ const s = StyleSheet.create({
   tipBody:  { fontSize: 12, color: "#8A6A00", lineHeight: 17 },
 
   // ── Sticky publish bar ──
-  publishBar: {
-    position: "absolute", left: 0, right: 0, bottom: 0,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: Platform.OS === "ios" ? 30 : 14,
-    backgroundColor: T.card,
-    borderTopWidth: 1, borderTopColor: T.border,
-  },
-  publishBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
-    backgroundColor: T.navy,
-    paddingVertical: 16, borderRadius: 16,
-    shadowColor: T.navy, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25, shadowRadius: 10, elevation: 4,
-  },
-  publishBtnDisabled: { backgroundColor: T.muted, shadowOpacity: 0 },
-  publishBtnTxt: { fontSize: 15, fontWeight: "800", color: T.white },
+ publishBar: {
+  position: "absolute",
+  left: 0,
+  right: 0,
+  bottom: 25, // 👈 move it a bit up (adjust 10 → 20 if you want more space)
+  paddingHorizontal: 16,
+  paddingTop: 12,
+  paddingBottom: Platform.OS === "ios" ? 30 : 14,
+  backgroundColor: T.card,
+  borderTopWidth: 1,
+  borderTopColor: T.border,
+},
+publishBtn: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
+  backgroundColor: T.navy,
+  paddingVertical: 16,
+  borderRadius: 16,
+  shadowColor: T.navy,
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.25,
+  shadowRadius: 10,
+  elevation: 4,
+},
+publishBtnDisabled: {
+  backgroundColor: T.muted,
+  shadowOpacity: 0,
+},
+publishBtnTxt: {
+  fontSize: 15,
+  fontWeight: "800",
+  color: T.white,
+},
 });
