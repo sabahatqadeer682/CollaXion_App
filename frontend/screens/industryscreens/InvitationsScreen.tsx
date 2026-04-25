@@ -11,19 +11,20 @@ import { useUser } from "./shared";
 
 const { width, height } = Dimensions.get("window");
 
-// ─── COLOR THEME ──────────────────────────────────────────────────
+// ─── COLOR THEME — matches CollaXion industry dashboard ──────────
 const THEME = {
-  headerDark:   "#1B2F3E",
-  headerMid:    "#1E3448",
-  headerLight:  "#22384F",
-  bg:           "#F2F4F6",
+  headerDark:   "#193648",
+  headerMid:    "#1A3045",
+  headerLight:  "#2A5068",
+  bg:           "#F0F4F8",
   cardBg:       "#FFFFFF",
-  primary:      "#1B2F3E",
-  primaryLight: "#2A4560",
+  primary:      "#193648",
+  primaryLight: "#2A5068",
   textDark:     "#0D1B2A",
-  textMid:      "#3D5166",
-  textLight:    "#7A90A4",
-  border:       "#E4EAF0",
+  textMid:      "#5B7080",
+  textLight:    "#9BB0BC",
+  border:       "#E3ECF0",
+  iconBg:       "#EEF3F7",
 };
 
 type InviteType = "MOU" | "Event" | "Collaboration" | "Workshop";
@@ -37,62 +38,105 @@ interface Invitation {
   agenda?: string[]; capacity?: number; mode?: "Physical" | "Virtual" | "Hybrid";
 }
 
+const RIPHAH = "Riphah International University";
+
 const MOCK_INVITATIONS: Invitation[] = [
   {
     _id: "i1", type: "MOU", title: "Academic Partnership MOU",
-    fromName: "NUCES Islamabad", fromRole: "University – Industry Liaison",
-    fromEmail: "liaison@nuces.edu.pk", fromPhone: "+92-51-111-128-128",
-    description: "NUCES invites you to formalize a Memorandum of Understanding covering student internships, joint research collaboration, and faculty development workshops for the academic year 2025-26.",
-    deadline: "30 Apr 2025", status: "Pending",
+    fromName: RIPHAH, fromRole: "Industry Liaison Office",
+    fromEmail: "industry.liaison@riphah.edu.pk", fromPhone: "+92-51-289-1835",
+    description:
+      "Riphah International University invites you to formalize a Memorandum of Understanding covering student internships, joint research collaboration, and faculty development workshops for the academic year 2026-27.",
+    deadline: "30 May 2026", status: "Pending",
     receivedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
     tags: ["Partnership", "Internship", "Research"],
-    benefits: ["Access to 2000+ CS/SE graduates annually","Co-branding on university publications","Priority booth at annual career fair","Joint research paper opportunities"],
-    agenda: ["MOU signing ceremony","Campus tour for HR team","Meet-and-greet with department heads"],
+    benefits: [
+      "Access to 1500+ CS / SE graduates annually",
+      "Co-branding on university publications",
+      "Priority booth at the annual career fair",
+      "Joint research paper opportunities",
+    ],
+    agenda: [
+      "MOU signing ceremony at Riphah main campus",
+      "Campus tour for HR team",
+      "Meet-and-greet with department heads",
+    ],
   },
   {
-    _id: "i2", type: "Event", title: "Tech Expo 2025 – Industry Showcase",
-    fromName: "COMSATS University", fromRole: "Event Organizing Committee",
-    fromEmail: "techexpo@comsats.edu.pk",
-    description: "You are invited to showcase your company at the annual Tech Expo 2025. Set up a branded booth, interact with 500+ students, and recruit top talent directly.",
-    date: "15 May 2025", endDate: "16 May 2025", time: "09:00 AM – 05:00 PM",
-    location: "COMSATS Auditorium, Islamabad", mode: "Physical", deadline: "05 May 2025",
+    _id: "i2", type: "Event", title: "Riphah Tech Expo 2026",
+    fromName: RIPHAH, fromRole: "Event Organizing Committee",
+    fromEmail: "techexpo@riphah.edu.pk",
+    description:
+      "You are invited to showcase your company at the annual Riphah Tech Expo. Set up a branded booth, interact with 500+ students, and recruit top talent directly.",
+    date: "15 Jun 2026", endDate: "16 Jun 2026", time: "09:00 AM – 05:00 PM",
+    location: "Riphah Main Campus, Auditorium Block, Islamabad",
+    mode: "Physical", deadline: "05 Jun 2026",
     capacity: 500, status: "Pending",
     receivedAt: new Date(Date.now() - 86400000).toISOString(),
     tags: ["Expo", "Networking", "Recruitment"],
-    benefits: ["Branded booth space (10×10 ft)","Logo placement on all event materials","Access to student CV database","Slot in panel discussion"],
-    agenda: ["Day 1: Company booth setup & student interactions","Day 2: Panel discussions & live demos","Evening: Networking dinner with faculty"],
+    benefits: [
+      "Branded booth space (10×10 ft)",
+      "Logo placement on all event materials",
+      "Access to student CV database",
+      "Slot in panel discussion",
+    ],
+    agenda: [
+      "Day 1: Booth setup & student interactions",
+      "Day 2: Panel discussions & live demos",
+      "Evening: Networking dinner with faculty",
+    ],
   },
   {
     _id: "i3", type: "Collaboration", title: "AI Research Collaboration",
-    fromName: "Quaid-i-Azam University", fromRole: "Department of Computer Science",
-    fromEmail: "cs@qau.edu.pk",
-    description: "QAU's CS department invites industry partners to co-supervise 3 final-year AI research projects and potentially co-author and publish joint research papers.",
-    deadline: "20 Apr 2025", status: "Accepted",
+    fromName: RIPHAH, fromRole: "Department of Computer Science",
+    fromEmail: "cs.dept@riphah.edu.pk",
+    description:
+      "Riphah's CS department invites industry partners to co-supervise 3 final-year AI research projects and potentially co-author and publish joint research papers.",
+    deadline: "20 May 2026", status: "Accepted",
     receivedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
     tags: ["AI", "Research", "Joint Project"],
-    benefits: ["Access to AI research outputs and IP","3 dedicated student researchers","Co-authorship on published papers","University lab access for your team"],
-    agenda: ["Kickoff meeting with project supervisors","Monthly progress reviews","Final presentation and publication submission"],
+    benefits: [
+      "Access to AI research outputs and IP",
+      "3 dedicated student researchers",
+      "Co-authorship on published papers",
+      "University lab access for your team",
+    ],
+    agenda: [
+      "Kickoff meeting with project supervisors",
+      "Monthly progress reviews",
+      "Final presentation and publication submission",
+    ],
   },
   {
     _id: "i4", type: "Workshop", title: "Industry-Led Flutter Workshop",
-    fromName: "UET Lahore", fromRole: "Industry Liaison Office",
-    fromEmail: "industry@uet.edu.pk", fromPhone: "+92-42-9029431",
-    description: "UET Lahore requests your development team to conduct a 1-day Flutter development workshop for 60 final-year CS students.",
-    date: "22 Apr 2025", time: "10:00 AM – 04:00 PM",
-    location: "UET Lahore, Dept. of CS, Room 301", mode: "Physical",
-    capacity: 60, deadline: "18 Apr 2025", status: "Declined",
+    fromName: RIPHAH, fromRole: "CS Department",
+    fromEmail: "workshops@riphah.edu.pk", fromPhone: "+92-51-289-1835",
+    description:
+      "Riphah requests your development team to conduct a 1-day Flutter development workshop for 60 final-year CS students.",
+    date: "22 May 2026", time: "10:00 AM – 04:00 PM",
+    location: "Riphah Main Campus, Dept. of CS, Room 301",
+    mode: "Physical",
+    capacity: 60, deadline: "18 May 2026", status: "Declined",
     receivedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
     tags: ["Flutter", "Workshop", "Mentorship"],
-    benefits: ["Brand visibility with 60 final-year students","Lunch and hospitality provided by UET","Certificate of appreciation"],
-    agenda: ["Morning: Flutter fundamentals & architecture","Afternoon: Hands-on project building","Wrap-up: Q&A and career talk"],
+    benefits: [
+      "Brand visibility with 60 final-year students",
+      "Lunch and hospitality provided by Riphah",
+      "Certificate of appreciation",
+    ],
+    agenda: [
+      "Morning: Flutter fundamentals & architecture",
+      "Afternoon: Hands-on project building",
+      "Wrap-up: Q&A and career talk",
+    ],
   },
 ];
 
 const TYPE_CONFIG: Record<InviteType, { color: string; bg: string; icon: string; grad: readonly [string, string] }> = {
-  MOU:           { color: THEME.primary,      bg: "#E8EEF3", icon: "document-text", grad: [THEME.headerDark, THEME.headerLight] },
-  Event:         { color: "#1A5276",          bg: "#D6EAF8", icon: "calendar",      grad: ["#1A5276", "#154360"] },
-  Collaboration: { color: "#1B4F72",          bg: "#D4E6F1", icon: "people",        grad: ["#1B4F72", "#1A3A52"] },
-  Workshop:      { color: "#1F618D",          bg: "#D6EAF8", icon: "school",        grad: ["#1F618D", "#1A5276"] },
+  MOU:           { color: THEME.primary, bg: THEME.iconBg, icon: "document-text", grad: [THEME.headerDark, THEME.headerLight] },
+  Event:         { color: "#C26B12",     bg: "#FDF3E7",   icon: "calendar",      grad: ["#E67E22", "#C26B12"] },
+  Collaboration: { color: "#5B3A8E",     bg: "#F0E8F8",   icon: "people",        grad: ["#7C3AED", "#5B21B6"] },
+  Workshop:      { color: "#2A5068",     bg: "#E8EEF3",   icon: "school",        grad: [THEME.primaryLight, THEME.headerDark] },
 };
 
 const STATUS_CONFIG: Record<InviteStatus, { color: string; bg: string; icon: string }> = {

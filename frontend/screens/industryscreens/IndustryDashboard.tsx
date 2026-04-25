@@ -362,12 +362,8 @@ function DashboardScreen() {
       <StatusBar barStyle="light-content" backgroundColor={THEME.headerBg} />
       <NotificationPanel visible={notifOpen} onClose={() => setNotifOpen(false)} notes={notes} setNotes={setNotes} />
 
-      {/* ── Top Navigation Bar (matches student: menu → logo → … → bell + avatar) ── */}
+      {/* ── Top Navigation Bar — logo + menu (left) → bell + avatar (right) ── */}
       <View style={d.header}>
-        <TouchableOpacity onPress={()=>nav.openDrawer()} style={d.menuBtn}>
-          <Ionicons name="menu" size={26} color="#fff"/>
-        </TouchableOpacity>
-
         <View style={d.logoBox}>
           <Image
             source={require("../../assets/images/logo.png")}
@@ -375,6 +371,10 @@ function DashboardScreen() {
             resizeMode="contain"
           />
         </View>
+
+        <TouchableOpacity onPress={()=>nav.openDrawer()} style={d.menuBtn}>
+          <Ionicons name="menu" size={26} color="#fff"/>
+        </TouchableOpacity>
 
         <View style={{ flex:1 }}/>
 
@@ -921,6 +921,11 @@ const d = StyleSheet.create({
     backgroundColor: "#fff",
     justifyContent: "center", alignItems: "center",
     overflow:"hidden",
+  },
+  logoCenterWrap: {
+    position:"absolute", left:0, right:0, top:0, bottom:0,
+    alignItems:"center", justifyContent:"center",
+    paddingTop: Platform.OS === "ios" ? 52 : 38,
   },
   headerIconBtn: {
     width:36, height:36, borderRadius:10,
