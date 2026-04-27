@@ -872,17 +872,85 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import axios from "axios";
-import React, { useCallback, useState } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useCallback, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
+    Image,
     Modal,
+    Platform,
+    Pressable,
     ScrollView,
+    StatusBar,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from "react-native";
+
+const NAVY = "#193648";
+const NAVY_LIGHT = "#2A5A72";
+const NAVY_DEEP = "#0F2438";
+
+// Company logo helper — known mock companies use real brand logos,
+// any other company falls back to auto domain guess, then letter avatar.
+const COMPANY_DOMAINS: Record<string, string> = {
+    "TechNest Solutions": "microsoft.com",
+    "DataSphere AI": "openai.com",
+    "AppForge Pakistan": "apple.com",
+    "SecureNet Corp": "cloudflare.com",
+    "PixelCraft Studio": "adobe.com",
+    "CloudBase Technologies": "google.com",
+    "InnovateHub": "atlassian.com",
+};
+
+const guessDomain = (company: string) => {
+    const slug = company.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return slug ? `${slug}.com` : "";
+};
+
+const getLogoUrl = (company: string) => {
+    const domain = COMPANY_DOMAINS[company] || guessDomain(company);
+    if (!domain) return "";
+    return `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
+};
+
+const getFallbackLogo = (company: string) =>
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(company || "Co")}&background=193648&color=fff&size=128&bold=true&font-size=0.42&format=png`;
+
+const CompanyLogo = ({ company, size = 48 }: { company: string; size?: number }) => {
+    const [failed, setFailed] = useState(false);
+    const uri = failed ? getFallbackLogo(company) : getLogoUrl(company);
+    return (
+        <View
+            style={{
+                width: size,
+                height: size,
+                borderRadius: 14,
+                backgroundColor: "#fff",
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+                padding: 6,
+                alignItems: "center",
+                justifyContent: "center",
+                shadowColor: NAVY,
+                shadowOpacity: 0.12,
+                shadowOffset: { width: 0, height: 3 },
+                shadowRadius: 5,
+                elevation: 2,
+            }}
+        >
+            <Image
+                key={uri}
+                source={{ uri }}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="contain"
+                onError={() => setFailed(true)}
+            />
+        </View>
+    );
+};
 
 // ─── Status config ────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, {
@@ -903,38 +971,38 @@ const STATUS_CONFIG: Record<string, {
         lineColor: "#D97706",
     },
     "Under Review": {
-        color: "#2563EB",
-        bg: "#EFF6FF",
+        color: NAVY_LIGHT,
+        bg: "#EFF4F8",
         icon: "magnify",
         step: 2,
-        activeColor: "#2563EB",
-        lineColor: "#2563EB",
+        activeColor: NAVY_LIGHT,
+        lineColor: NAVY_LIGHT,
     },
     Shortlisted: {
-        color: "#193648",
-        bg: "#F5F3FF",
+        color: NAVY,
+        bg: "#E8F0F5",
         icon: "star-outline",
         step: 3,
-        activeColor: "#193648",
-        lineColor: "#7C3AED",
+        activeColor: NAVY,
+        lineColor: NAVY,
     },
     "Send to Liaison": {
-        color: "##193648",
-        bg: "#F5F3FF",
+        color: NAVY,
+        bg: "#E8F0F5",
         icon: "account-arrow-right",
         step: 3,
         label: "Shortlisted",
-        activeColor: "#193648",
-        lineColor: "#7C3AED",
+        activeColor: NAVY,
+        lineColor: NAVY,
     },
     "Send to Industry": {
-        color: "#193648",
-        bg: "#F5F3FF",
+        color: NAVY,
+        bg: "#E8F0F5",
         icon: "domain",
         step: 3,
         label: "Shortlisted",
-        activeColor: "#193648",
-        lineColor: "#7C3AED",
+        activeColor: NAVY,
+        lineColor: NAVY,
     },
     Approved: {
         color: "#059669",
@@ -955,7 +1023,7 @@ const STATUS_CONFIG: Record<string, {
 };
 
 
-const mapStatus = (s) => {
+const mapStatus = (s: string | undefined | null): string => {
     if (!s) return "Pending";
 
     switch (s.toLowerCase()) {
@@ -989,6 +1057,28 @@ const MyApplicationsScreen = () => {
     const [loading, setLoading]           = useState(true);
     const [selectedApp, setSelectedApp]   = useState<any>(null);
     const [detailVisible, setDetailVisible] = useState(false);
+    const [filter, setFilter] = useState<"All" | "Pending" | "Shortlisted" | "Approved" | "Rejected">("All");
+
+    const stats = useMemo(() => {
+        const total = applications.length;
+        const pending = applications.filter((a) => mapStatus(a.status) === "Pending" || mapStatus(a.status) === "Under Review").length;
+        const shortlisted = applications.filter((a) => isShortlist(mapStatus(a.status))).length;
+        const approved = applications.filter((a) => isApproved(mapStatus(a.status))).length;
+        const rejected = applications.filter((a) => isRejected(mapStatus(a.status))).length;
+        return { total, pending, shortlisted, approved, rejected };
+    }, [applications]);
+
+    const filteredApps = useMemo(() => {
+        if (filter === "All") return applications;
+        return applications.filter((a) => {
+            const s = mapStatus(a.status);
+            if (filter === "Pending") return s === "Pending" || s === "Under Review";
+            if (filter === "Shortlisted") return isShortlist(s);
+            if (filter === "Approved") return isApproved(s);
+            if (filter === "Rejected") return isRejected(s);
+            return true;
+        });
+    }, [applications, filter]);
 
     useFocusEffect(
         useCallback(() => {
@@ -1040,31 +1130,17 @@ const MyApplicationsScreen = () => {
 
                 {/* Card top row */}
                 <View style={styles.cardTop}>
-                    <View
-                        style={[
-                            styles.companyIcon,
-                            { backgroundColor: cfg.bg },
-                        ]}
-                    >
-                        <MaterialCommunityIcons
-                            name={
-                                isApproved(status)
-                                    ? "check-decagram"
-                                    : isRejected(status)
-                                    ? "close-circle"
-                                    : "office-building"
-                            }
-                            size={24}
-                            color={cfg.color}
-                        />
-                    </View>
+                    <CompanyLogo company={internship?.company || "Other"} size={52} />
                     <View style={{ flex: 1, marginLeft: 12 }}>
                         <Text style={styles.cardTitle} numberOfLines={1}>
                             {internship?.title || "Internship"}
                         </Text>
-                        <Text style={styles.cardCompany}>
-                            {internship?.company || "Company"}
-                        </Text>
+                        <View style={styles.companyRow}>
+                            <MaterialCommunityIcons name="office-building" size={11} color="#64748B" />
+                            <Text style={styles.cardCompany} numberOfLines={1}>
+                                {internship?.company || "Company"}
+                            </Text>
+                        </View>
                     </View>
                     <View
                         style={[
@@ -1119,7 +1195,7 @@ const MyApplicationsScreen = () => {
                             color="#059669"
                         />
                         <Text style={styles.approvedRowText}>
-                            Congratulations! You've been selected 🎉
+                            Congratulations! You&apos;ve been selected 🎉
                         </Text>
                     </View>
                 )}
@@ -1225,98 +1301,143 @@ const MyApplicationsScreen = () => {
     };
 
     // ─── Screen ───────────────────────────────────────────────────────────────
+    const FILTERS: { key: typeof filter; label: string; count: number; color: string }[] = [
+        { key: "All",         label: "All",         count: stats.total,       color: NAVY },
+        { key: "Pending",     label: "Pending",     count: stats.pending,     color: "#D97706" },
+        { key: "Shortlisted", label: "Shortlisted", count: stats.shortlisted, color: NAVY },
+        { key: "Approved",    label: "Approved",    count: stats.approved,    color: "#059669" },
+        { key: "Rejected",    label: "Rejected",    count: stats.rejected,    color: "#DC2626" },
+    ];
+
     return (
         <View style={styles.container}>
-            {/* Summary chips */}
-            <View style={styles.summaryRow}>
-                <View style={styles.summaryChip}>
-                    <Text style={styles.summaryNum}>
-                        {applications.length}
-                    </Text>
-                    <Text style={styles.summaryLabel}>Total</Text>
-                </View>
-                <View style={styles.summaryChip}>
-                    <Text
-                        style={[styles.summaryNum, { color: "#D97706" }]}
-                    >
-                        {
-                            applications.filter(
-                                // (a) => a.status === "Pending"
-                                (a) => mapStatus(a.status) === "Pending"
-                            ).length
-                        }
-                    </Text>
-                    <Text style={styles.summaryLabel}>Pending</Text>
-                </View>
-                <View style={styles.summaryChip}>
-                    <Text
-                        style={[styles.summaryNum, { color: "#7C3AED" }]}
-                    >
-                        {
-                            applications.filter((a) =>
-                                // isShortlist(a.status)
+            <StatusBar barStyle="light-content" backgroundColor={NAVY} />
 
-                            isShortlist(mapStatus(a.status))
-                            ).length
-                        }
-                    </Text>
-                    <Text style={styles.summaryLabel}>Shortlisted</Text>
+            {/* HERO HEADER */}
+            <LinearGradient
+                colors={[NAVY_DEEP, NAVY, NAVY_LIGHT]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.hero}
+            >
+                <View style={styles.heroBadge}>
+                    <MaterialCommunityIcons name="briefcase-check" size={12} color="#FFFFFF" />
+                    <Text style={styles.heroBadgeText}>APPLICATION TRACKER</Text>
                 </View>
-                <View style={styles.summaryChip}>
-                    <Text
-                        style={[styles.summaryNum, { color: "#059669" }]}
-                    >
-                        {
-                            applications.filter((a) =>
-                                // isApproved(a.status)
-                            isApproved(mapStatus(a.status))
-                            ).length
-                        }
-                    </Text>
-                    <Text style={styles.summaryLabel}>Approved</Text>
+                <Text style={styles.heroTitle}>My Applications</Text>
+                <Text style={styles.heroSubtitle}>
+                    Track every step from apply to offer
+                </Text>
+
+                {/* Hero stats grid */}
+                <View style={styles.heroStatsRow}>
+                    <View style={styles.heroStat}>
+                        <View style={styles.heroStatIcon}>
+                            <MaterialCommunityIcons name="briefcase" size={14} color="#fff" />
+                        </View>
+                        <Text style={styles.heroStatVal}>{stats.total}</Text>
+                        <Text style={styles.heroStatLab}>Total</Text>
+                    </View>
+                    <View style={styles.heroStatDivider} />
+                    <View style={styles.heroStat}>
+                        <View style={[styles.heroStatIcon, { backgroundColor: "rgba(217,119,6,0.25)" }]}>
+                            <MaterialCommunityIcons name="clock-outline" size={14} color="#FBBF24" />
+                        </View>
+                        <Text style={styles.heroStatVal}>{stats.pending}</Text>
+                        <Text style={styles.heroStatLab}>In Review</Text>
+                    </View>
+                    <View style={styles.heroStatDivider} />
+                    <View style={styles.heroStat}>
+                        <View style={[styles.heroStatIcon, { backgroundColor: "rgba(16,185,129,0.25)" }]}>
+                            <MaterialCommunityIcons name="check-decagram" size={14} color="#34D399" />
+                        </View>
+                        <Text style={styles.heroStatVal}>{stats.approved}</Text>
+                        <Text style={styles.heroStatLab}>Approved</Text>
+                    </View>
                 </View>
-                <View style={styles.summaryChip}>
-                    <Text
-                        style={[styles.summaryNum, { color: "#DC2626" }]}
-                    >
-                        {
-                            applications.filter((a) =>
-                                // isRejected(a.status)
-                            isRejected(mapStatus(a.status))
-                            ).length
-                        }
-                    </Text>
-                    <Text style={styles.summaryLabel}>Rejected</Text>
-                </View>
+            </LinearGradient>
+
+            {/* Filter tabs */}
+            <View style={styles.filterWrap}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+                >
+                    {FILTERS.map((f) => {
+                        const active = filter === f.key;
+                        return (
+                            <Pressable
+                                key={f.key}
+                                onPress={() => setFilter(f.key)}
+                                style={[
+                                    styles.filterChip,
+                                    active && {
+                                        backgroundColor: f.color,
+                                        borderColor: f.color,
+                                    },
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        styles.filterChipText,
+                                        active && { color: "#fff" },
+                                    ]}
+                                >
+                                    {f.label}
+                                </Text>
+                                <View
+                                    style={[
+                                        styles.filterCountBox,
+                                        active && { backgroundColor: "rgba(255,255,255,0.25)" },
+                                    ]}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.filterCountText,
+                                            active && { color: "#fff" },
+                                        ]}
+                                    >
+                                        {f.count}
+                                    </Text>
+                                </View>
+                            </Pressable>
+                        );
+                    })}
+                </ScrollView>
             </View>
 
             {loading ? (
-                <ActivityIndicator
-                    color="#193648"
-                    size="large"
-                    style={{ marginTop: 60 }}
-                />
+                <View style={{ marginTop: 50, alignItems: "center" }}>
+                    <ActivityIndicator color={NAVY} size="large" />
+                    <Text style={styles.loadingText}>Loading your applications...</Text>
+                </View>
             ) : (
                 <FlatList
-                    data={applications}
+                    data={filteredApps}
                     keyExtractor={(item) => item._id}
                     renderItem={renderCard}
                     contentContainerStyle={{
                         padding: 16,
                         paddingBottom: 100,
                     }}
+                    showsVerticalScrollIndicator={false}
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
-                            <MaterialCommunityIcons
-                                name="briefcase-off"
-                                size={64}
-                                color="#D1D5DB"
-                            />
+                            <View style={styles.emptyIconWrap}>
+                                <MaterialCommunityIcons
+                                    name="briefcase-search-outline"
+                                    size={48}
+                                    color={NAVY}
+                                />
+                            </View>
                             <Text style={styles.emptyTitle}>
-                                No Applications Yet
+                                {filter === "All" ? "No Applications Yet" : `No ${filter} Applications`}
                             </Text>
                             <Text style={styles.emptySubText}>
-                                Browse internships and start applying!
+                                {filter === "All"
+                                    ? "Browse internships and start applying to track them here."
+                                    : "Try a different filter to see your applications."}
                             </Text>
                         </View>
                     }
@@ -1545,28 +1666,103 @@ const MyApplicationsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#F0F4F8" },
+    container: { flex: 1, backgroundColor: "#F4F7FB" },
 
-    // ── Summary ───────────────────────────────────────────────────────────────
-    summaryRow: {
-        flexDirection: "row",
-        backgroundColor: "#fff",
-        padding: 12,
-        gap: 4,
-        borderBottomWidth: 1,
-        borderBottomColor: "#F3F4F6",
+    // ── Hero header ───────────────────────────────────────────────────────────
+    hero: {
+        paddingTop: Platform.OS === "android" ? 26 : 56,
+        paddingBottom: 26,
+        paddingHorizontal: 22,
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+        shadowColor: NAVY,
+        shadowOpacity: 0.3,
+        shadowOffset: { width: 0, height: 8 },
+        shadowRadius: 14,
+        elevation: 10,
     },
-    summaryChip: { flex: 1, alignItems: "center", paddingVertical: 6 },
-    summaryNum:  { fontSize: 20, fontWeight: "800", color: "#193648" },
-    summaryLabel:{ fontSize: 10, color: "#6B7280", marginTop: 2 },
+    heroBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        backgroundColor: "rgba(255,255,255,0.18)",
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 10,
+        alignSelf: "flex-start",
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.25)",
+    },
+    heroBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800", letterSpacing: 1 },
+    heroTitle: { color: "#fff", fontSize: 26, fontWeight: "800", letterSpacing: -0.3 },
+    heroSubtitle: { color: "rgba(255,255,255,0.75)", fontSize: 12.5, marginTop: 4 },
+    heroStatsRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.10)",
+        borderRadius: 16,
+        paddingVertical: 14,
+        marginTop: 18,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.12)",
+    },
+    heroStat: { flex: 1, alignItems: "center", gap: 3 },
+    heroStatIcon: {
+        width: 28,
+        height: 28,
+        borderRadius: 9,
+        backgroundColor: "rgba(255,255,255,0.18)",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 2,
+    },
+    heroStatVal: { color: "#fff", fontSize: 19, fontWeight: "800" },
+    heroStatLab: { color: "rgba(255,255,255,0.75)", fontSize: 10.5, fontWeight: "600", marginTop: 1 },
+    heroStatDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.18)", height: 50 },
+
+    // ── Filter tabs ───────────────────────────────────────────────────────────
+    filterWrap: {
+        marginTop: 14,
+        marginBottom: 4,
+    },
+    filterChip: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 7,
+        backgroundColor: "#fff",
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: "#E2E8F0",
+    },
+    filterChipText: { fontSize: 12.5, fontWeight: "700", color: "#475569" },
+    filterCountBox: {
+        backgroundColor: "#F1F5F9",
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 10,
+        minWidth: 22,
+        alignItems: "center",
+    },
+    filterCountText: { fontSize: 11, fontWeight: "800", color: "#475569" },
+
+    loadingText: { marginTop: 12, color: "#64748B", fontSize: 13 },
 
     // ── Card ──────────────────────────────────────────────────────────────────
     card: {
         backgroundColor: "#fff",
-        borderRadius: 20,
+        borderRadius: 22,
         padding: 18,
         marginBottom: 14,
-        elevation: 2,
+        borderWidth: 1,
+        borderColor: "#EDF2F7",
+        shadowColor: NAVY,
+        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: 5 },
+        shadowRadius: 12,
+        elevation: 3,
         overflow: "hidden",
     },
     cardApproved: {
@@ -1601,7 +1797,8 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     cardTitle:   { fontSize: 15, fontWeight: "700", color: "#111827" },
-    cardCompany: { fontSize: 13, color: "#6B7280", marginTop: 2 },
+    cardCompany: { fontSize: 13, color: "#6B7280", marginTop: 2, flex: 1 },
+    companyRow:  { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
     statusBadge: {
         flexDirection: "row",
         alignItems: "center",
@@ -1687,9 +1884,18 @@ const styles = StyleSheet.create({
     tapMore:    { fontSize: 12, fontWeight: "600" },
 
     // ── Empty ─────────────────────────────────────────────────────────────────
-    emptyState:   { alignItems: "center", paddingTop: 80 },
-    emptyTitle:   { fontSize: 18, fontWeight: "700", color: "#374151", marginTop: 16 },
-    emptySubText: { fontSize: 14, color: "#9CA3AF", marginTop: 8 },
+    emptyState:   { alignItems: "center", paddingTop: 60 },
+    emptyIconWrap: {
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        backgroundColor: "#E8F0F5",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 16,
+    },
+    emptyTitle:   { fontSize: 18, fontWeight: "800", color: NAVY, marginTop: 6 },
+    emptySubText: { fontSize: 13.5, color: "#64748B", marginTop: 8, textAlign: "center", paddingHorizontal: 28, lineHeight: 20 },
 
     // ── Modal ─────────────────────────────────────────────────────────────────
     modalOverlay: {

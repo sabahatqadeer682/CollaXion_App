@@ -42,16 +42,23 @@ const generateCode = () => Math.floor(100000 + Math.random() * 900000).toString(
 // REGISTER STUDENT
 // ============================
 router.post("/register", async (req, res) => {
-    const { fullName, email, password, phone, department, semester, city, address } = req.body;
+    const { fullName, sapId, gender, email, password, phone, department, semester, city, address } = req.body;
     try {
-        const existingStudent = await Student.findOne({ email });
-        if (existingStudent)
-            return res.status(409).json({ success: false, message: "Email already registered" });
+        if (!sapId || !/^\d{5,7}$/.test(String(sapId).trim()))
+            return res.status(400).json({ success: false, message: "Invalid SAP ID (5-7 digits required)" });
+
+        const existingStudent = await Student.findOne({ $or: [{ email }, { sapId: String(sapId).trim() }] });
+        if (existingStudent) {
+            const message = existingStudent.email === email ? "Email already registered" : "SAP ID already registered";
+            return res.status(409).json({ success: false, message });
+        }
 
         const verificationCode = generateCode();
 
         const newStudent = new Student({
             fullName,
+            sapId: String(sapId).trim(),
+            gender,
             email,
             password,
             phone,
@@ -69,7 +76,7 @@ router.post("/register", async (req, res) => {
             from: `"CollaXion" <${process.env.EMAIL_USER}>`,
             to: email,
             subject: "Your Verification Code",
-            html: `<p>Dear ${fullName},</p><p>Thank you for registering with CollaXion.</p><p>Your verification code is: <strong>${verificationCode}</strong></p><p>Regards,<br/>The CollaXion Team</p>`,
+            html: `<p>Dear ${fullName},</p><p>Thank you for registering with CollaXion.</p><p>Your verification code is: <strong>${verificationCode}</strong></p><p>Where collaboration meets innovation,<br/>The CollaXion Support</p>`,
         });
 
         res.status(201).json({ success: true, message: "Verification code sent to your email" });
@@ -323,7 +330,9 @@ router.post("/upload-cv/:email", upload.single("cv"), async (req, res) => {
         student.cvUrl = `/uploads/cv/${req.file.filename}`;
         // Mark as processing so the frontend can show a state
         student.cvProcessing = true;
-        await student.save();
+        // validateModifiedOnly avoids re-validating legacy fields on older
+        // documents (e.g. those created before sapId was added).
+        await student.save({ validateModifiedOnly: true });
 
         // 🚀 Respond IMMEDIATELY — mobile fetch was timing out on the
         // multi-second Gemini calls below, surfacing as "Network request failed".
@@ -375,7 +384,7 @@ router.post("/upload-cv/:email", upload.single("cv"), async (req, res) => {
                 fresh.experience = extractedData.experience || [];
                 fresh.professionalSummary = extractedData.summary || "";
                 fresh.cvProcessing = false;
-                await fresh.save();
+                await fresh.save({ validateModifiedOnly: true });
 
                 // Push a notification + WS event so the UI updates in real time
                 try {
@@ -395,7 +404,7 @@ router.post("/upload-cv/:email", upload.single("cv"), async (req, res) => {
                     const fresh = await Student.findOne({ email });
                     if (fresh) {
                         fresh.cvProcessing = false;
-                        await fresh.save();
+                        await fresh.save({ validateModifiedOnly: true });
                     }
                 } catch {}
             }
@@ -696,7 +705,7 @@ router.delete("/delete-cv/:email", async (req, res) => {
             }
         }
 
-        // CV.... data clear
+        // CV data clear
         student.cvUrl = undefined;
         student.cvFeedback = undefined;
         student.extractedSkills = [];
@@ -704,7 +713,8 @@ router.delete("/delete-cv/:email", async (req, res) => {
         student.experience = [];
         student.professionalSummary = undefined;
 
-        await student.save();
+        // validateModifiedOnly so we don't trip on unrelated legacy fields.
+        await student.save({ validateModifiedOnly: true });
 
         res.status(200).json({
             success: true,
@@ -883,7 +893,7 @@ router.post("/send-rating", async (req, res) => {
 
         await transporter.sendMail({
             from: `"CollaXion App" <${process.env.EMAIL_USER}>`,
-            to: process.env.TEAM_EMAIL || "collaxionteam@gmail.com",
+            to: process.env.TEAM_EMAIL || "collaxionsupport@gmail.com",
             subject: `${starEmojis[stars]} New Rating: ${labels[stars]} (${stars}/5) — CollaXion`,
             html: `
             <!DOCTYPE html><html><body style="margin:0;padding:0;background:#f0f4f7;font-family:Arial,sans-serif;">
@@ -919,7 +929,7 @@ router.post("/send-rating", async (req, res) => {
                     </table>` : `<p style="color:#6B8A9A;font-size:13px;text-align:center;">No written feedback provided.</p>`}
                   </td></tr>
                   <tr><td style="background:#F0F4F7;padding:14px 32px;text-align:center;border-top:1px solid #E2ECF1;">
-                    <p style="margin:0;font-size:11px;color:#9AADB8;">© 2025 CollaXion • collaxionteam@gmail.com</p>
+                    <p style="margin:0;font-size:11px;color:#9AADB8;">© 2025 CollaXion • collaxionsupport@gmail.com</p>
                   </td></tr>
                 </table>
               </td></tr>

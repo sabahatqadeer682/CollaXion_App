@@ -64,6 +64,7 @@ const ProfileScreen = ({ navigation }: any) => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [cvLoading, setCvLoading] = useState(false);
+    const [cvDeleting, setCvDeleting] = useState(false);
     const [editing, setEditing] = useState(false);
     const [profileImageLocal, setProfileImageLocal] = useState(null);
     const [imageUploading, setImageUploading] = useState(false);
@@ -78,15 +79,14 @@ const ProfileScreen = ({ navigation }: any) => {
         }, [])
     );
 
-    const fetchStudentData = async () => {
-        setLoading(true);
+    const fetchStudentData = async (opts: { silent?: boolean } = {}) => {
+        if (!opts.silent) setLoading(true);
         try {
             const email = await AsyncStorage.getItem("studentEmail");
             if (!email) return setStudent(null);
 
             const res = await axios.get(`${CONSTANT.API_BASE_URL}/api/student/getStudent/${email}`);
             const studentData = res.data;
-console.log("CV URL:", studentData.cvUrl);
             setStudent(studentData);
 
             // if (studentData.profileImage) {
@@ -126,9 +126,9 @@ console.log("CV URL:", studentData.cvUrl);
 }
         } catch (err) {
             console.log("Fetch Error:", err);
-            Alert.alert("Error", "Failed to fetch student data.");
+            if (!opts.silent) Alert.alert("Error", "Failed to fetch student data.");
         } finally {
-            setLoading(false);
+            if (!opts.silent) setLoading(false);
         }
     };
 
@@ -335,41 +335,47 @@ const pickImage = async () => {
 };
 
     const uploadCV = async () => {
+        if (cvLoading || cvDeleting) return;
         try {
             const result = await DocumentPicker.getDocumentAsync({
-                type: "application/pdf",
+                type: ["application/pdf",
+                       "application/msword",
+                       "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
                 copyToCacheDirectory: true,
+                multiple: false,
             });
 
-            if (result.canceled || !result.assets || result.assets.length === 0) {
-                Alert.alert("Cancelled", "File selection cancelled by user.");
+            // User dismissed the picker — silent, no scary "cancelled" toast.
+            if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+            const file = result.assets[0];
+
+            // Pre-flight size check — backend rejects > 5 MB so let's not waste the upload.
+            if (file.size && file.size > 5 * 1024 * 1024) {
+                Alert.alert("Too large", "CV must be 5 MB or smaller.");
                 return;
             }
 
-            const file = result.assets[0];
             setCvLoading(true);
-
 
             const formData = new FormData();
             formData.append("cv", {
                 uri: file.uri,
-                name: file.name,
+                name: file.name || "cv.pdf",
                 type: file.mimeType || "application/pdf",
             } as any);
 
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 90000); // 90s safety cap
+            const timeout = setTimeout(() => controller.abort(), 90000);
 
             let response: Response;
             try {
                 response = await fetch(
-                    `${CONSTANT.API_BASE_URL}/api/student/upload-cv/${student.email}`,
+                    `${CONSTANT.API_BASE_URL}/api/student/upload-cv/${encodeURIComponent(student.email)}`,
                     {
                         method: "POST",
                         body: formData,
-                        headers: {
-                            Accept: "application/json",
-                        },
+                        headers: { Accept: "application/json" },
                         signal: controller.signal,
                     }
                 );
@@ -378,35 +384,74 @@ const pickImage = async () => {
             }
 
             if (!response.ok) {
-                throw new Error(`Server responded with ${response.status}`);
+                let serverMsg = "";
+                try { serverMsg = (await response.json())?.message || ""; } catch {}
+                throw new Error(serverMsg || `Server responded with ${response.status}`);
             }
 
             const data = await response.json();
-            console.log("CV uploaded:", data);
-            await fetchStudentData();
+            console.log("CV uploaded:", data?.cvUrl || data);
 
-            // Poll for AI completion so skills appear automatically without
-            // leaving / re-focusing the screen.
+            // Optimistically reflect the new CV in local state so the UI flips
+            // instantly to the "uploaded" view without a full-screen reload.
+            setStudent((prev: any) => prev ? {
+                ...prev,
+                cvUrl: data?.cvUrl || data?.student?.cvUrl || prev.cvUrl,
+                cvProcessing: true,
+            } : prev);
+
+            // Silent refresh so we adopt whatever the server returned.
+            await fetchStudentData({ silent: true });
+
             setAiAnalyzing(true);
             pollForSkills(student.email);
         } catch (err: any) {
             console.error("CV Upload Error:", err);
             const isAbort = err?.name === "AbortError";
             Alert.alert(
-                "Error",
+                "Upload failed",
                 isAbort
                     ? "Upload timed out. Check your Wi-Fi / server and try again."
                     : err?.message?.includes("Network request failed")
-                    ? "Could not reach the server. Make sure the backend is running and your phone is on the same network."
-                    : err?.message || "Upload failed."
+                    ? "Could not reach the server. Make sure the backend is running and your device is on the same network."
+                    : err?.message || "Could not upload CV."
             );
         } finally {
             setCvLoading(false);
         }
     };
 
+    const viewCV = async () => {
+        if (!student?.email || !student?.cvUrl) {
+            Alert.alert("No CV", "Please upload your CV first.");
+            return;
+        }
+        const url = `${CONSTANT.API_BASE_URL}/api/student/view-cv/${encodeURIComponent(student.email)}`;
+        try {
+            // Pre-flight HEAD so a stale cvUrl pointing at a missing file shows
+            // a clean alert instead of an empty browser tab.
+            const head = await fetch(url, { method: "HEAD" }).catch(() => null);
+            if (head && !head.ok) {
+                Alert.alert(
+                    "CV unavailable",
+                    "Your CV file is missing on the server. Please upload it again."
+                );
+                return;
+            }
+            await WebBrowser.openBrowserAsync(url, {
+                presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+                showTitle: true,
+                toolbarColor: "#193648",
+                controlsColor: "#fff",
+            });
+        } catch (e) {
+            try { await Linking.openURL(url); }
+            catch { Alert.alert("Error", "Could not open CV in a browser."); }
+        }
+    };
 
     const deleteCV = async () => {
+        if (cvDeleting || cvLoading) return;
         Alert.alert(
             "Delete CV",
             "Are you sure you want to delete your CV? This will also remove AI recommendations based on your CV.",
@@ -416,23 +461,35 @@ const pickImage = async () => {
                     text: "Delete",
                     style: "destructive",
                     onPress: async () => {
+                        setCvDeleting(true);
+                        // Optimistic clear — UI flips back to the "no CV" state immediately.
+                        const prevSnapshot = student;
+                        setStudent((prev: any) => prev ? {
+                            ...prev,
+                            cvUrl: null,
+                            cvFeedback: null,
+                            extractedSkills: [],
+                            education: [],
+                            experience: [],
+                            professionalSummary: null,
+                        } : prev);
+
                         try {
-
-                            await axios.delete(`${CONSTANT.API_BASE_URL}/api/student/delete-cv/${student.email}`);
-
-
-                            setStudent({
-                                ...student,
-                                cvUrl: null,
-                                cvFeedback: null,
-                                extractedSkills: [],
-                            });
-
-                            Alert.alert("Success", "CV deleted successfully");
-                            await fetchStudentData();
-                        } catch (err) {
-                            console.log("Delete CV Error:", err);
-                            Alert.alert("Error", "Failed to delete CV");
+                            await axios.delete(
+                                `${CONSTANT.API_BASE_URL}/api/student/delete-cv/${encodeURIComponent(student.email)}`
+                            );
+                            await fetchStudentData({ silent: true });
+                            Alert.alert("Deleted", "Your CV has been removed.");
+                        } catch (err: any) {
+                            console.log("Delete CV Error:", err?.response?.data || err.message);
+                            // Rollback if server didn't actually delete.
+                            if (prevSnapshot) setStudent(prevSnapshot);
+                            Alert.alert(
+                                "Delete failed",
+                                err?.response?.data?.message || "Could not delete CV. Please try again."
+                            );
+                        } finally {
+                            setCvDeleting(false);
                         }
                     },
                 },
@@ -566,37 +623,29 @@ const pickImage = async () => {
                             </View>
                             <View style={styles.cvActions}>
                                 <TouchableOpacity
-                                    onPress={async () => {
-                                        if (!student?.email) return;
-                                        const url = `${CONSTANT.API_BASE_URL}/api/student/view-cv/${encodeURIComponent(student.email)}`;
-                                        try {
-                                            await WebBrowser.openBrowserAsync(url, {
-                                                presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-                                                showTitle: true,
-                                                toolbarColor: "#193648",
-                                                controlsColor: "#fff",
-                                            });
-                                        } catch (e) {
-                                            try {
-                                                await Linking.openURL(url);
-                                            } catch {
-                                                Alert.alert("Error", "Could not open CV.");
-                                            }
-                                        }
-                                    }}
+                                    onPress={viewCV}
                                     style={styles.viewCvButton}
+                                    disabled={cvDeleting}
+                                    activeOpacity={0.85}
                                 >
                                     <Ionicons name="eye-outline" size={18} color="#193648" />
                                     <Text style={styles.viewCvText}>View CV</Text>
                                 </TouchableOpacity>
 
-                                {/* <TouchableOpacity onPress={uploadCV} style={styles.replaceCvButton}>
-                                    <Ionicons name="refresh-outline" size={18} color="#F39C12" />
-                                    <Text style={styles.replaceCvText}>Replace</Text>
-                                </TouchableOpacity>  */}
-                                <TouchableOpacity onPress={deleteCV} style={styles.deleteCvButton}>
-                                    <Ionicons name="trash-outline" size={18} color="#E74C3C" />
-                                    <Text style={styles.deleteCvText}>Delete</Text>
+                                <TouchableOpacity
+                                    onPress={deleteCV}
+                                    style={[styles.deleteCvButton, cvDeleting && { opacity: 0.6 }]}
+                                    disabled={cvDeleting || cvLoading}
+                                    activeOpacity={0.85}
+                                >
+                                    {cvDeleting ? (
+                                        <ActivityIndicator size="small" color="#E74C3C" />
+                                    ) : (
+                                        <Ionicons name="trash-outline" size={18} color="#E74C3C" />
+                                    )}
+                                    <Text style={styles.deleteCvText}>
+                                        {cvDeleting ? "Deleting…" : "Delete"}
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
                         </View>

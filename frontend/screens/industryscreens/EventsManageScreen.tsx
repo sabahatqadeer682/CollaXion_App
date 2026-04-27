@@ -91,7 +91,7 @@ export function EventsManageScreen() {
   const handleDelete = (event: any) => {
     Alert.alert(
       "Delete Event",
-      `"${event.title}" permanently delete ho jayega. Sure ho?`,
+      `"${event.title}" will be permanently deleted. Are you sure?`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -138,8 +138,8 @@ export function EventsManageScreen() {
         <View style={s.emptyIconBox}>
           <Ionicons name="calendar-outline" size={34} color={T.navy} />
         </View>
-        <Text style={s.emptyTitle}>Koi Event Nahi</Text>
-        <Text style={s.emptySub}>Pehla event create karein aur universities ko invite karein</Text>
+        <Text style={s.emptyTitle}>No Events Yet</Text>
+        <Text style={s.emptySub}>Create your first event and invite universities to participate</Text>
         <TouchableOpacity
           style={s.emptyBtn}
           onPress={() => nav.navigate("EventCreation")}
@@ -327,7 +327,7 @@ export function EventsManageScreen() {
       {/* List */}
       {loading ? (
         <View style={s.loadingWrap}>
-          <Text style={{ color: T.sub, fontSize: 14 }}>Events load ho rahe hain...</Text>
+          <Text style={{ color: T.sub, fontSize: 14 }}>Loading events...</Text>
         </View>
       ) : (
         <ScrollView

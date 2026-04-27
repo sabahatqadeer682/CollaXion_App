@@ -27,7 +27,7 @@ router.post("/send-rating", async (req, res) => {
 
         await transporter.sendMail({
             from: `"CollaXion App" <${process.env.EMAIL_USER}>`,
-            to: process.env.TEAM_EMAIL || "collaxionteam@gmail.com",
+            to: process.env.TEAM_EMAIL || "collaxionsupport@gmail.com",
             subject: `${starEmojis[stars]} New Rating: ${labels[stars]} (${stars}/5) — CollaXion`,
             html: `
             <!DOCTYPE html><html><body style="margin:0;padding:0;background:#f0f4f7;font-family:Arial,sans-serif;">
@@ -63,7 +63,7 @@ router.post("/send-rating", async (req, res) => {
                     </table>` : `<p style="color:#6B8A9A;font-size:13px;text-align:center;">No written feedback provided.</p>`}
                   </td></tr>
                   <tr><td style="background:#F0F4F7;padding:14px 32px;text-align:center;border-top:1px solid #E2ECF1;">
-                    <p style="margin:0;font-size:11px;color:#9AADB8;">© 2025 CollaXion • collaxionteam@gmail.com</p>
+                    <p style="margin:0;font-size:11px;color:#9AADB8;">© 2025 CollaXion • collaxionsupport@gmail.com</p>
                   </td></tr>
                 </table>
               </td></tr>

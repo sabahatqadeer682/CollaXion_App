@@ -24,6 +24,9 @@ export const uploadLogo = multer({
 
 // ─────────────────────────────────────────────────────────────
 //  GET  /api/industry/auth/profile?email=xxx
+//  If the requested email has no record yet AND a profile already
+//  exists in the DB, fall back to the most-recently-updated one
+//  so a single-tenant demo always lands on the real data.
 // ─────────────────────────────────────────────────────────────
 export const getProfile = async (req, res) => {
   try {
@@ -36,6 +39,9 @@ export const getProfile = async (req, res) => {
     let company = await Profile.findOne({ email });
 
     if (!company) {
+      const fallback = await Profile.findOne().sort({ updatedAt: -1 });
+      if (fallback) return res.status(200).json({ company: fallback });
+
       return res.status(200).json({
         company: {
           email,
@@ -54,6 +60,22 @@ export const getProfile = async (req, res) => {
     return res.status(200).json({ company });
   } catch (err) {
     console.error("[getProfile]", err);
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+//  GET  /api/industry/auth/profile/any
+//  Returns the latest Profile in the DB (or null) — used by the
+//  app on startup to discover the active industry record so the
+//  UI seeds itself from real data instead of empty defaults.
+// ─────────────────────────────────────────────────────────────
+export const getAnyProfile = async (_req, res) => {
+  try {
+    const company = await Profile.findOne().sort({ updatedAt: -1 });
+    return res.status(200).json({ company: company || null });
+  } catch (err) {
+    console.error("[getAnyProfile]", err);
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 };

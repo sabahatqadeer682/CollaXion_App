@@ -6,7 +6,7 @@ import * as Haptics from "expo-haptics";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
-  Animated, Dimensions, Easing, Image, Modal, Platform, Pressable,
+  Animated, Dimensions, Easing, Image, ImageBackground, Modal, Platform, Pressable,
   ScrollView, StatusBar, StyleSheet, Text,
   TouchableOpacity, Vibration, View, RefreshControl,
 } from "react-native";
@@ -267,17 +267,42 @@ function NotificationPanel({
 }
 
 // ─── DASHBOARD ───────────────────────────────────────────────────
+const DASHBOARD_HERO_IMAGES = [
+  "https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1200&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1556761175-b413da4baf72?q=80&w=1200&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1556157382-97eda2d62296?q=80&w=1200&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1531497865144-0464ef8fb9a9?q=80&w=1200&auto=format&fit=crop",
+];
+
 function DashboardScreen() {
   const nav = useNavigation<any>();
   const { user, refreshUser, ax, logo, setLogo } = useUser();
   const liveLogo = useIndustryLogo();
-  const [counts, setCounts] = useState({ mous:0, posts:0, events:0, pending:0 });
+  const [mouCount, setMouCount] = useState(0);
+  const [pending,  setPending]  = useState(0);
   const [recentMous, setRecentMous] = useState<any[]>([]);
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts,   setPosts]  = useState<any[]>([]);
+  const [events,  setEvents] = useState<any[]>([]);
+  // Derive counts from the live arrays so the numbers can never drift away
+  // from the actual cards being rendered.
+  const counts = {
+    mous:    mouCount,
+    pending,
+    events:  events.length,
+    posts:   posts.length + events.length,
+  };
   const [refreshing, setRefreshing] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notes, setNotes] = useState<any[]>([]);
+  const [heroIdx, setHeroIdx] = useState(0);
   const unreadCount = notes.filter((n)=>!n.read).length;
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setHeroIdx((i) => (i + 1) % DASHBOARD_HERO_IMAGES.length);
+    }, 4000);
+    return () => clearInterval(id);
+  }, []);
 
   const loadNotifications = async () => {
     if (!user?.email) return;
@@ -320,21 +345,34 @@ function DashboardScreen() {
       const allPosts  = postsRes.data || [];
       const allEvents = Array.isArray(eventsRes.data) ? eventsRes.data : (eventsRes.data?.events || []);
       const liveEvents = allEvents.filter((e:any) => e.status === "published");
-      const pending    = mous.filter((x:any)=>
-        ["Sent to Industry Laison Incharge","Changes Proposed"].includes(x.status)
-      ).length;
-      setCounts({
-        mous:    mous.length,
-        posts:   allPosts.length + liveEvents.length,
-        events:  liveEvents.length,
-        pending,
-      });
-      setRecentMous(mous.slice(0,3));
-      // ── FIX 1: Sort newest first so freshly-posted items appear at top immediately
-      const sorted = [...allPosts].sort(
+
+      // Dedupe by _id so server-side $or matching can never multiply rows.
+      const dedupe = (arr: any[]) => {
+        const seen = new Set<string>();
+        const out: any[] = [];
+        for (const x of arr) {
+          const id = x?._id ? String(x._id) : "";
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+          out.push(x);
+        }
+        return out;
+      };
+
+      const uniquePosts = dedupe(allPosts).sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-      setPosts(sorted);
+      const uniqueEvents = dedupe(liveEvents);
+
+      const pendingCount = mous.filter((x:any)=>
+        ["Sent to Industry Laison Incharge","Changes Proposed"].includes(x.status)
+      ).length;
+
+      setMouCount(mous.length);
+      setPending(pendingCount);
+      setRecentMous(mous.slice(0,3));
+      setPosts(uniquePosts);
+      setEvents(uniqueEvents);
     } catch(e:any) {
       console.log("loadData error:", e?.response?.status, e?.response?.data);
     }
@@ -355,7 +393,40 @@ function DashboardScreen() {
     };
 
     socket.on("newNotification", handleNewNotification);
-    return () => { socket.off("newNotification", handleNewNotification); };
+
+    // Real-time post add/update — keeps "Your Posts" in sync without refresh.
+    // Counts are derived from the posts array so we don't need a separate
+    // increment that could drift out of sync with the canonical DB count.
+    const handleNewPost = (data: any) => {
+      if (!data?._id) return;
+      setPosts((prev) => {
+        if (prev.some((p) => p._id === data._id)) return prev;
+        return [data, ...prev];
+      });
+    };
+    const handlePostUpdated = (data: any) => {
+      if (!data?._id) return;
+      setPosts((prev) => prev.map((p) => (p._id === data._id ? { ...p, ...data } : p)));
+    };
+    const handleNewEvent = (data: any) => {
+      if (!data?._id) return;
+      // Only published events show on dashboard counts.
+      if (data.status && data.status !== "published") return;
+      setEvents((prev) => {
+        if (prev.some((e) => e._id === data._id)) return prev;
+        return [data, ...prev];
+      });
+    };
+    socket.on("newPost", handleNewPost);
+    socket.on("postUpdated", handlePostUpdated);
+    socket.on("newEvent", handleNewEvent);
+
+    return () => {
+      socket.off("newNotification", handleNewNotification);
+      socket.off("newPost", handleNewPost);
+      socket.off("postUpdated", handlePostUpdated);
+      socket.off("newEvent", handleNewEvent);
+    };
   }, [user?.email]);
 
   // ── FIX 2: Reliable focus listener — refetches on every navigation return
@@ -383,6 +454,18 @@ function DashboardScreen() {
     return () => { unsubFocus(); };
   }, [nav]);
 
+  // Once the canonical industry user is discovered (e.g. /profile/any seeded
+  // it after first paint, or the user just edited the profile), re-pull
+  // dashboard data so MOUs/posts/events use the correct industry headers
+  // and the greeting matches the DB — no manual refresh needed.
+  useEffect(() => {
+    if (!user?._id) return;
+    loadProfile();
+    loadData();
+    loadNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?._id, user?.email, user?.name]);
+
   const onRefresh = async () => { setRefreshing(true); await Promise.all([loadProfile(), loadData()]); setRefreshing(false); };
   const initials  = (n:string) => n?.split(" ").map((w:string)=>w[0]).slice(0,2).join("").toUpperCase()||"CX";
 
@@ -399,7 +482,7 @@ function DashboardScreen() {
   const QUICK_ACTIONS = [
     { icon:"search",    label:"Browse Opportunities",  desc:"Find & post internships",   screen:"PostOpportunity" },
     { icon:"sparkles",  label:"AI Recommend",          desc:"Personalized suggestions",  screen:"AIRecommend" },
-    { icon:"people",    label:"My Applications",       desc:"Track applicant status",    screen:"StudentApplications" },
+    { icon:"people",    label:"Student Applications",  desc:"Applications received",    screen:"StudentApplications" },
     { icon:"calendar",  label:"Events",                desc:"Job fairs & seminars",      screen:"EventCreation" },
   ];
 
@@ -436,25 +519,26 @@ function DashboardScreen() {
         }}
       />
 
-      {/* ── Top Navigation Bar ── */}
+      {/* ── Top Navigation Bar ── matches student header style ── */}
       <View style={d.header}>
-        <View style={d.logoBox}>
-          <Image
-            source={require("../../assets/images/logo.png")}
-            style={{ width: 36, height: 36 }}
-            resizeMode="contain"
-          />
+        <View style={{ flexDirection:"row", alignItems:"center", gap:10 }}>
+          <TouchableOpacity onPress={()=>nav.openDrawer()} style={d.menuBtn}>
+            <MaterialCommunityIcons name="menu" size={26} color="#fff"/>
+          </TouchableOpacity>
+          <View style={d.logoBox}>
+            <Image
+              source={require("../../assets/images/logo.png")}
+              style={{ width: 28, height: 28 }}
+              resizeMode="contain"
+            />
+          </View>
         </View>
-
-        <TouchableOpacity onPress={()=>nav.openDrawer()} style={d.menuBtn}>
-          <Ionicons name="menu" size={26} color="#fff"/>
-        </TouchableOpacity>
 
         <View style={{ flex:1 }}/>
 
         <View style={{ flexDirection:"row", alignItems:"center", gap:8 }}>
           <TouchableOpacity onPress={()=>setNotifOpen(true)} style={d.headerIconBtn}>
-            <Ionicons name="notifications-outline" size={22} color="#fff"/>
+            <MaterialCommunityIcons name="bell-outline" size={22} color="#fff"/>
             {unreadCount>0 && (
               <View style={d.badge}>
                 <Text style={d.badgeTxt}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
@@ -477,8 +561,28 @@ function DashboardScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.teal}/>}>
         <Animated.View style={{opacity:fadeAnim, transform:[{translateY:slideAnim}]}}>
 
-          {/* ── Hero ── */}
+          {/* ── Hero (with cycling video-like background) ── */}
           <View style={d.heroSection}>
+            {DASHBOARD_HERO_IMAGES.map((uri, i) => (
+              <View
+                key={uri}
+                style={[StyleSheet.absoluteFillObject, { opacity: heroIdx === i ? 1 : 0 }]}
+                pointerEvents="none"
+              >
+                <ImageBackground source={{ uri }} style={{ flex: 1 }} resizeMode="cover" />
+              </View>
+            ))}
+            <View style={d.heroOverlay} pointerEvents="none" />
+
+            <View style={d.heroDots}>
+              {DASHBOARD_HERO_IMAGES.map((_, i) => (
+                <View
+                  key={i}
+                  style={[d.heroDot, heroIdx === i && d.heroDotActive]}
+                />
+              ))}
+            </View>
+
             <View style={d.heroTopRow}>
               <View style={d.heroContent}>
                 <View style={d.greetingPill}>
@@ -489,7 +593,7 @@ function DashboardScreen() {
                   {user?.name?.split(" ")[0] || "Industry"}
                 </Text>
                 <Text style={d.heroSubText}>
-                  Empowering talent connections — manage MOUs, opportunities & events.
+                  Empowering talent connections - manage MOUs, opportunities & events.
                 </Text>
               </View>
             </View>
@@ -754,9 +858,15 @@ function CustomDrawer(props: DrawerContentComponentProps) {
           style: "destructive",
           onPress: () => {
             drawerNav.closeDrawer();
-            drawerNav.reset({
+            // Sign-out lands on the Roles selection screen so the user can
+            // pick their role again (Student / Industry) instead of jumping
+            // straight back into the industry login.
+            drawerNav.getParent()?.reset?.({
               index: 0,
-              routes: [{ name: "IndustryLogin" }],
+              routes: [{ name: "RolesScreen" }],
+            }) ?? drawerNav.reset({
+              index: 0,
+              routes: [{ name: "RolesScreen" }],
             });
           },
         },
@@ -873,13 +983,14 @@ function IndustryDrawer() {
         options={{ ...ac("#193648"), drawerLabel: "MOU Management",
           drawerIcon: ({ color, size }) => <MaterialCommunityIcons name="file-document-outline" color={color} size={size}/> }}/>
 
+      {/* Internships drawer entry hidden — keep the screen registered (height 0)
+          so deep-links / nav.navigate("InternshipsMain") still work. */}
       <Drawer.Screen name="InternshipsMain" component={InternshipsMainScreen}
-        options={{ ...ac("#193648"), drawerLabel: "Internships",
-          drawerIcon: ({ color, size }) => <MaterialCommunityIcons name="briefcase-search" color={color} size={size}/> }}/>
+        options={{ drawerItemStyle: { height: 0 } }}/>
 
+      {/* Projects drawer entry hidden — same rationale as above. */}
       <Drawer.Screen name="ManageProjects" component={ManageProjectsScreen}
-        options={{ ...ac("#193648"), drawerLabel: "Projects",
-          drawerIcon: ({ color, size }) => <MaterialCommunityIcons name="flask-outline" color={color} size={size}/> }}/>
+        options={{ drawerItemStyle: { height: 0 } }}/>
 
       <Drawer.Screen name="AIChatbot" component={AIChatbotScreen}
         options={{ ...ac("#193648"), drawerLabel: "CXbot AI",
@@ -975,13 +1086,12 @@ const d = StyleSheet.create({
     alignItems:"center",
     backgroundColor:THEME.headerBg,
     paddingTop: Platform.OS==="ios" ? 52 : 38,
-    paddingBottom:14,
+    paddingBottom:12,
     paddingHorizontal:14,
-    gap:10,
   },
-  menuBtn: { width:36, height:36, justifyContent:"center", alignItems:"center" },
+  menuBtn: { width:32, height:32, justifyContent:"center", alignItems:"center" },
   logoBox: {
-    width: 32, height: 32, borderRadius: 8,
+    width: 28, height: 28, borderRadius: 6,
     backgroundColor: "#fff",
     justifyContent: "center", alignItems: "center",
     overflow:"hidden",
@@ -992,21 +1102,21 @@ const d = StyleSheet.create({
     paddingTop: Platform.OS === "ios" ? 52 : 38,
   },
   headerIconBtn: {
-    width:36, height:36, borderRadius:10,
+    padding:7, borderRadius:10,
     backgroundColor:"rgba(255,255,255,0.1)",
     justifyContent:"center", alignItems:"center",
   },
   badge: {
     position:"absolute", top:-3, right:-3,
-    minWidth:16, height:16, borderRadius:8,
-    backgroundColor: THEME.red,
+    minWidth:15, height:15, borderRadius:8,
+    backgroundColor:"#EF4444",
     justifyContent:"center", alignItems:"center",
     borderWidth:1.5, borderColor: THEME.headerBg,
     paddingHorizontal:3,
   },
-  badgeTxt: { fontSize:9, fontWeight:"900", color:"#fff" },
+  badgeTxt: { fontSize:8, fontWeight:"800", color:"#fff" },
   avatarBtn: {
-    width:32, height:32, borderRadius:16,
+    width:32, height:32, borderRadius:15,
     borderWidth:2, borderColor:"rgba(255,255,255,0.3)",
     overflow:"hidden",
   },
@@ -1016,7 +1126,7 @@ const d = StyleSheet.create({
     backgroundColor: THEME.headerBg,
     paddingHorizontal: SCREEN_WIDTH * 0.05,
     paddingTop: 24,
-    paddingBottom: 25,
+    paddingBottom: 40,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     marginBottom: 15,
@@ -1025,6 +1135,30 @@ const d = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
+    overflow: "hidden",
+    position: "relative",
+  },
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(25, 54, 72, 0.90)",
+  },
+  heroDots: {
+    position: "absolute",
+    bottom: 16,
+    right: SCREEN_WIDTH * 0.05,
+    flexDirection: "row",
+    gap: 4,
+    zIndex: 5,
+  },
+  heroDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "rgba(255,255,255,0.35)",
+  },
+  heroDotActive: {
+    width: 14,
+    backgroundColor: "#FFFFFF",
   },
   heroTopRow: { flexDirection:"row", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20 },
   heroContent: { flex:1, paddingRight:10 },
@@ -1156,7 +1290,7 @@ const d = StyleSheet.create({
     marginHorizontal:16, padding:16, borderRadius:20, marginBottom:12,
     shadowColor:THEME.headerBg, shadowOffset:{width:0, height:4}, shadowOpacity:0.25, shadowRadius:10, elevation:5,
   },
-  aiBadgeLogo: { width:38, height:38, borderRadius:12, marginRight:12, backgroundColor:"rgba(255,255,255,0.15)" },
+  aiBadgeLogo: { width:38, height:38, borderRadius:12, marginRight:12, backgroundColor:"#FFFFFF", padding:4 },
   aiText:      { color:"#fff", fontSize:14, fontWeight:"700" },
   aiSubText:   { color:"rgba(255,255,255,0.55)", fontSize:11, marginTop:2 },
 });

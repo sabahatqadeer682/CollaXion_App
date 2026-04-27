@@ -9,7 +9,13 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.Collaxion-mobileApp",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "CollaXion uses your microphone for voice notes and calls.",
+        "NSCameraUsageDescription": "CollaXion uses your camera for video calls.",
+        "NSPhotoLibraryUsageDescription": "CollaXion needs access to your photos to share images and videos in chat."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +25,17 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "package": "com.anonymous.Collaxion_mobileApp"
     },
     "web": {
       "output": "static",
@@ -40,7 +56,8 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

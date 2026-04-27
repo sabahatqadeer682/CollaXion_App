@@ -9,6 +9,7 @@ import {
   ActivityIndicator, Alert, Animated,
   DeviceEventEmitter,
   Dimensions, Image, Platform,
+  StatusBar,
   StyleSheet, Text, TextInput,
   TouchableOpacity, View
 } from "react-native";
@@ -18,6 +19,16 @@ import { CONSTANT } from "@/constants/constant";
 
 const LOGO_KEY = "industryLogo";
 export const LOGO_EVENT = "industry:logo:change";
+// Fires after the industry profile (name, phone, website, etc.) is saved.
+// Any screen that consumes useUser() can rely on the provider re-fetching
+// from the server so dashboard, drawer, and cards stay in sync.
+export const USER_EVENT = "industry:user:change";
+
+// Broadcast that the industry profile has changed — UserProvider listens and
+// re-pulls the canonical record from the backend so every consumer updates.
+export const broadcastUser = () => {
+  DeviceEventEmitter.emit(USER_EVENT);
+};
 
 // Filter to keep only renderable URIs (http(s) URL or data URI). Anything
 // else (especially file://) is treated as empty so we never try to render
@@ -181,12 +192,13 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     axios.create({
       baseURL: BASE,
       headers: {
-        "x-industry-id":  user?._id  ?? "",
-        "x-company-name": user?.name ?? "",
-        "Content-Type":   "application/json",
+        "x-industry-id":    user?._id   ?? "",
+        "x-company-name":   user?.name  ?? "",
+        "x-industry-email": user?.email ?? "",
+        "Content-Type":     "application/json",
       },
     }),
-  [user?._id, user?.name]
+  [user?._id, user?.name, user?.email]
   );
 
   // Single writer for the logo. Updates state, the user object, and the cache.
@@ -224,7 +236,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user?.email]);
 
-  // Pre-load cached logo + fetch fresh profile on mount.
+  // Pre-load cached logo + discover the canonical industry profile from the
+  // database on first mount. We hit /profile/any so we don't depend on the
+  // hardcoded default email — whichever record actually exists in MongoDB
+  // becomes the active user, and every consumer of useUser() lights up with
+  // the real saved details (name, industry, website, address, about, phone,
+  // logo).
   useEffect(() => {
     (async () => {
       try {
@@ -234,10 +251,37 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           setUser((prev) => prev ? { ...prev, logo: cached } : prev);
         }
       } catch {}
+
+      try {
+        const { data } = await axios.get(`${BASE}/api/industry/auth/profile/any`);
+        if (data?.company?.email) {
+          setUser((prev) => prev ? { ...prev, ...data.company } : data.company);
+          if (data.company.logo) {
+            setLogoState(data.company.logo);
+            AsyncStorage.setItem(LOGO_KEY, data.company.logo).catch(() => {});
+          }
+          return; // refreshUser already covered by adopting the canonical record
+        }
+      } catch (err: any) {
+        console.log("Industry profile/any error:", err?.response?.data || err.message);
+      }
+
+      // Fallback if the discovery endpoint isn't available — keep the legacy
+      // path of fetching by the default user email.
       refreshUser();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Listen for global "industry profile changed" events. Any save anywhere
+  // in the app fires USER_EVENT; we re-pull from the backend so every
+  // consumer (dashboard, drawer, cards) sees the canonical, persisted data.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(USER_EVENT, () => {
+      refreshUser();
+    });
+    return () => sub.remove();
+  }, [refreshUser]);
 
   return (
     <UserCtx.Provider value={{ user, setUser, updateUser, refreshUser, ax, logo, setLogo }}>
@@ -400,14 +444,22 @@ export const sharedStyles = StyleSheet.create({
 
   toast: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 56 : 40,
-    left: 12, right: 12,
-    flexDirection: "row", alignItems: "center", gap: 10,
+    top: Platform.OS === "ios"
+      ? 64
+      : (StatusBar.currentHeight || 24) + 16,
+    left: 14, right: 14,
+    flexDirection: "row", alignItems: "flex-start", gap: 10,
     paddingHorizontal: 16, paddingVertical: 14,
     borderRadius: 16, borderWidth: 1,
     elevation: 12, zIndex: 9999,
+    shadowColor: "#0F2236", shadowOpacity: 0.18, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
   },
-  toastTxt: { fontSize: 13, fontWeight: "700", flex: 1 },
+  toastTxt: {
+    fontSize: 13, fontWeight: "700", flex: 1,
+    lineHeight: 18, flexShrink: 1, flexWrap: "wrap",
+    paddingTop: 1,
+  },
 
   hdr: {
     backgroundColor: C.white,

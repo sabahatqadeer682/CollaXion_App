@@ -45,7 +45,7 @@
 //     },
 //     {
 //         q: "How do I delete my account?",
-//         a: "Please contact our support team at collaxionteam@gmail.com and we will process your request within 48 hours.",
+//         a: "Please contact our support team at collaxionsupport@gmail.com and we will process your request within 48 hours.",
 //     },
 //     {
 //         q: "Why am I not getting recommendations?",
@@ -73,11 +73,11 @@
 
 //                 <TouchableOpacity
 //                     style={modal.emailBtn}
-//                     onPress={() => Linking.openURL("mailto:collaxionteam@gmail.com?subject=Support Request")}
+//                     onPress={() => Linking.openURL("mailto:collaxionsupport@gmail.com?subject=Support Request")}
 //                     activeOpacity={0.8}
 //                 >
 //                     <Ionicons name="mail" size={20} color="#fff" />
-//                     <Text style={modal.emailText}>collaxionteam@gmail.com</Text>
+//                     <Text style={modal.emailText}>collaxionsupport@gmail.com</Text>
 //                 </TouchableOpacity>
 
 //                 <View style={modal.divider} />
@@ -126,7 +126,7 @@
 
 //                         <TouchableOpacity
 //                             style={faqStyle.contactRow}
-//                             onPress={() => Linking.openURL("mailto:collaxionteam@gmail.com?subject=Help Request")}
+//                             onPress={() => Linking.openURL("mailto:collaxionsupport@gmail.com?subject=Help Request")}
 //                             activeOpacity={0.8}
 //                         >
 //                             <Ionicons name="mail-outline" size={18} color="#5B6FE6" />
@@ -367,7 +367,7 @@
 //                         <Text style={styles.footerLogoText}>CX</Text>
 //                     </View>
 //                     <Text style={styles.footerVersion}>CollaXion v1.0.0</Text>
-//                     <Text style={styles.footerEmail}>collaxionteam@gmail.com</Text>
+//                     <Text style={styles.footerEmail}>collaxionsupport@gmail.com</Text>
 //                 </View>
 
 //             </ScrollView>
@@ -717,7 +717,7 @@
 //     { q: "Can I save internships for later?", a: "Yes! Bookmark any listing. Access saved internships from the Saved Internships section in Settings." },
 //     { q: "How do I update my profile?", a: "Go to Settings → Profile Settings to update your name, skills, bio, and profile photo." },
 //     { q: "Is my data secure?", a: "Absolutely. CollaXion uses secure MongoDB Atlas storage and never shares your personal data with third parties." },
-//     { q: "How do I delete my account?", a: "Contact our support team at collaxionteam@gmail.com and we will process your request within 48 hours." },
+//     { q: "How do I delete my account?", a: "Contact our support team at collaxionsupport@gmail.com and we will process your request within 48 hours." },
 //     { q: "Why am I not getting AI recommendations?", a: "Make sure you have uploaded your CV. Our AI extracts your skills from your CV to generate recommendations." },
 // ];
 
@@ -727,8 +727,8 @@
 //     { title: "How We Use Your Data", body: "Your data is used to power AI-based internship recommendations, match you with industry partners, and personalise your CollaXion experience." },
 //     { title: "Data Storage", body: "All data is securely stored on MongoDB Atlas with encrypted connections. We never store plain credit card or payment information." },
 //     { title: "Third-Party Sharing", body: "We do not sell, rent, or share your personal information with advertisers or unrelated third parties." },
-//     { title: "Your Rights", body: "You may request deletion of your account and all associated data at any time by contacting collaxionteam@gmail.com." },
-//     { title: "Contact", body: "For privacy concerns, reach us at collaxionteam@gmail.com. We respond within 48 hours on business days." },
+//     { title: "Your Rights", body: "You may request deletion of your account and all associated data at any time by contacting collaxionsupport@gmail.com." },
+//     { title: "Contact", body: "For privacy concerns, reach us at collaxionsupport@gmail.com. We respond within 48 hours on business days." },
 // ];
 
 // const TERMS_SECTIONS = [
@@ -795,7 +795,7 @@
 //                         <>
 //                             <Text style={{ fontSize: 48 }}>🎉</Text>
 //                             <Text style={m.title}>Thank You!</Text>
-//                             <Text style={m.sub}>Your feedback has been sent to the CollaXion team.</Text>
+//                             <Text style={m.sub}>Your feedback has been sent to CollaXion.</Text>
 //                             <TouchableOpacity style={m.primaryBtn} onPress={close}>
 //                                 <Text style={m.primaryBtnTxt}>Done</Text>
 //                             </TouchableOpacity>
@@ -885,9 +885,9 @@
 //                 <Image source={require("../../assets/images/logo.png")} style={m.bigLogo} resizeMode="contain" />
 //                 <Text style={m.title}>Contact Support</Text>
 //                 <Text style={m.sub}>Our team typically responds within 24 hours.</Text>
-//                 <TouchableOpacity style={m.primaryBtn} onPress={() => Linking.openURL("mailto:collaxionteam@gmail.com?subject=Support Request")} activeOpacity={0.8}>
+//                 <TouchableOpacity style={m.primaryBtn} onPress={() => Linking.openURL("mailto:collaxionsupport@gmail.com?subject=Support Request")} activeOpacity={0.8}>
 //                     <Ionicons name="mail" size={18} color="#fff" />
-//                     <Text style={m.primaryBtnTxt}>  collaxionteam@gmail.com</Text>
+//                     <Text style={m.primaryBtnTxt}>  collaxionsupport@gmail.com</Text>
 //                 </TouchableOpacity>
 //                 <View style={m.divider} />
 //                 <Text style={m.hoursLabel}>Support Hours</Text>
@@ -919,7 +919,7 @@
 //                                 {open === i && <Text style={faq.a}>{item.a}</Text>}
 //                             </TouchableOpacity>
 //                         ))}
-//                         <TouchableOpacity style={faq.emailRow} onPress={() => Linking.openURL("mailto:collaxionteam@gmail.com?subject=Help Request")} activeOpacity={0.8}>
+//                         <TouchableOpacity style={faq.emailRow} onPress={() => Linking.openURL("mailto:collaxionsupport@gmail.com?subject=Help Request")} activeOpacity={0.8}>
 //                             <Ionicons name="mail-outline" size={16} color={C.accent} />
 //                             <Text style={faq.emailTxt}> Still stuck? Email us</Text>
 //                         </TouchableOpacity>
@@ -1265,7 +1265,7 @@ const FAQ_DATA = [
     { q: "Can I save internships for later?", a: "Yes! Bookmark any listing. Access saved internships from the Saved Internships section in Settings." },
     { q: "How do I update my profile?", a: "Go to Settings → Profile Settings to update your name, skills, bio, and profile photo." },
     { q: "Is my data secure?", a: "Absolutely. CollaXion uses secure MongoDB Atlas storage and never shares your personal data with third parties." },
-    { q: "How do I delete my account?", a: "Contact our support team at collaxionteam@gmail.com and we will process your request within 48 hours." },
+    { q: "How do I delete my account?", a: "Contact our support team at collaxionsupport@gmail.com and we will process your request within 48 hours." },
     { q: "Why am I not getting AI recommendations?", a: "Make sure you have uploaded your CV. Our AI extracts your skills from your CV to generate recommendations." },
 ];
 
@@ -1274,8 +1274,8 @@ const PRIVACY_SECTIONS = [
     { title: "How We Use Your Data", body: "Your data is used to power AI-based internship recommendations, match you with industry partners, and personalise your CollaXion experience." },
     { title: "Data Storage", body: "All data is securely stored on MongoDB Atlas with encrypted connections. We never store plain credit card or payment information." },
     { title: "Third-Party Sharing", body: "We do not sell, rent, or share your personal information with advertisers or unrelated third parties." },
-    { title: "Your Rights", body: "You may request deletion of your account and all associated data at any time by contacting collaxionteam@gmail.com." },
-    { title: "Contact", body: "For privacy concerns, reach us at collaxionteam@gmail.com. We respond within 48 hours on business days." },
+    { title: "Your Rights", body: "You may request deletion of your account and all associated data at any time by contacting collaxionsupport@gmail.com." },
+    { title: "Contact", body: "For privacy concerns, reach us at collaxionsupport@gmail.com. We respond within 48 hours on business days." },
 ];
 
 const TERMS_SECTIONS = [
@@ -1295,7 +1295,7 @@ const RatingModal = ({ visible, onClose }: any) => {
     const [done, setDone] = useState(false);
 
     const submit = async () => {
-        if (stars === 0) { Alert.alert("Rating chahiye", "Please pehle stars select karo."); return; }
+        if (stars === 0) { Alert.alert("Rating required", "Please select a star rating first."); return; }
         setLoading(true);
         try {
             const studentEmail = (await AsyncStorage.getItem("studentEmail")) || "unknown@collaxion.app";
@@ -1311,7 +1311,7 @@ const RatingModal = ({ visible, onClose }: any) => {
             if (!response.ok || !data.success) throw new Error(data.message || "Server error");
             setDone(true);
         } catch (err: any) {
-            Alert.alert("Error", err.message === "Network request failed" ? "Internet connection check karo." : "Rating submit nahi ho saki. Dobara try karo.");
+            Alert.alert("Error", err.message === "Network request failed" ? "Please check your internet connection." : "Could not submit rating. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -1327,9 +1327,23 @@ const RatingModal = ({ visible, onClose }: any) => {
                         <>
                             <Text style={{ fontSize: 48 }}>🎉</Text>
                             <Text style={m.title}>Thank You!</Text>
-                            <Text style={m.sub}>Your feedback has been sent to the CollaXion team.</Text>
-                            <TouchableOpacity style={m.primaryBtn} onPress={close}>
-                                <Text style={m.primaryBtnTxt}>Done</Text>
+                            <Text style={m.sub}>Your feedback has been sent to CollaXion.</Text>
+                            <TouchableOpacity
+                                style={{
+                                    backgroundColor: C.navy,
+                                    paddingVertical: 10,
+                                    paddingHorizontal: 36,
+                                    borderRadius: 10,
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    marginTop: 10,
+                                }}
+                                onPress={close}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 14 }}>
+                                    OK
+                                </Text>
                             </TouchableOpacity>
                         </>
                     ) : (
@@ -1411,7 +1425,7 @@ const PolicyModal = ({ visible, onClose, title, sections }: any) => (
                 <View style={fs.footerNote}>
                     <Ionicons name="shield-checkmark-outline" size={16} color={C.accent} />
                     <Text style={fs.footerNoteTxt}>
-                        For any questions, contact us at collaxionteam@gmail.com
+                        For any questions, contact us at collaxionsupport@gmail.com
                     </Text>
                 </View>
 
@@ -1451,14 +1465,14 @@ const ContactModal = ({ visible, onClose }: any) => (
                     <TouchableOpacity
                         style={fs.contactRow}
                         activeOpacity={0.7}
-                        onPress={() => Linking.openURL("mailto:collaxionteam@gmail.com?subject=Support Request")}
+                        onPress={() => Linking.openURL("mailto:collaxionsupport@gmail.com?subject=Support Request")}
                     >
                         <View style={[fs.contactIcon, { backgroundColor: "#E8F8F0" }]}>
                             <Ionicons name="mail" size={20} color="#27AE60" />
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={fs.contactLabel}>Email Support</Text>
-                            <Text style={fs.contactValue}>collaxionteam@gmail.com</Text>
+                            <Text style={fs.contactValue}>collaxionsupport@gmail.com</Text>
                         </View>
                         <Ionicons name="open-outline" size={16} color={C.sub} />
                     </TouchableOpacity>
@@ -1576,7 +1590,7 @@ const FAQModal = ({ visible, onClose }: any) => {
                         </View>
                         <TouchableOpacity
                             style={fs.helpBtn}
-                            onPress={() => Linking.openURL("mailto:collaxionteam@gmail.com?subject=Help Request")}
+                            onPress={() => Linking.openURL("mailto:collaxionsupport@gmail.com?subject=Help Request")}
                             activeOpacity={0.8}
                         >
                             <Ionicons name="mail-outline" size={15} color="#fff" />
@@ -1604,7 +1618,7 @@ const LogoutModal = ({ visible, onCancel, onConfirm }: any) => (
                     <TouchableOpacity style={m.cancelBtn} onPress={onCancel} activeOpacity={0.8}>
                         <Text style={m.cancelTxt}>Cancel</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[m.primaryBtn, { backgroundColor: C.red }]} onPress={onConfirm} activeOpacity={0.8}>
+                    <TouchableOpacity style={[m.primaryBtn, { backgroundColor: "#193648" }]} onPress={onConfirm} activeOpacity={0.8}>
                         <Text style={m.primaryBtnTxt}>Sign Out</Text>
                     </TouchableOpacity>
                 </View>
@@ -1655,7 +1669,6 @@ const SettingsScreen = ({ navigation }: any) => {
 
                 <View style={s.hero}>
                     <View style={s.heroTop}>
-                        <Image source={require("../../assets/images/logo.png")} style={s.heroLogo} resizeMode="contain" />
                         <View style={s.heroBadge}>
                             <View style={s.heroDot} />
                             <Text style={s.heroBadgeTxt}>Active</Text>
@@ -1687,14 +1700,6 @@ const SettingsScreen = ({ navigation }: any) => {
                     <Opt icon="calendar-outline" title="Events" color={C.red} onPress={() => navigation.navigate("Events")} isLast />
                 </View>
 
-                <Label text="PREFERENCES" />
-                <View style={s.card}>
-                    <Opt icon="notifications-outline" title="Push Notifications" color={C.accent} onPress={() => {}}
-                        right={<Switch value={notifs} onValueChange={setNotifs} trackColor={{ false: "#DDD", true: C.navy }} thumbColor="#fff" />} />
-                    <Opt icon="moon-outline" title="Dark Mode" color={C.navyD} onPress={() => {}} isLast
-                        right={<Switch value={darkMode} onValueChange={setDarkMode} trackColor={{ false: "#DDD", true: C.navy }} thumbColor="#fff" />} />
-                </View>
-
                 <Label text="SUPPORT" />
                 <View style={s.card}>
                     <Opt icon="help-circle-outline" title="Help & FAQ" color="#16A085" onPress={() => setFaqVisible(true)} />
@@ -1705,7 +1710,7 @@ const SettingsScreen = ({ navigation }: any) => {
                 </View>
 
                 <TouchableOpacity style={s.logoutBtn} onPress={() => setLogoutVisible(true)} activeOpacity={0.85}>
-                    <Ionicons name="log-out-outline" size={18} color={C.red} />
+                    <Ionicons name="log-out-outline" size={18} color={C.white} />
                     <Text style={s.logoutTxt}>Sign Out</Text>
                 </TouchableOpacity>
 
@@ -1763,9 +1768,11 @@ const s = StyleSheet.create({
     logoutBtn: {
         flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8,
         margin: 14, marginTop: 22, padding: 15, borderRadius: 16,
-        backgroundColor: C.white, borderWidth: 1.5, borderColor: "#FADBD8", elevation: 1,
+        backgroundColor: "#193648", borderWidth: 0,
+        shadowColor: "#193648", shadowOpacity: 0.25, shadowRadius: 10,
+        shadowOffset: { width: 0, height: 6 }, elevation: 4,
     },
-    logoutTxt:   { fontSize: 15, fontWeight: "700", color: C.red },
+    logoutTxt:   { fontSize: 15, fontWeight: "700", color: C.white, letterSpacing: 0.3 },
     footer:      { alignItems: "center", paddingVertical: 30, gap: 5 },
     footerLogo:  { width: 36, height: 36, borderRadius: 10, marginBottom: 6 },
     footerApp:   { fontSize: 12, color: "#9AADB8", fontWeight: "600" },

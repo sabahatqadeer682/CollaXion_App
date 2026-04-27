@@ -206,7 +206,7 @@
 //                                                     <td style="padding:14px 18px;">
 //                                                         <p style="margin:0;font-size:13px;color:#856404;line-height:1.6;">
 //                                                             ⚠️ <strong>Yeh aap nahi thay?</strong> Agar aap ne password nahi badla toh foran 
-//                                                             <a href="mailto:collaxionteam@gmail.com" style="color:#5B6FE6;">collaxionteam@gmail.com</a> 
+//                                                             <a href="mailto:collaxionsupport@gmail.com" style="color:#5B6FE6;">collaxionsupport@gmail.com</a> 
 //                                                             pe contact karo.
 //                                                         </p>
 //                                                     </td>
@@ -224,7 +224,7 @@
 //                                     <tr>
 //                                         <td style="background:#F8FAFC;padding:16px 32px;text-align:center;border-top:1px solid #EEE;">
 //                                             <p style="margin:0;font-size:11px;color:#BDC3C7;">
-//                                                 © 2025 CollaXion • collaxionteam@gmail.com
+//                                                 © 2025 CollaXion • collaxionsupport@gmail.com
 //                                             </p>
 //                                         </td>
 //                                     </tr>
@@ -395,7 +395,7 @@
 //                                                     <td style="padding:14px 18px;">
 //                                                         <p style="margin:0;font-size:13px;color:#856404;line-height:1.6;">
 //                                                             ⚠️ <strong>Yeh aap nahi thay?</strong> Agar aap ne password nahi badla toh foran 
-//                                                             <a href="mailto:collaxionteam@gmail.com" style="color:#5B6FE6;">collaxionteam@gmail.com</a> 
+//                                                             <a href="mailto:collaxionsupport@gmail.com" style="color:#5B6FE6;">collaxionsupport@gmail.com</a> 
 //                                                             pe contact karo.
 //                                                         </p>
 //                                                     </td>
@@ -413,7 +413,7 @@
 //                                     <tr>
 //                                         <td style="background:#F8FAFC;padding:16px 32px;text-align:center;border-top:1px solid #EEE;">
 //                                             <p style="margin:0;font-size:11px;color:#BDC3C7;">
-//                                                 © 2026 CollaXion • collaxionteam@gmail.com
+//                                                 © 2026 CollaXion • collaxionsupport@gmail.com
 //                                             </p>
 //                                         </td>
 //                                     </tr>
@@ -584,7 +584,7 @@ export const updatePassword = async (req, res) => {
                                                     <td style="padding:14px 18px;">
                                                         <p style="margin:0;font-size:13px;color:#856404;line-height:1.6;">
                                                             ⚠️ <strong>Not you?</strong> If you did not change your password, immediately contact 
-                                                            <a href="mailto:collaxionteam@gmail.com" style="color:#5B6FE6;">collaxionteam@gmail.com</a>.
+                                                            <a href="mailto:collaxionsupport@gmail.com" style="color:#5B6FE6;">collaxionsupport@gmail.com</a>.
                                                         </p>
                                                     </td>
                                                 </tr>
@@ -601,7 +601,7 @@ export const updatePassword = async (req, res) => {
                                     <tr>
                                         <td style="background:#F8FAFC;padding:16px 32px;text-align:center;border-top:1px solid #EEE;">
                                             <p style="margin:0;font-size:11px;color:#BDC3C7;">
-                                                © 2026 CollaXion • collaxionteam@gmail.com
+                                                © 2026 CollaXion • collaxionsupport@gmail.com
                                             </p>
                                         </td>
                                     </tr>

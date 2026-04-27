@@ -85,7 +85,7 @@ router.post("/chat", async (req, res) => {
 
     const candidate = response.data?.candidates?.[0];
     const reply = candidate?.content?.parts?.[0]?.text?.trim()
-      || "Maafi chahta hoon, abhi response generate nahi ho saka. Dobara try karein.";
+      || "Sorry, I couldn't generate a response right now. Please try again.";
 
     return res.json({ reply });
 
@@ -93,7 +93,7 @@ router.post("/chat", async (req, res) => {
     console.error("❌ CXbot Gemini error:", err?.response?.data || err.message);
     const geminiMsg = err?.response?.data?.error?.message;
     return res.status(500).json({
-      error: geminiMsg || "CXbot se response nahi mila. Server check karein.",
+      error: geminiMsg || "No response from CXbot. Please check the server.",
     });
   }
 });

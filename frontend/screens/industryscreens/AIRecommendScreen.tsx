@@ -173,7 +173,7 @@ function StudentDetailModal({
                 <View style={sd.aiBox}>
                   <View style={sd.aiBoxHead}>
                     <Ionicons name="sparkles" size={14} color={THEME.accent}/>
-                    <Text style={sd.aiBoxTitle}>Gemini AI Analysis</Text>
+                    <Text style={sd.aiBoxTitle}>CXbot AI Analysis</Text>
                   </View>
                   <Text style={sd.aiBoxText}>{rec.aiReason}</Text>
                 </View>
@@ -574,7 +574,7 @@ Sort by matchScore descending.`;
         }))
       );
     } catch(e:any) {
-      setSearchError("Gemini API error: " + e.message);
+      setSearchError("CXbot AI error: " + e.message);
     } finally {
       setSearchLoading(false); pulseAnim.stopAnimation(); pulseAnim.setValue(1);
     }
@@ -612,11 +612,11 @@ Sort by matchScore descending.`;
           </TouchableOpacity>
           <View style={{flex:1,marginLeft:14}}>
             <Text style={s.hTitle}>AI Recommend</Text>
-            <Text style={s.hSub}>Gemini-powered skill matching</Text>
+            <Text style={s.hSub}>CXbot-powered skill matching</Text>
           </View>
           <View style={s.gemPill}>
             <Ionicons name="sparkles" size={12} color="#F59E0B"/>
-            <Text style={s.gemPillTxt}>Gemini</Text>
+            <Text style={s.gemPillTxt}>CXbot</Text>
           </View>
         </View>
         {/* Stats */}
@@ -701,7 +701,7 @@ Sort by matchScore descending.`;
                     transform:[{scale:searchLoading?pulseAnim:new Animated.Value(1)}]}}>
                     <Ionicons name={searchLoading?"hourglass":"sparkles"} size={17} color="#fff"/>
                     <Text style={s.analyzeBtnTxt}>
-                      {searchLoading?"Analyzing with Gemini...":"Find Best Matches"}
+                      {searchLoading?"Analyzing with CXbot...":"Find Best Matches"}
                     </Text>
                   </Animated.View>
                 </View>
@@ -754,7 +754,7 @@ Sort by matchScore descending.`;
                 </View>
                 <Text style={s.emptyTitle}>AI-Powered Matching</Text>
                 <Text style={s.emptySub}>
-                  Enter your job requirements and let Gemini AI rank {ALL_STUDENTS.length} student applications by skill relevance.
+                  Enter your job requirements and let CXbot AI rank {ALL_STUDENTS.length} student applications by skill relevance.
                 </Text>
                 {["Skill overlap scoring","CGPA weighting","Personalized AI reasoning"].map((f,i)=>(
                   <View key={i} style={s.featureRow}>

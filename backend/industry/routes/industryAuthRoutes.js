@@ -1,7 +1,12 @@
 import express from "express";
-import { getProfile, updateProfile } from "../controller/profileController.js";
+import { getAnyProfile, getProfile, updateProfile } from "../controller/profileController.js";
 
 const router = express.Router();
+
+// GET  /api/industry/auth/profile/any
+// Must come BEFORE the parameterless /profile so Express doesn't treat
+// "any" as the profile email.
+router.get("/profile/any", getAnyProfile);
 
 // GET  /api/industry/auth/profile?email=xxx
 router.get("/profile", getProfile);

@@ -8,7 +8,7 @@ import {
   ScrollView, StatusBar, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
 } from "react-native";
-import { useUser } from "./shared";
+import { useToast, useUser } from "./shared";
 
 // ── Theme — matches CollaXion industry dashboard ───────────────────
 const T = {
@@ -41,6 +41,77 @@ const SKILL_SUGGESTIONS = [
   "JavaScript", "Node.js", "Flutter", "TensorFlow", "SQL", "Figma",
   "C++", "Java", "Swift", "Kotlin", "DevOps", "Cloud Computing",
 ];
+
+// ── Auto-suggestion datasets ─────────────────────────────────────
+const TITLE_SUGGESTIONS: Record<PostType, string[]> = {
+  Internship: [
+    "Frontend Developer Intern",
+    "Backend Developer Intern",
+    "Full-Stack Developer Intern",
+    "Mobile App Developer Intern",
+    "AI / ML Intern",
+    "Data Analyst Intern",
+    "UI/UX Designer Intern",
+    "DevOps Intern",
+    "QA Engineer Intern",
+    "Marketing Intern",
+  ],
+  Project: [
+    "AI Research Project",
+    "Computer Vision Project",
+    "NLP Research Project",
+    "Web Development Project",
+    "Mobile App Project",
+    "IoT Prototype",
+    "Data Analytics Project",
+    "Blockchain Prototype",
+  ],
+  Workshop: [
+    "Data Science Bootcamp",
+    "React Native Workshop",
+    "Python for Beginners",
+    "Cybersecurity Workshop",
+    "Cloud Computing Bootcamp",
+    "AI for Beginners",
+    "UI/UX Design Workshop",
+  ],
+};
+
+const STIPEND_SUGGESTIONS = [
+  "Unpaid",
+  "PKR 10,000/mo",
+  "PKR 15,000/mo",
+  "PKR 25,000/mo",
+  "PKR 40,000/mo",
+  "PKR 50,000/mo",
+  "Stipend on completion",
+  "Performance-based",
+];
+
+const DURATION_SUGGESTIONS = [
+  "2 Weeks", "1 Month", "6 Weeks",
+  "2 Months", "3 Months", "6 Months", "1 Year",
+];
+
+const LOCATION_SUGGESTIONS = [
+  "Islamabad", "Rawalpindi", "Lahore", "Karachi",
+  "Faisalabad", "Multan", "Peshawar", "Remote",
+];
+
+const DESCRIPTION_TEMPLATES: Record<PostType, string[]> = {
+  Internship: [
+    "We are looking for a motivated intern to join our team and work on real-world projects. You'll collaborate with senior engineers, learn modern tools, and ship features used by real users.",
+    "Hands-on internship covering end-to-end project work. Mentorship provided. Strong learning curve in agile development, code review, and production deployment.",
+  ],
+  Project: [
+    "Final-year-project sponsorship — work alongside our R&D team on a real industry problem. Deliverables: prototype, report, and a final demo.",
+    "Applied research project for senior students. Industry mentor + lab access provided. Outcome may be considered for a paid role.",
+  ],
+  Workshop: [
+    "Hands-on training program covering fundamentals to project work. Open to all students. Certificate awarded on completion.",
+    "Intensive bootcamp with daily exercises, real datasets, and a capstone project. Limited seats — selection based on skills.",
+  ],
+};
 
 const MONTH_NAMES = [
   "Jan","Feb","Mar","Apr","May","Jun",
@@ -242,6 +313,7 @@ const cal = StyleSheet.create({
 export function PostOpportunityScreen() {
   const nav = useNavigation<any>();
   const { user, ax } = useUser();
+  const toast = useToast();
 
   const [type, setType]             = useState<PostType>("Internship");
   const [title, setTitle]           = useState("");
@@ -298,11 +370,11 @@ export function PostOpportunityScreen() {
 
   const handlePost = async () => {
     if (!title.trim() || !description.trim()) {
-      Alert.alert("Required", "Title aur description zaroori hain.");
+      Alert.alert("Required", "Title and description are required.");
       return;
     }
     if (!user?._id) {
-      Alert.alert("Error", "Session khatam ho gaya. Dobara login karein.");
+      Alert.alert("Error", "Your session has expired. Please log in again.");
       return;
     }
     setLoading(true);
@@ -314,6 +386,7 @@ export function PostOpportunityScreen() {
       };
       const response = await ax().post("/api/industry/posts", payload);
       console.log("✅ Post created:", response.data?._id);
+      toast(`Your ${type} post has been created`, "success");
       Alert.alert("Posted! 🎉", `Your ${type} post is live!`, [
         { text: "OK", onPress: () => nav.goBack() },
       ]);
@@ -435,6 +508,17 @@ export function PostOpportunityScreen() {
                   onChangeText={setTitle} maxLength={80}
                 />
               </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled" style={{ marginTop: 8 }}>
+                {TITLE_SUGGESTIONS[type]
+                  .filter((t) => t.toLowerCase() !== title.trim().toLowerCase())
+                  .map((sg) => (
+                    <TouchableOpacity key={sg} onPress={() => setTitle(sg)} style={s.suggestionChip}>
+                      <Ionicons name="sparkles-outline" size={12} color={T.navy} />
+                      <Text style={s.suggestionTxt}>{sg}</Text>
+                    </TouchableOpacity>
+                  ))}
+              </ScrollView>
             </View>
 
             {/* ── Description ── */}
@@ -446,9 +530,19 @@ export function PostOpportunityScreen() {
                   placeholder="Describe the role, responsibilities, and what students will learn..."
                   placeholderTextColor={T.placeholder} value={description}
                   onChangeText={setDesc} multiline numberOfLines={5} textAlignVertical="top"
+                  maxLength={1000}
                 />
               </View>
               <Text style={s.charCount}>{description.length} / 1000</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled" style={{ marginTop: 4 }}>
+                {DESCRIPTION_TEMPLATES[type].map((tpl, i) => (
+                  <TouchableOpacity key={i} onPress={() => setDesc(tpl)} style={s.suggestionChip}>
+                    <Ionicons name="document-text-outline" size={12} color={T.navy} />
+                    <Text style={s.suggestionTxt} numberOfLines={1}>Template {i + 1}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
 
             {/* ── Stipend + Duration ── */}
@@ -469,6 +563,31 @@ export function PostOpportunityScreen() {
                     placeholderTextColor={T.placeholder} value={duration} onChangeText={setDuration} />
                 </View>
               </View>
+            </View>
+            {/* Stipend + Duration suggestions */}
+            <View style={s.section}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled">
+                {STIPEND_SUGGESTIONS
+                  .filter((sg) => sg !== stipend)
+                  .map((sg) => (
+                    <TouchableOpacity key={`stipend-${sg}`} onPress={() => setStipend(sg)} style={s.suggestionChip}>
+                      <Ionicons name="cash-outline" size={12} color={T.navy} />
+                      <Text style={s.suggestionTxt}>{sg}</Text>
+                    </TouchableOpacity>
+                  ))}
+              </ScrollView>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled" style={{ marginTop: 6 }}>
+                {DURATION_SUGGESTIONS
+                  .filter((sg) => sg !== duration)
+                  .map((sg) => (
+                    <TouchableOpacity key={`dur-${sg}`} onPress={() => setDuration(sg)} style={s.suggestionChip}>
+                      <Ionicons name="time-outline" size={12} color={T.navy} />
+                      <Text style={s.suggestionTxt}>{sg}</Text>
+                    </TouchableOpacity>
+                  ))}
+              </ScrollView>
             </View>
 
             {/* ── Seats + Deadline ── */}
@@ -528,6 +647,17 @@ export function PostOpportunityScreen() {
                 <TextInput style={s.input} placeholder="City, Building, or 'Remote'"
                   placeholderTextColor={T.placeholder} value={location} onChangeText={setLocation} />
               </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled" style={{ marginTop: 8 }}>
+                {LOCATION_SUGGESTIONS
+                  .filter((sg) => sg.toLowerCase() !== location.trim().toLowerCase())
+                  .map((sg) => (
+                    <TouchableOpacity key={`loc-${sg}`} onPress={() => setLocation(sg)} style={s.suggestionChip}>
+                      <Ionicons name="location-outline" size={12} color={T.navy} />
+                      <Text style={s.suggestionTxt}>{sg}</Text>
+                    </TouchableOpacity>
+                  ))}
+              </ScrollView>
             </View>
 
             {/* ── Skills ── */}
@@ -544,15 +674,19 @@ export function PostOpportunityScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Suggestions */}
+              {/* Suggestions — filter by what's typed so it acts like autocomplete */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled" style={{ marginTop: 10 }}>
-                {SKILL_SUGGESTIONS.filter((sk) => !skills.includes(sk)).map((sk) => (
-                  <TouchableOpacity key={sk} onPress={() => addSkill(sk)} style={s.suggestionChip}>
-                    <Ionicons name="add-circle-outline" size={13} color={T.navy} />
-                    <Text style={s.suggestionTxt}>{sk}</Text>
-                  </TouchableOpacity>
-                ))}
+                {SKILL_SUGGESTIONS
+                  .filter((sk) => !skills.includes(sk))
+                  .filter((sk) => !skillInput.trim()
+                    || sk.toLowerCase().includes(skillInput.trim().toLowerCase()))
+                  .map((sk) => (
+                    <TouchableOpacity key={sk} onPress={() => addSkill(sk)} style={s.suggestionChip}>
+                      <Ionicons name="add-circle-outline" size={13} color={T.navy} />
+                      <Text style={s.suggestionTxt}>{sk}</Text>
+                    </TouchableOpacity>
+                  ))}
               </ScrollView>
 
               {/* Selected */}

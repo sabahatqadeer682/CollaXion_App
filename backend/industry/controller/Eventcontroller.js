@@ -112,6 +112,37 @@ export async function createEvent(req, res) {
         relatedEventTitle: event.title,
       });
 
+      // Push real-time event so the dashboard "Your Posts" + counts refresh
+      // for every connected session of this industry without a manual reload.
+      try {
+        req.app.locals.broadcastToIndustry?.(companyName, {
+          event: "newEvent",
+          data:  event,
+        });
+      } catch (_) {}
+
+      // Persist + push an in-app notification so the bell list lights up.
+      try {
+        const industryEmail = (req.headers["x-industry-email"] || req.body.industryEmail || "").toString().trim();
+        if (industryEmail) {
+          // Lazy import to keep the controller's existing imports untouched.
+          const { default: IndustryNotification } = await import("../models/IndustryNotification.js");
+          const note = await IndustryNotification.create({
+            industryEmail,
+            title:   "Event Created",
+            message: `Your event "${event.title}" is now live.`,
+            type:    "event",
+            meta:    { eventId: event._id, eventType: event.eventType, date: event.date },
+          });
+          req.app.locals.broadcast?.(industryEmail, {
+            event: "newNotification",
+            data:  note,
+          });
+        }
+      } catch (e) {
+        console.error("Event-create notification failed:", e?.message);
+      }
+
       // ── Notifications: invited universities ─────────────────────
       if (event.invitedUniversities.length > 0) {
         const uniNotifs = event.invitedUniversities.map((uni) => ({
@@ -140,11 +171,21 @@ export async function createEvent(req, res) {
 // ═══════════════════════════════════════════════════════════════════════════════
 export async function getMyEvents(req, res) {
   try {
-    const industryId = req.headers["x-industry-id"] || req.query.industryId;
-    if (!industryId) return res.status(400).json({ success: false, message: "industryId required" });
+    const industryId  = req.headers["x-industry-id"]  || req.query.industryId;
+    const companyName = req.headers["x-company-name"] || req.query.companyName;
+    if (!industryId && !companyName) {
+      return res.status(400).json({ success: false, message: "industryId required" });
+    }
+
+    // Match by industry id OR company name. Industry "_id" can drift across
+    // sessions; falling back to companyName keeps every event the industry
+    // has ever created visible on the dashboard / EventsManage screen.
+    const ors = [];
+    if (industryId)  ors.push({ industryId });
+    if (companyName) ors.push({ companyName });
 
     const events = await Event.find({
-      industryId,
+      $or: ors,
       status: { $in: ["published", "hidden"] },
     }).sort({ createdAt: -1 });
 

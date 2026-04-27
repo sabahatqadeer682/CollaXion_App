@@ -46,8 +46,10 @@ export const extractSkillsFromCV = async (filePath, fileType) => {
             console.log("TXT extracted successfully");
         }
 
-        // Cleanup
-        fs.unlinkSync(filePath);
+        // NOTE: Do NOT delete the uploaded CV here — the file path is stored
+        // on the Student document as cvUrl and the /view-cv endpoint streams
+        // it back to the user. Deleting now would orphan the DB reference.
+        // (File is removed by /delete-cv or when the next CV upload replaces it.)
 
         if (!textContent.trim()) {
             throw new Error("Resume text extraction failed.");

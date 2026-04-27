@@ -3085,10 +3085,18 @@ const calculateMatch = (studentSkills: string[], requiredSkills: string[]): numb
 };
 
 const getMatchColor = (score: number) => {
-    if (score >= 70) return "#059669";
-    if (score >= 40) return "#D97706";
-    return "#6B7280";
+    if (score >= 70) return "#193648";
+    if (score >= 40) return "#2A5A72";
+    return "#64748B";
 };
+
+// Hero auto-cycling cinematic images — internship/career related
+const HERO_IMAGES = [
+    "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1200&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=80&w=1200&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=1200&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?q=80&w=1200&auto=format&fit=crop",
+];
 
 const InternshipsScreen = () => {
     const [search, setSearch] = useState("");
@@ -3105,6 +3113,15 @@ const InternshipsScreen = () => {
     const [applicationCount, setApplicationCount] = useState(0);
     const [coverLetter, setCoverLetter] = useState("");
     const [showCoverLetter, setShowCoverLetter] = useState(false);
+    const [heroIdx, setHeroIdx] = useState(0);
+
+    // Auto-cycle hero background every 4 seconds (video-like effect)
+    useEffect(() => {
+        const id = setInterval(() => {
+            setHeroIdx((i) => (i + 1) % HERO_IMAGES.length);
+        }, 4000);
+        return () => clearInterval(id);
+    }, []);
 
     useFocusEffect(
         useCallback(() => {
@@ -3240,7 +3257,7 @@ const InternshipsScreen = () => {
         const studentSkillsLower = studentSkills.map((s) => s.toLowerCase());
 
         return (
-            <Animatable.View animation="fadeInUp" style={[styles.card, isHighMatch && styles.highMatchCard]}>
+            <Animatable.View animation="fadeInUp" style={[styles.card, isHighMatch && styles.highMatchCard, isApplied && styles.appliedCard]}>
                 {isHighMatch && (
                     <View style={styles.topMatchBadge}>
                         <MaterialCommunityIcons name="star" size={12} color="#FFF" />
@@ -3311,18 +3328,81 @@ const InternshipsScreen = () => {
     return (
         <SafeAreaView style={styles.safeArea}>
             <ScrollView stickyHeaderIndices={[1]} showsVerticalScrollIndicator={false}>
-                <ImageBackground source={{ uri: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1000&auto=format&fit=crop" }} style={styles.hero}>
+                <View style={styles.hero}>
+                    {/* Cycling background images (video-like) */}
+                    {HERO_IMAGES.map((uri, i) => (
+                        <Animatable.View
+                            key={uri}
+                            style={[StyleSheet.absoluteFillObject, { opacity: heroIdx === i ? 1 : 0 }]}
+                            animation={heroIdx === i ? "fadeIn" : undefined}
+                            duration={1200}
+                        >
+                            <ImageBackground source={{ uri }} style={{ flex: 1 }} resizeMode="cover" />
+                        </Animatable.View>
+                    ))}
+
+                    {/* Dark navy gradient overlay */}
                     <View style={styles.heroOverlay}>
-                        <Text style={styles.heroTitle}>Smart Matches</Text>
-                        <Text style={styles.heroSubtitle}>
-                            {studentSkills.length > 0 ? `Filtered by ${studentSkills.length} skills from your CV` : "Upload CV for better matching"}
-                        </Text>
-                        <View style={styles.appCountBadge}>
-                            <MaterialCommunityIcons name="briefcase-check" size={16} color="#FFF" />
-                            <Text style={styles.appCountText}>{applicationCount} Applications Submitted</Text>
+                        {/* Live pulse dot — feels like a video */}
+                        <View style={styles.heroLiveRow}>
+                            <Animatable.View
+                                animation={{ 0: { opacity: 1 }, 0.5: { opacity: 0.3 }, 1: { opacity: 1 } }}
+                                iterationCount="infinite"
+                                duration={1400}
+                                style={styles.liveDot}
+                            />
+                            <Text style={styles.liveText}>EXPLORE • LIVE OPPORTUNITIES</Text>
+                        </View>
+
+                        <Animatable.Text
+                            animation="fadeInUp"
+                            duration={700}
+                            style={styles.heroTitle}
+                        >
+                            Smart Matches
+                        </Animatable.Text>
+
+                        <Animatable.Text
+                            animation="fadeInUp"
+                            delay={150}
+                            duration={700}
+                            style={styles.heroSubtitle}
+                        >
+                            {studentSkills.length > 0
+                                ? `Filtered by ${studentSkills.length} skills from your CV`
+                                : "Upload CV for personalized matching"}
+                        </Animatable.Text>
+
+                        <Animatable.View
+                            animation="fadeInUp"
+                            delay={300}
+                            duration={700}
+                            style={styles.heroBadgeRow}
+                        >
+                            <View style={styles.appCountBadge}>
+                                <MaterialCommunityIcons name="briefcase-check" size={14} color="#FFF" />
+                                <Text style={styles.appCountText}>{applicationCount} Applied</Text>
+                            </View>
+                            <View style={[styles.appCountBadge, { backgroundColor: "rgba(245,158,11,0.25)" }]}>
+                                <MaterialCommunityIcons name="lightning-bolt" size={14} color="#FBBF24" />
+                                <Text style={[styles.appCountText, { color: "#FBBF24" }]}>AI Powered</Text>
+                            </View>
+                        </Animatable.View>
+
+                        {/* Slide indicator dots */}
+                        <View style={styles.heroDots}>
+                            {HERO_IMAGES.map((_, i) => (
+                                <View
+                                    key={i}
+                                    style={[
+                                        styles.heroDot,
+                                        heroIdx === i && styles.heroDotActive,
+                                    ]}
+                                />
+                            ))}
                         </View>
                     </View>
-                </ImageBackground>
+                </View>
 
                 <View style={styles.filterSection}>
                     <View style={styles.searchBar}>
@@ -3355,7 +3435,15 @@ const InternshipsScreen = () => {
                 ) : (
                     <>
                         <View style={styles.resultsHeader}>
-                            <Text style={styles.resultsCount}>{filteredData.length} Opportunities Found</Text>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                                <View style={styles.resultsIconBox}>
+                                    <MaterialCommunityIcons name="lightning-bolt" size={14} color="#193648" />
+                                </View>
+                                <Text style={styles.resultsCount}>Opportunities for you</Text>
+                            </View>
+                            <View style={styles.resultsCountBadge}>
+                                <Text style={styles.resultsCountBadgeText}>{filteredData.length}</Text>
+                            </View>
                         </View>
                         <FlatList
                             data={filteredData}
@@ -3368,52 +3456,182 @@ const InternshipsScreen = () => {
                 )}
             </ScrollView>
 
-            {/* Modal remains same but with updated structure for applying */}
+            {/* ── DETAIL MODAL — premium ── */}
             <Modal visible={detailModalVisible} animationType="slide">
-                <SafeAreaView style={{ flex: 1, backgroundColor: "#FFF" }}>
+                <SafeAreaView style={{ flex: 1, backgroundColor: "#F4F7FB" }}>
                     {selectedItem && (
                         <View style={styles.modalRoot}>
-                            <TouchableOpacity style={styles.closeBtn} onPress={() => { setDetailModalVisible(false); setShowCoverLetter(false); setCoverLetter(""); }}>
-                                <Ionicons name="close-circle" size={36} color="#193648" />
-                            </TouchableOpacity>
-                            <ScrollView showsVerticalScrollIndicator={false}>
+                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+                                {/* Hero banner with navy gradient */}
                                 <View style={styles.modalBanner}>
-                                    <Image source={{ uri: selectedItem.logo || "https://img.icons8.com/color/96/briefcase.png" }} style={styles.modalLogo} />
-                                    <Text style={styles.modalTitle}>{selectedItem.title}</Text>
-                                    <Text style={styles.modalCompany}>{selectedItem.company}</Text>
-                                </View>
-
-                                <View style={styles.modalBody}>
-                                    <View style={styles.matchCard}>
-                                        <MaterialCommunityIcons name="brain" size={22} color="#193648" />
-                                        <View style={{ flex: 1, marginLeft: 12 }}>
-                                            <Text style={styles.matchCardTitle}>Skill Match: {selectedItem.matchScore}%</Text>
+                                    {/* Top bar: back + share */}
+                                    <View style={styles.modalTopBar}>
+                                        <TouchableOpacity
+                                            style={styles.modalBackBtn}
+                                            onPress={() => { setDetailModalVisible(false); setShowCoverLetter(false); setCoverLetter(""); }}
+                                        >
+                                            <Ionicons name="arrow-back" size={20} color="#FFF" />
+                                        </TouchableOpacity>
+                                        <View style={styles.modalLiveBadge}>
+                                            <View style={styles.modalLiveDot} />
+                                            <Text style={styles.modalLiveText}>OPEN POSITION</Text>
                                         </View>
                                     </View>
 
-                                    <Text style={styles.sectionTitle}>About the Role</Text>
-                                    <Text style={styles.sectionBody}>{selectedItem.description}</Text>
+                                    {/* Logo + title */}
+                                    <View style={styles.modalLogoBox}>
+                                        <Image
+                                            source={{ uri: selectedItem.logo || "https://img.icons8.com/color/96/briefcase.png" }}
+                                            style={styles.modalLogoImg}
+                                            resizeMode="contain"
+                                        />
+                                    </View>
+                                    <Text style={styles.modalTitle}>{selectedItem.title}</Text>
+                                    <View style={styles.modalCompanyRow}>
+                                        <MaterialCommunityIcons name="office-building" size={14} color="rgba(255,255,255,0.85)" />
+                                        <Text style={styles.modalCompany}>{selectedItem.company}</Text>
+                                    </View>
 
+                                    {/* Key info pills inside hero */}
+                                    <View style={styles.modalPillRow}>
+                                        {selectedItem.location && (
+                                            <View style={styles.modalPill}>
+                                                <Ionicons name="location" size={11} color="#FFF" />
+                                                <Text style={styles.modalPillText}>{selectedItem.location}</Text>
+                                            </View>
+                                        )}
+                                        {selectedItem.type && (
+                                            <View style={styles.modalPill}>
+                                                <MaterialCommunityIcons name="briefcase-clock" size={11} color="#FFF" />
+                                                <Text style={styles.modalPillText}>{selectedItem.type}</Text>
+                                            </View>
+                                        )}
+                                        {selectedItem.stipend && (
+                                            <View style={styles.modalPill}>
+                                                <MaterialCommunityIcons name="cash-multiple" size={11} color="#FFF" />
+                                                <Text style={styles.modalPillText}>{selectedItem.stipend}</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                </View>
+
+                                <View style={styles.modalBody}>
+                                    {/* Match score card */}
+                                    <View style={styles.matchCard}>
+                                        <View style={styles.matchIconBox}>
+                                            <MaterialCommunityIcons name="brain" size={20} color="#193648" />
+                                        </View>
+                                        <View style={{ flex: 1, marginLeft: 12 }}>
+                                            <Text style={styles.matchCardTitle}>AI Skill Match</Text>
+                                            <View style={styles.matchProgressBg}>
+                                                <View style={[styles.matchProgressFill, { width: `${Math.max(selectedItem.matchScore || 0, 5)}%` }]} />
+                                            </View>
+                                        </View>
+                                        <Text style={styles.matchScoreVal}>{selectedItem.matchScore || 0}%</Text>
+                                    </View>
+
+                                    {/* Quick stats grid */}
+                                    {selectedItem.duration && (
+                                        <View style={styles.statsGrid}>
+                                            <View style={styles.statBox}>
+                                                <MaterialCommunityIcons name="calendar-clock" size={18} color="#193648" />
+                                                <Text style={styles.statLabel}>Duration</Text>
+                                                <Text style={styles.statValue}>{selectedItem.duration}</Text>
+                                            </View>
+                                            {selectedItem.domain && (
+                                                <View style={styles.statBox}>
+                                                    <MaterialCommunityIcons name="tag-outline" size={18} color="#193648" />
+                                                    <Text style={styles.statLabel}>Domain</Text>
+                                                    <Text style={styles.statValue} numberOfLines={1}>{selectedItem.domain}</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    )}
+
+                                    {/* About section */}
+                                    <View style={styles.sectionHeader}>
+                                        <View style={styles.sectionDot} />
+                                        <Text style={styles.sectionTitle}>About the Role</Text>
+                                    </View>
+                                    <View style={styles.sectionCard}>
+                                        <Text style={styles.sectionBody}>{selectedItem.description || "No description provided."}</Text>
+                                    </View>
+
+                                    {/* Required skills */}
+                                    {selectedItem.requiredSkills?.length > 0 && (
+                                        <>
+                                            <View style={styles.sectionHeader}>
+                                                <View style={styles.sectionDot} />
+                                                <Text style={styles.sectionTitle}>Required Skills</Text>
+                                            </View>
+                                            <View style={styles.skillsCloud}>
+                                                {selectedItem.requiredSkills.map((skill: string, i: number) => {
+                                                    const matched = studentSkills.map(s => s.toLowerCase()).some(s => s.includes(skill.toLowerCase()) || skill.toLowerCase().includes(s));
+                                                    return (
+                                                        <View key={i} style={[styles.skillChip, matched && styles.skillChipMatched]}>
+                                                            {matched && <Ionicons name="checkmark-circle" size={11} color="#193648" />}
+                                                            <Text style={[styles.skillChipText, matched && styles.skillChipTextMatched]}>{skill}</Text>
+                                                        </View>
+                                                    );
+                                                })}
+                                            </View>
+                                        </>
+                                    )}
+
+                                    {/* Cover letter or apply */}
                                     {showCoverLetter ? (
                                         <View>
-                                            <Text style={styles.sectionTitle}>Cover Letter</Text>
+                                            <View style={styles.sectionHeader}>
+                                                <View style={styles.sectionDot} />
+                                                <Text style={styles.sectionTitle}>Your Cover Letter</Text>
+                                            </View>
                                             <TextInput
                                                 style={styles.coverLetterInput}
-                                                placeholder="Why are you a good fit?"
+                                                placeholder="Tell us why you'd be a great fit for this role..."
+                                                placeholderTextColor="#94A3B8"
                                                 multiline
                                                 value={coverLetter}
                                                 onChangeText={setCoverLetter}
+                                                textAlignVertical="top"
                                             />
-                                            <TouchableOpacity style={styles.mainApplyBtn} onPress={submitApplication} disabled={applying}>
-                                                {applying ? <ActivityIndicator color="#FFF" /> : <Text style={styles.mainApplyBtnText}>Submit Now</Text>}
+                                            <Text style={styles.coverLetterHint}>
+                                                {coverLetter.length} characters · Optional but recommended
+                                            </Text>
+                                            <TouchableOpacity
+                                                style={[styles.mainApplyBtn, applying && { opacity: 0.7 }]}
+                                                onPress={submitApplication}
+                                                disabled={applying}
+                                                activeOpacity={0.85}
+                                            >
+                                                {applying ? (
+                                                    <ActivityIndicator color="#FFF" />
+                                                ) : (
+                                                    <>
+                                                        <Ionicons name="send" size={16} color="#FFF" />
+                                                        <Text style={styles.mainApplyBtnText}>Submit Application</Text>
+                                                    </>
+                                                )}
                                             </TouchableOpacity>
                                         </View>
                                     ) : !appliedIds.includes(selectedItem._id) ? (
-                                        <TouchableOpacity style={styles.mainApplyBtn} onPress={handleApply}>
+                                        <TouchableOpacity
+                                            style={styles.mainApplyBtn}
+                                            onPress={handleApply}
+                                            activeOpacity={0.85}
+                                        >
+                                            <Ionicons name="rocket-outline" size={16} color="#FFF" />
                                             <Text style={styles.mainApplyBtnText}>Apply Now</Text>
                                         </TouchableOpacity>
                                     ) : (
-                                        <View style={styles.appliedState}><Text style={styles.appliedText}>Applied Successfully</Text></View>
+                                        <View style={styles.appliedState}>
+                                            <View style={styles.appliedIconCircle}>
+                                                <Ionicons name="checkmark" size={26} color="#FFF" />
+                                            </View>
+                                            <Text style={styles.appliedText}>Application Submitted</Text>
+                                            <Text style={styles.appliedSubText}>
+                                                We&apos;ll notify you once the company responds
+                                            </Text>
+                                        </View>
                                     )}
                                 </View>
                             </ScrollView>
@@ -3427,73 +3645,525 @@ const InternshipsScreen = () => {
 
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: "#F0F4F8" },
-    hero: { width: "100%", height: 180 },
-    heroOverlay: { flex: 1, backgroundColor: "rgba(25, 54, 72, 0.8)", justifyContent: "center", padding: 24 },
-    heroTitle: { fontSize: 26, fontWeight: "bold", color: "#FFF" },
-    heroSubtitle: { fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 4 },
-    appCountBadge: { flexDirection: "row", alignItems: "center", marginTop: 10, backgroundColor: "rgba(255,255,255,0.15)", alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 6 },
-    appCountText: { color: "#FFF", fontSize: 12, fontWeight: "600" },
-    filterSection: { backgroundColor: "#FFF", paddingVertical: 12, elevation: 3 },
-    searchBar: { flexDirection: "row", alignItems: "center", backgroundColor: "#F4F7F6", marginHorizontal: 16, borderRadius: 12, paddingHorizontal: 14, height: 46 },
-    searchInput: { flex: 1, fontSize: 15, color: "#111827", marginLeft: 8 },
-    domainScroll: { marginTop: 12, paddingLeft: 16 },
-    chip: { paddingHorizontal: 16, paddingVertical: 7, backgroundColor: "#FFF", borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: "#D1D5DB" },
-    activeChip: { backgroundColor: "#193648", borderColor: "#193648" },
-    chipText: { color: "#7F8C8D", fontWeight: "600", fontSize: 13 },
+    hero: {
+        width: "100%",
+        height: 230,
+        position: "relative",
+        overflow: "hidden",
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+    },
+    heroOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(15, 36, 56, 0.78)",
+        justifyContent: "center",
+        paddingHorizontal: 24,
+        paddingVertical: 22,
+    },
+    heroLiveRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 10,
+        backgroundColor: "rgba(0,0,0,0.3)",
+        alignSelf: "flex-start",
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: "rgba(239,68,68,0.5)",
+    },
+    liveDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: "#EF4444",
+    },
+    liveText: {
+        color: "#FFFFFF",
+        fontSize: 9.5,
+        fontWeight: "800",
+        letterSpacing: 1.2,
+    },
+    heroTitle: { fontSize: 28, fontWeight: "800", color: "#FFF", letterSpacing: -0.5 },
+    heroSubtitle: { fontSize: 13, color: "rgba(255,255,255,0.85)", marginTop: 4 },
+    heroBadgeRow: { flexDirection: "row", gap: 8, marginTop: 12 },
+    appCountBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.18)",
+        paddingHorizontal: 11,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 5,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.2)",
+    },
+    appCountText: { color: "#FFF", fontSize: 11.5, fontWeight: "700" },
+    heroDots: {
+        flexDirection: "row",
+        gap: 5,
+        position: "absolute",
+        bottom: 14,
+        right: 24,
+    },
+    heroDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: "rgba(255,255,255,0.35)",
+    },
+    heroDotActive: {
+        width: 18,
+        backgroundColor: "#FFFFFF",
+    },
+    filterSection: {
+        backgroundColor: "#FFF",
+        paddingVertical: 14,
+        paddingTop: 16,
+        shadowColor: "#193648",
+        shadowOpacity: 0.06,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 10,
+        elevation: 3,
+    },
+    searchBar: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#F4F7FB",
+        marginHorizontal: 16,
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        height: 48,
+        borderWidth: 1,
+        borderColor: "#EEF2F6",
+    },
+    searchInput: { flex: 1, fontSize: 14.5, color: "#111827", marginLeft: 8, padding: 0 },
+    domainScroll: { marginTop: 14, paddingLeft: 16 },
+    chip: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        backgroundColor: "#fff",
+        borderRadius: 22,
+        marginRight: 8,
+        borderWidth: 1,
+        borderColor: "#E2E8F0",
+    },
+    activeChip: {
+        backgroundColor: "#193648",
+        borderColor: "#193648",
+        shadowColor: "#193648",
+        shadowOpacity: 0.25,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    chipText: { color: "#64748B", fontWeight: "700", fontSize: 12.5 },
     activeChipText: { color: "#FFF" },
-    resultsHeader: { paddingHorizontal: 16, paddingVertical: 12 },
-    resultsCount: { fontSize: 15, fontWeight: "700", color: "#111827" },
-    card: { backgroundColor: "#FFF", borderRadius: 18, marginBottom: 14, elevation: 2, marginHorizontal: 16 },
-    highMatchCard: { borderWidth: 1.5, borderColor: "#059669" },
-    topMatchBadge: { flexDirection: "row", alignItems: "center", backgroundColor: "#059669", alignSelf: "flex-start", marginLeft: 16, marginTop: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-    topMatchText: { color: "#FFF", fontSize: 11, fontWeight: "bold" },
-    cardContent: { padding: 16 },
-    cardHeader: { flexDirection: "row", alignItems: "flex-start", marginBottom: 14 },
-    companyLogo: { width: 45, height: 45, borderRadius: 10, backgroundColor: "#F0F4F8" },
-    cardTitle: { fontSize: 16, fontWeight: "700", color: "#111827", flex: 1 },
-    cardCompany: { fontSize: 14, color: "#6B7280" },
-    locationRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
-    locationText: { fontSize: 12, color: "#9CA3AF", marginLeft: 3 },
-    aiMatchContainer: { marginBottom: 12 },
-    aiMatchHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
-    aiMatchTitle: { fontSize: 13, color: "#193648", fontWeight: "600" },
-    aiMatchPercent: { fontSize: 14, fontWeight: "bold" },
-    progressBarBg: { height: 6, backgroundColor: "#E5E7EB", borderRadius: 3 },
-    progressBarFill: { height: "100%", borderRadius: 3 },
-    tagRow: { flexDirection: "row", gap: 6, marginBottom: 12, flexWrap: "wrap" },
-    domainTag: { backgroundColor: "#EBF5FB", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5 },
-    domainText: { color: "#2980B9", fontSize: 10, fontWeight: "600" },
-    typeTag: { backgroundColor: "#F5F3FF", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5 },
-    typeText: { color: "#7C3AED", fontSize: 10, fontWeight: "600" },
-    stipendTag: { backgroundColor: "#ECFDF5", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5 },
-    stipendText: { color: "#059669", fontSize: 10, fontWeight: "600" },
-    skillsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 14 },
-    skillItem: { backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
-    skillItemMatched: { backgroundColor: "#ECFDF5", borderWidth: 1, borderColor: "#A7F3D0" },
-    skillText: { color: "#374151", fontSize: 11 },
-    skillTextMatched: { color: "#059669" },
-    detailsBtn: { backgroundColor: "#193648", flexDirection: "row", justifyContent: "center", alignItems: "center", paddingVertical: 12, borderRadius: 12, gap: 8 },
-    appliedBtn: { backgroundColor: "#F0FDF4", borderWidth: 1, borderColor: "#A7F3D0" },
-    detailsBtnText: { color: "#FFF", fontWeight: "bold" },
-    emptyState: { alignItems: "center", paddingTop: 80 },
-    emptyTitle: { fontSize: 18, fontWeight: "700", color: "#374151", marginTop: 16 },
-    emptySubText: { fontSize: 14, color: "#9CA3AF", textAlign: "center", paddingHorizontal: 40 },
+
+    resultsHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 18,
+        paddingTop: 16,
+        paddingBottom: 6,
+    },
+    resultsCount: { fontSize: 13, fontWeight: "800", color: "#193648", letterSpacing: 0.5, textTransform: "uppercase" },
+    resultsIconBox: {
+        width: 26,
+        height: 26,
+        borderRadius: 8,
+        backgroundColor: "#E8F0F5",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    resultsCountBadge: {
+        backgroundColor: "#193648",
+        minWidth: 28,
+        height: 24,
+        borderRadius: 12,
+        paddingHorizontal: 8,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    resultsCountBadgeText: { color: "#fff", fontSize: 12, fontWeight: "800" },
+
+    card: {
+        backgroundColor: "#FFF",
+        borderRadius: 20,
+        marginBottom: 14,
+        marginHorizontal: 16,
+        shadowColor: "#193648",
+        shadowOpacity: 0.10,
+        shadowOffset: { width: 0, height: 6 },
+        shadowRadius: 16,
+        elevation: 5,
+        overflow: "hidden",
+    },
+    highMatchCard: {
+        shadowColor: "#193648",
+        shadowOpacity: 0.18,
+    },
+    appliedCard: {
+        backgroundColor: "#F0FDF4",
+    },
+    topMatchBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#193648",
+        alignSelf: "flex-start",
+        marginLeft: 16,
+        marginTop: 14,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 10,
+        gap: 5,
+    },
+    topMatchText: { color: "#FFF", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
+    cardContent: { padding: 18 },
+    cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 14, gap: 12 },
+    companyLogo: {
+        width: 48,
+        height: 48,
+        borderRadius: 14,
+        backgroundColor: "#F4F7FB",
+    },
+    cardTitle: { fontSize: 15, fontWeight: "800", color: "#0F172A", flex: 1, lineHeight: 20 },
+    cardCompany: { fontSize: 13, color: "#475569", fontWeight: "600", marginTop: 4 },
+    locationRow: { flexDirection: "row", alignItems: "center", marginTop: 5, gap: 4 },
+    locationText: { fontSize: 11.5, color: "#94A3B8", fontWeight: "500" },
+
+    aiMatchContainer: {
+        marginBottom: 14,
+        backgroundColor: "#F4F7FB",
+        borderRadius: 12,
+        paddingVertical: 11,
+        paddingHorizontal: 12,
+    },
+    aiMatchHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+    aiMatchTitle: { fontSize: 12, color: "#193648", fontWeight: "700", marginLeft: 4 },
+    aiMatchPercent: { fontSize: 14, fontWeight: "800", color: "#193648" },
+    progressBarBg: { height: 6, backgroundColor: "#E2E8F0", borderRadius: 3, overflow: "hidden" },
+    progressBarFill: { height: "100%", borderRadius: 3, backgroundColor: "#193648" },
+
+    tagRow: { flexDirection: "row", gap: 6, marginBottom: 14, flexWrap: "wrap" },
+    domainTag: {
+        backgroundColor: "#E8F0F5",
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+    },
+    domainText: { color: "#193648", fontSize: 10.5, fontWeight: "700" },
+    typeTag: {
+        backgroundColor: "#EFF4F8",
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+    },
+    typeText: { color: "#2A5A72", fontSize: 10.5, fontWeight: "700" },
+    stipendTag: {
+        backgroundColor: "#F0F4F8",
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+    },
+    stipendText: { color: "#0F2438", fontSize: 10.5, fontWeight: "700" },
+
+    skillsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 16 },
+    skillItem: {
+        backgroundColor: "#F1F5F9",
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 10,
+    },
+    skillItemMatched: { backgroundColor: "#E8F0F5" },
+    skillText: { color: "#475569", fontSize: 11, fontWeight: "600" },
+    skillTextMatched: { color: "#193648", fontWeight: "800" },
+
+    detailsBtn: {
+        backgroundColor: "#193648",
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center",
+        paddingVertical: 13,
+        borderRadius: 14,
+        gap: 8,
+        shadowColor: "#193648",
+        shadowOpacity: 0.25,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    appliedBtn: {
+        backgroundColor: "#DCFCE7",
+        shadowOpacity: 0,
+        elevation: 0,
+    },
+    detailsBtnText: { color: "#FFF", fontWeight: "800", fontSize: 13.5, letterSpacing: 0.3 },
+
+    emptyState: { alignItems: "center", paddingTop: 60, paddingHorizontal: 24 },
+    emptyTitle: { fontSize: 18, fontWeight: "800", color: "#193648", marginTop: 16 },
+    emptySubText: { fontSize: 13.5, color: "#64748B", textAlign: "center", paddingHorizontal: 16, marginTop: 8, lineHeight: 20 },
     modalRoot: { flex: 1 },
     closeBtn: { position: "absolute", top: 10, right: 10, zIndex: 10 },
-    modalBanner: { backgroundColor: "#193648", padding: 30, alignItems: "center" },
-    modalLogo: { width: 60, height: 60, borderRadius: 12, backgroundColor: "#FFF", marginBottom: 10 },
-    modalTitle: { fontSize: 20, fontWeight: "bold", color: "#FFF", textAlign: "center" },
-    modalCompany: { fontSize: 14, color: "rgba(255,255,255,0.7)" },
-    modalBody: { padding: 20 },
-    matchCard: { flexDirection: "row", alignItems: "center", backgroundColor: "#F0F4F8", padding: 15, borderRadius: 12, marginBottom: 20 },
-    matchCardTitle: { fontSize: 14, fontWeight: "700" },
-    sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
-    sectionBody: { fontSize: 14, color: "#5D6D7E", lineHeight: 20, marginBottom: 15 },
-    coverLetterInput: { backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, padding: 12, minHeight: 100, marginBottom: 15 },
-    mainApplyBtn: { backgroundColor: "#193648", paddingVertical: 14, borderRadius: 12, alignItems: "center" },
-    mainApplyBtnText: { color: "#FFF", fontWeight: "bold" },
-    appliedState: { alignItems: "center", padding: 20 },
-    appliedText: { fontSize: 16, fontWeight: "bold", color: "#059669" }
+
+    /* Banner */
+    modalBanner: {
+        backgroundColor: "#193648",
+        paddingHorizontal: 22,
+        paddingTop: 16,
+        paddingBottom: 28,
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+        alignItems: "center",
+        shadowColor: "#193648",
+        shadowOpacity: 0.3,
+        shadowOffset: { width: 0, height: 8 },
+        shadowRadius: 14,
+        elevation: 10,
+    },
+    modalTopBar: {
+        width: "100%",
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 12,
+    },
+    modalBackBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: "rgba(255,255,255,0.18)",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    modalLiveBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        backgroundColor: "rgba(34,197,94,0.2)",
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "rgba(34,197,94,0.5)",
+    },
+    modalLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#22C55E" },
+    modalLiveText: { color: "#86EFAC", fontSize: 9.5, fontWeight: "800", letterSpacing: 1 },
+
+    modalLogoBox: {
+        width: 78,
+        height: 78,
+        borderRadius: 22,
+        backgroundColor: "#FFF",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 14,
+        padding: 10,
+        shadowColor: "#000",
+        shadowOpacity: 0.15,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    modalLogoImg: { width: "100%", height: "100%" },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: "800",
+        color: "#FFF",
+        textAlign: "center",
+        letterSpacing: -0.3,
+    },
+    modalCompanyRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        marginTop: 4,
+    },
+    modalCompany: { fontSize: 13, color: "rgba(255,255,255,0.85)", fontWeight: "600" },
+
+    modalPillRow: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        justifyContent: "center",
+        gap: 6,
+        marginTop: 14,
+    },
+    modalPill: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        backgroundColor: "rgba(255,255,255,0.18)",
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.2)",
+    },
+    modalPillText: { color: "#FFF", fontSize: 11, fontWeight: "700" },
+
+    /* Body */
+    modalBody: { paddingHorizontal: 18, paddingTop: 18 },
+
+    /* Match score card */
+    matchCard: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#FFF",
+        paddingVertical: 14,
+        paddingHorizontal: 14,
+        borderRadius: 16,
+        marginBottom: 16,
+        shadowColor: "#193648",
+        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 10,
+        elevation: 3,
+    },
+    matchIconBox: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: "#E8F0F5",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    matchCardTitle: { fontSize: 12, color: "#64748B", fontWeight: "700", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
+    matchProgressBg: { height: 6, backgroundColor: "#E2E8F0", borderRadius: 3, overflow: "hidden" },
+    matchProgressFill: { height: "100%", backgroundColor: "#193648", borderRadius: 3 },
+    matchScoreVal: { fontSize: 22, fontWeight: "800", color: "#193648", marginLeft: 12 },
+
+    /* Stats grid */
+    statsGrid: { flexDirection: "row", gap: 10, marginBottom: 18 },
+    statBox: {
+        flex: 1,
+        backgroundColor: "#FFF",
+        padding: 14,
+        borderRadius: 14,
+        gap: 4,
+        shadowColor: "#193648",
+        shadowOpacity: 0.06,
+        shadowOffset: { width: 0, height: 3 },
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    statLabel: { fontSize: 10.5, color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3, marginTop: 4 },
+    statValue: { fontSize: 13.5, color: "#193648", fontWeight: "800" },
+
+    /* Section */
+    sectionHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 10,
+        marginTop: 6,
+    },
+    sectionDot: { width: 4, height: 18, backgroundColor: "#193648", borderRadius: 2 },
+    sectionTitle: { fontSize: 15, fontWeight: "800", color: "#193648", letterSpacing: 0.2 },
+    sectionCard: {
+        backgroundColor: "#FFF",
+        padding: 14,
+        borderRadius: 14,
+        marginBottom: 18,
+        shadowColor: "#193648",
+        shadowOpacity: 0.05,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 6,
+        elevation: 1,
+    },
+    sectionBody: { fontSize: 13.5, color: "#475569", lineHeight: 21 },
+
+    /* Skills cloud */
+    skillsCloud: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 6,
+        marginBottom: 22,
+    },
+    skillChip: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        backgroundColor: "#fff",
+        paddingHorizontal: 11,
+        paddingVertical: 7,
+        borderRadius: 12,
+        shadowColor: "#193648",
+        shadowOpacity: 0.05,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+        elevation: 1,
+    },
+    skillChipMatched: { backgroundColor: "#E8F0F5" },
+    skillChipText: { fontSize: 12, color: "#64748B", fontWeight: "600" },
+    skillChipTextMatched: { color: "#193648", fontWeight: "800" },
+
+    /* Cover letter */
+    coverLetterInput: {
+        backgroundColor: "#FFF",
+        borderRadius: 14,
+        padding: 14,
+        minHeight: 130,
+        marginBottom: 6,
+        fontSize: 14,
+        color: "#0F172A",
+        shadowColor: "#193648",
+        shadowOpacity: 0.06,
+        shadowOffset: { width: 0, height: 3 },
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    coverLetterHint: {
+        fontSize: 11,
+        color: "#94A3B8",
+        textAlign: "right",
+        marginBottom: 16,
+        fontWeight: "500",
+    },
+
+    /* Apply button */
+    mainApplyBtn: {
+        backgroundColor: "#193648",
+        flexDirection: "row",
+        paddingVertical: 16,
+        borderRadius: 16,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        marginTop: 6,
+        shadowColor: "#193648",
+        shadowOpacity: 0.35,
+        shadowOffset: { width: 0, height: 6 },
+        shadowRadius: 12,
+        elevation: 6,
+    },
+    mainApplyBtnText: { color: "#FFF", fontWeight: "800", fontSize: 15, letterSpacing: 0.4 },
+
+    /* Applied state */
+    appliedState: {
+        alignItems: "center",
+        padding: 28,
+        backgroundColor: "#F0FDF4",
+        borderRadius: 16,
+        marginTop: 10,
+    },
+    appliedIconCircle: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: "#10B981",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 12,
+        shadowColor: "#10B981",
+        shadowOpacity: 0.4,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    appliedText: { fontSize: 17, fontWeight: "800", color: "#059669" },
+    appliedSubText: { fontSize: 12.5, color: "#475569", marginTop: 4, textAlign: "center" }
 });
 
 export default InternshipsScreen;

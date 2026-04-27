@@ -7,7 +7,7 @@ import {
   ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View
 } from "react-native";
-import { BASE, broadcastLogo, C, sharedStyles, useIndustryLogo, useToast, useUser } from "./shared";
+import { BASE, broadcastLogo, broadcastUser, C, sharedStyles, useIndustryLogo, useToast, useUser } from "./shared";
 
 // ── Color Theme (CollaXion) ───────────────────────────────────
 const T = {
@@ -109,45 +109,37 @@ export function ProfileScreen() {
   };
 
   const save = async () => {
-    // ── Confirmation that Save fired AT ALL — if you don't see this Alert,
-    //    the latest code isn't loaded. Reload Metro & Expo Go.
-    Alert.alert(
-      "🔧 Save tapped",
-      `email: ${form.email || "(empty!)"}\nname: ${form.name || ""}\nlogo type: ${
-        !form.logo ? "empty"
-        : form.logo.startsWith("data:") ? "data URI ✅"
-        : form.logo.startsWith("file:") ? "FILE:// (will be dropped)"
-        : "other"
-      }\nlogo length: ${(form.logo || "").length}\nBASE: ${BASE}`
-    );
-
-    if (!form.email) {
+    // Always key off the canonical account email (from context), never a
+    // value typed into the form — that's how an edit becomes an update of
+    // the SAME Profile document instead of accidentally upserting a new one.
+    const accountEmail = (user?.email || form.email || "").trim().toLowerCase();
+    if (!accountEmail) {
       toast("No email found — cannot save", "error");
       return;
     }
     setLd(true);
     try {
-      // Build payload — only send a renderable logo (data URI / http URL).
-      const { logo, ...rest } = form as any;
-      const payload: any = { ...rest };
-      if (typeof logo === "string" && (logo.startsWith("data:") || /^https?:\/\//i.test(logo))) {
-        payload.logo = logo;
+      // Build payload — whitelist canonical fields only so we don't ship _id /
+      // verified / timestamps back to the server. Logo is included only when
+      // it's renderable (data URI or http URL); a stray file:// is dropped.
+      const payload: any = {
+        email:    accountEmail,
+        name:     (form.name     ?? "").trim(),
+        industry: (form.industry ?? "").trim(),
+        website:  (form.website  ?? "").trim(),
+        address:  (form.address  ?? "").trim(),
+        about:    (form.about    ?? "").trim(),
+        phone:    (form.phone    ?? "").trim(),
+      };
+      if (typeof form.logo === "string" &&
+          (form.logo.startsWith("data:") || /^https?:\/\//i.test(form.logo))) {
+        payload.logo = form.logo;
       }
 
       const resp = await ax().put(`${BASE}/api/industry/auth/profile`, payload);
       const data = resp.data;
 
-      // Confirmation that backend responded with the saved logo
-      Alert.alert(
-        "✅ Backend response",
-        `logo saved: ${
-          data?.company?.logo
-            ? data.company.logo.substring(0, 50) + "…"
-            : "(empty / not returned)"
-        }`
-      );
-
-      // ── Adopt the server's canonical logo URL ──
+      // ── Adopt the server's canonical record so local state matches DB ──
       const serverLogo = data?.company?.logo || "";
       if (serverLogo) {
         broadcastLogo(serverLogo);
@@ -158,8 +150,13 @@ export function ProfileScreen() {
       }
       updateUser(data.company);
 
+      // Fire global event → every screen using useUser() re-pulls fresh data
+      // (dashboard, drawer, post cards, etc.) so the UI matches the DB.
+      broadcastUser();
+
       await refreshUser?.();
-      toast("Profile updated!", "success");
+      toast("Your profile has been updated", "success");
+      Alert.alert("Profile Updated", "Your profile has been updated successfully.");
     } catch (err: any) {
       const msg =
         err?.response?.status
@@ -246,21 +243,26 @@ export function ProfileScreen() {
           </View>
 
           <Text style={[styles.profSection, { marginTop: 20 }]}>Contact</Text>
-          {[
-            { lbl: "Email", key: "email", kbType: "email-address" },
-            { lbl: "Phone", key: "phone", kbType: "phone-pad" },
-          ].map((f) => (
-            <View key={f.key} style={styles.fieldWrap}>
-              <Text style={styles.fieldLbl}>{f.lbl}</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={(form as any)[f.key] ?? ""}
-                onChangeText={(v) => setForm((x: any) => ({ ...x, [f.key]: v }))}
-                keyboardType={(f as any).kbType || "default"}
-                autoCapitalize="none"
-              />
-            </View>
-          ))}
+          {/* Email is the unique account key — read-only here. */}
+          <View style={styles.fieldWrap}>
+            <Text style={styles.fieldLbl}>Email</Text>
+            <TextInput
+              style={[styles.fieldInput, { backgroundColor: "#EEF2F7", color: T.sub }]}
+              value={form.email ?? ""}
+              editable={false}
+              selectTextOnFocus={false}
+            />
+          </View>
+          <View style={styles.fieldWrap}>
+            <Text style={styles.fieldLbl}>Phone</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={form.phone ?? ""}
+              onChangeText={(v) => setForm((x: any) => ({ ...x, phone: v }))}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+            />
+          </View>
 
           <TouchableOpacity style={styles.saveBtn} onPress={save} disabled={ld}>
             {ld ? (

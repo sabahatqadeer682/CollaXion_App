@@ -1087,17 +1087,18 @@
 
 import { CONSTANT } from "@/constants/constant";
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  StyleSheet, View, Text, FlatList, TouchableOpacity,
-  ActivityIndicator, Dimensions, Linking, Animated,
-  Platform, StatusBar
+  ActivityIndicator, Alert, Animated, Dimensions, Easing,
+  FlatList, Linking, Platform, StatusBar, StyleSheet, Text,
+  TouchableOpacity, View,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import axios from 'axios';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native'; // Navigation import kiya
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import * as WebBrowser from 'expo-web-browser';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -1221,15 +1222,22 @@ const DARK_MAP_STYLE = [
 ];
 
 const NearbyIndustriesScreen = () => {
-  const navigation = useNavigation<any>(); // Navigation initialize kiya
+  const navigation = useNavigation<any>();
   const [userLocation, setUserLocation] = useState<any>(null);
   const [industries, setIndustries] = useState<Industry[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<'all' | 'partner' | 'hiring'>('all');
   const [selectedIndustry, setSelectedIndustry] = useState<Industry | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const mapRef = useRef<MapView>(null);
+  // Per-screen fade + slide animation; replays on every focus so returning
+  // from the dashboard feels alive.
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(24)).current;
 
+  // Locate the user once on mount; subsequent focuses just refresh the
+  // industries list using the cached userLocation.
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -1245,6 +1253,43 @@ const NearbyIndustriesScreen = () => {
       fetchData(coords.latitude, coords.longitude);
     })();
   }, []);
+
+  // Auto-refresh whenever the screen is focused (back from dashboard etc.).
+  useFocusEffect(
+    useCallback(() => {
+      // Replay the fade-in + slide-up animation each time we land here.
+      fadeAnim.setValue(0);
+      slideAnim.setValue(24);
+      Animated.parallel([
+        Animated.timing(fadeAnim,  { toValue: 1, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]).start();
+
+      if (userLocation) {
+        setRefreshing(true);
+        fetchData(userLocation.latitude, userLocation.longitude).finally(() => setRefreshing(false));
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userLocation?.latitude, userLocation?.longitude])
+  );
+
+  // "Website" button — opens a Google search for the company so the user
+  // gets Google's knowledge panel + the official site link, even when the
+  // record doesn't carry a `website` field.
+  const openWebsite = async (item: Industry) => {
+    const query = `${item.name} ${item.address || ""}`.trim();
+    const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    try {
+      await WebBrowser.openBrowserAsync(url, {
+        toolbarColor: "#193648",
+        controlsColor: "#fff",
+        showTitle: true,
+      });
+    } catch {
+      try { await Linking.openURL(url); }
+      catch { Alert.alert("Couldn't open", "We couldn't open the search right now."); }
+    }
+  };
 
   const fetchData = async (lat: number, lng: number) => {
     try {
@@ -1294,45 +1339,80 @@ const NearbyIndustriesScreen = () => {
       >
         {item.isRegistered && <View style={styles.cardAccent} />}
         <View style={styles.cardInner}>
+          {/* ── Top row: logo block + identity + distance pill ── */}
           <View style={styles.cardHeader}>
             <View style={[styles.iconWrap, item.isRegistered ? styles.iconWrapGreen : styles.iconWrapGray]}>
-              <MaterialCommunityIcons name="office-building" size={22} color={item.isRegistered ? '#0F6E56' : '#888'} />
+              <MaterialCommunityIcons
+                name="office-building"
+                size={26}
+                color={item.isRegistered ? '#0F6E56' : '#94A3B8'}
+              />
             </View>
+
             <View style={styles.cardTextBlock}>
               <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
-              <Text style={styles.cardAddr} numberOfLines={1}>
-                <Ionicons name="location-outline" size={11} color="#999" /> {item.address}
-              </Text>
-              <View style={styles.metaRow}>
-                <Text style={styles.stars}>{'★'.repeat(Math.floor(item.rating))}</Text>
-                <Text style={styles.ratingNum}>{item.rating.toFixed(1)}</Text>
+              <View style={styles.addrRow}>
+                <Ionicons name="location-sharp" size={12} color="#94A3B8" />
+                <Text style={styles.cardAddr} numberOfLines={1}>{item.address}</Text>
               </View>
             </View>
+
             <View style={styles.distBlock}>
               <Text style={styles.distText}>{item.distanceKm}</Text>
-              <Text style={styles.distUnit}>km</Text>
+              <Text style={styles.distUnit}>KM</Text>
             </View>
           </View>
 
+          {/* ── Tags / status row ── */}
+          <View style={styles.tagRow}>
+            <View style={styles.ratingPill}>
+              <Ionicons name="star" size={11} color="#F59E0B" />
+              <Text style={styles.ratingPillTxt}>{item.rating.toFixed(1)}</Text>
+              <Text style={styles.ratingPillSub}>
+                {'★'.repeat(Math.floor(item.rating))}{'☆'.repeat(5 - Math.floor(item.rating))}
+              </Text>
+            </View>
+            {item.isRegistered ? (
+              <View style={styles.partnerPill}>
+                <Ionicons name="checkmark-circle" size={11} color="#10B981" />
+                <Text style={styles.partnerPillTxt}>VERIFIED PARTNER</Text>
+              </View>
+            ) : (
+              <View style={styles.notRegPill}>
+                <Ionicons name="ellipse-outline" size={10} color="#94A3B8" />
+                <Text style={styles.notRegPillTxt}>Not on CollaXion</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.cardDivider} />
+
+          {/* ── Action row ── */}
           <View style={styles.cardFooter}>
-             <TouchableOpacity 
-                style={styles.webBtn} 
-                onPress={() => item.website && Linking.openURL(`https://${item.website}`)}
-             >
-                <Ionicons name="globe-outline" size={13} color="#185FA5" />
-                <Text style={styles.webBtnText}>Website</Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.webBtn}
+              onPress={() => openWebsite(item)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="globe-outline" size={14} color="#193648" />
+              <Text style={styles.webBtnText}>Website</Text>
+            </TouchableOpacity>
 
             {item.isRegistered ? (
-              <TouchableOpacity 
-                style={styles.internBtn} 
-                onPress={() => navigation.navigate("Internships")} // <-- Navigation added here
+              <TouchableOpacity
+                style={styles.internBtn}
+                onPress={() => navigation.navigate("Internships")}
+                activeOpacity={0.85}
               >
                 <FontAwesome5 name="briefcase" size={11} color="#fff" />
-                <Text style={styles.internBtnText}>Internships</Text>
+                <Text style={styles.internBtnText}>View Internships</Text>
+                <Ionicons name="arrow-forward" size={12} color="#fff" style={{ marginLeft: 2 }} />
               </TouchableOpacity>
             ) : (
-                <View style={styles.notRegWrap}><Text style={styles.notRegText}>Not Registered</Text></View>
+              <View style={styles.disabledIntern}>
+                <Ionicons name="lock-closed" size={11} color="#94A3B8" />
+                <Text style={styles.disabledInternTxt}>No openings</Text>
+              </View>
             )}
           </View>
         </View>
@@ -1354,6 +1434,20 @@ const NearbyIndustriesScreen = () => {
             initialRegion={userLocation}
             customMapStyle={DARK_MAP_STYLE}
           >
+            {/* User location marker — bright red so the student can spot
+                their own position on the dark map at a glance. */}
+            <Marker
+              coordinate={{ latitude: userLocation.latitude, longitude: userLocation.longitude }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              zIndex={999}
+            >
+              <View style={styles.userMarkerOuter}>
+                <View style={styles.userMarkerInner}>
+                  <Ionicons name="person" size={12} color="#fff" />
+                </View>
+              </View>
+            </Marker>
+
             {industries.map(ind => (
               <Marker
                 key={ind._id}
@@ -1372,15 +1466,39 @@ const NearbyIndustriesScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* LIST PANEL */}
-      <View style={styles.panel}>
+      {/* LIST PANEL — fade + slide up on every focus */}
+      <Animated.View
+        style={[
+          styles.panel,
+          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+        ]}
+      >
         <View style={styles.handle} />
         <View style={styles.panelHeader}>
-          <Text style={styles.panelTitle}>Nearby Industries</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={styles.panelTitle}>Nearby Industries</Text>
+            {refreshing ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <ActivityIndicator size="small" color="#193648" />
+                <Text style={{ fontSize: 11, color: "#64748B", fontWeight: "700" }}>Refreshing…</Text>
+              </View>
+            ) : (
+              <Text style={{ fontSize: 11.5, color: "#64748B", fontWeight: "700" }}>
+                {filteredIndustries.length} found
+              </Text>
+            )}
+          </View>
           <View style={styles.filterRow}>
             {(['all', 'partner'] as const).map(f => (
-              <TouchableOpacity key={f} style={[styles.filterTab, activeFilter === f && styles.filterTabActive]} onPress={() => setActiveFilter(f)}>
-                <Text style={[styles.filterTabText, activeFilter === f && styles.filterTabTextActive]}>{f.toUpperCase()}</Text>
+              <TouchableOpacity
+                key={f}
+                style={[styles.filterTab, activeFilter === f && styles.filterTabActive]}
+                onPress={() => setActiveFilter(f)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.filterTabText, activeFilter === f && styles.filterTabTextActive]}>
+                  {f.toUpperCase()}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -1392,56 +1510,203 @@ const NearbyIndustriesScreen = () => {
             keyExtractor={item => item._id}
             renderItem={renderCard}
             contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
           />
         )}
-      </View>
+      </Animated.View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0d1f3c' },
-  mapWrap: { height: H * 0.46 },
-  centerBtn: { position: 'absolute', right: 16, bottom: 40, backgroundColor: '#185FA5', padding: 12, borderRadius: 30 },
-  markerWrap: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
-  markerGreen: { backgroundColor: '#0F6E56' },
-  markerBlue: { backgroundColor: '#185FA5' },
-  markerSelected: { width: 38, height: 38, borderRadius: 19, borderWidth: 3 },
-  panel: { flex: 1, backgroundColor: '#f5f7fa', borderTopLeftRadius: 26, borderTopRightRadius: 26, marginTop: -26 },
-  handle: { width: 40, height: 5, backgroundColor: '#ccc', alignSelf: 'center', marginVertical: 10, borderRadius: 10 },
-  panelHeader: { paddingHorizontal: 20 },
-  panelTitle: { fontSize: 20, fontWeight: 'bold', color: '#193648' },
-  filterRow: { flexDirection: 'row', gap: 8, marginVertical: 10 },
-  filterTab: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd' },
-  filterTabActive: { backgroundColor: '#193648' },
-  filterTabText: { fontSize: 10, color: '#666' },
-  filterTabTextActive: { color: '#fff' },
-  listContent: { padding: 16 },
-  card: { backgroundColor: '#fff', borderRadius: 15, marginBottom: 12, elevation: 3 },
-  cardPartner: { borderColor: '#b7e5d4', borderWidth: 1 },
-  cardSelected: { borderColor: '#185FA5', borderWidth: 2 },
-  cardAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: '#1D9E75', borderTopLeftRadius: 15, borderBottomLeftRadius: 15 },
-  cardInner: { padding: 15 },
-  cardHeader: { flexDirection: 'row', gap: 12 },
-  iconWrap: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  iconWrapGreen: { backgroundColor: '#E1F5EE' },
-  iconWrapGray: { backgroundColor: '#f0f0f0' },
-  cardTextBlock: { flex: 1 },
-  cardName: { fontSize: 15, fontWeight: 'bold' },
-  cardAddr: { fontSize: 11, color: '#888' },
-  metaRow: { flexDirection: 'row', gap: 5, marginTop: 4 },
-  stars: { color: '#EA9F27', fontSize: 12 },
-  ratingNum: { color: '#888', fontSize: 11 },
-  distBlock: { alignItems: 'center' },
-  distText: { color: '#185FA5', fontWeight: 'bold', fontSize: 16 },
-  distUnit: { color: '#185FA5', fontSize: 10 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#eee', marginTop: 12, paddingTop: 10 },
-  webBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: '#185FA5', paddingHorizontal: 10, borderRadius: 5 },
-  webBtnText: { color: '#185FA5', fontSize: 12 },
-  internBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#193648', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 },
-  internBtnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  notRegWrap: { paddingVertical: 5 },
-  notRegText: { color: '#aaa', fontStyle: 'italic', fontSize: 11 },
+  container: { flex: 1, backgroundColor: "#0F1E33" },
+
+  // ── MAP ──
+  mapWrap: { height: H * 0.46, position: "relative" },
+  centerBtn: {
+    position: "absolute", right: 16, bottom: 30,
+    backgroundColor: "#193648",
+    width: 48, height: 48, borderRadius: 24,
+    alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 }, elevation: 8,
+    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)",
+  },
+
+  // ── Markers ──
+  markerWrap: {
+    width: 34, height: 34, borderRadius: 17,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 2.5, borderColor: "#fff",
+    shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 }, elevation: 6,
+  },
+  markerGreen: { backgroundColor: "#10B981" },
+  markerBlue:  { backgroundColor: "#3B82F6" },
+  markerSelected: {
+    width: 44, height: 44, borderRadius: 22, borderWidth: 3.5,
+    backgroundColor: "#193648",
+  },
+  userMarkerOuter: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: "rgba(239,68,68,0.25)",
+    alignItems: "center", justifyContent: "center",
+  },
+  userMarkerInner: {
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: "#EF4444",
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 2.5, borderColor: "#fff",
+    shadowColor: "#EF4444", shadowOpacity: 0.45, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 }, elevation: 8,
+  },
+
+  // ── Bottom-sheet panel ──
+  panel: {
+    flex: 1,
+    backgroundColor: "#F4F8FB",
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    marginTop: -28,
+    shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 18,
+    shadowOffset: { width: 0, height: -8 }, elevation: 14,
+  },
+  handle: {
+    width: 44, height: 5, backgroundColor: "#CBD5E1",
+    alignSelf: "center", marginTop: 10, marginBottom: 6, borderRadius: 10,
+  },
+  panelHeader: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 4 },
+  panelTitle: { fontSize: 22, fontWeight: "800", color: "#193648", letterSpacing: 0.3 },
+
+  filterRow: { flexDirection: "row", gap: 10, marginTop: 12 },
+  filterTab: {
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10,
+    backgroundColor: "#fff", borderWidth: 1, borderColor: "#E2EAF0",
+  },
+  filterTabActive: {
+    backgroundColor: "#193648",
+    borderColor: "#193648",
+    shadowColor: "#193648", shadowOpacity: 0.25, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 }, elevation: 4,
+  },
+  filterTabText: { fontSize: 11, color: "#64748B", fontWeight: "700", letterSpacing: 0.6 },
+  filterTabTextActive: { color: "#fff" },
+
+  listContent: { padding: 16, paddingBottom: 32 },
+
+  // ── Industry card ──
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    marginBottom: 16,
+    overflow: "hidden",
+    shadowColor: "#0F1E33", shadowOpacity: 0.10, shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 }, elevation: 4,
+    borderWidth: 1, borderColor: "#EEF2F7",
+  },
+  cardPartner: { borderColor: "#BBF7D0" },
+  cardSelected: {
+    borderColor: "#193648", borderWidth: 1.5,
+    shadowOpacity: 0.22, shadowRadius: 22,
+    shadowOffset: { width: 0, height: 12 }, elevation: 10,
+  },
+  cardAccent: {
+    position: "absolute", left: 0, top: 0, bottom: 0, width: 5,
+    backgroundColor: "#10B981",
+    borderTopLeftRadius: 20, borderBottomLeftRadius: 20,
+  },
+  cardInner: { paddingHorizontal: 18, paddingVertical: 16 },
+  cardHeader: { flexDirection: "row", gap: 14, alignItems: "center" },
+
+  iconWrap: {
+    width: 54, height: 54, borderRadius: 16,
+    alignItems: "center", justifyContent: "center",
+  },
+  iconWrapGreen: { backgroundColor: "#ECFDF5", borderWidth: 1.2, borderColor: "#A7F3D0" },
+  iconWrapGray:  { backgroundColor: "#F1F5F9", borderWidth: 1.2, borderColor: "#E2E8F0" },
+
+  cardTextBlock: { flex: 1, paddingTop: 0 },
+  cardName: { fontSize: 16, fontWeight: "800", color: "#0F1E33", letterSpacing: 0.2 },
+  addrRow:  { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  cardAddr: { flex: 1, fontSize: 12, color: "#64748B", fontWeight: "500" },
+
+  // ── Tag row (rating + partner status) ──
+  tagRow: {
+    flexDirection: "row", alignItems: "center", flexWrap: "wrap",
+    gap: 8, marginTop: 14,
+  },
+  ratingPill: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1, borderColor: "#FDE68A",
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 8,
+  },
+  ratingPillTxt: { color: "#92400E", fontWeight: "800", fontSize: 12 },
+  ratingPillSub: { color: "#F59E0B", fontSize: 10.5, letterSpacing: 0.8 },
+  partnerPill: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1, borderColor: "#A7F3D0",
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 8,
+  },
+  partnerPillTxt: { color: "#0F6E56", fontWeight: "800", fontSize: 10, letterSpacing: 0.6 },
+  notRegPill: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1, borderColor: "#E2E8F0",
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 8,
+  },
+  notRegPillTxt: { color: "#64748B", fontWeight: "700", fontSize: 10.5, letterSpacing: 0.4 },
+
+  cardDivider: {
+    height: 1, backgroundColor: "#F1F5F9",
+    marginTop: 14, marginBottom: 12,
+  },
+
+  distBlock: {
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: "#EEF4FA",
+    paddingHorizontal: 12, paddingVertical: 9,
+    borderRadius: 12, minWidth: 60,
+    borderWidth: 1, borderColor: "#DBE7F3",
+  },
+  distText: { color: "#193648", fontWeight: "800", fontSize: 16.5, lineHeight: 18 },
+  distUnit: { color: "#5B7080", fontSize: 9.5, fontWeight: "800", letterSpacing: 1, marginTop: 2 },
+
+  // ── Footer ──
+  cardFooter: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    gap: 10,
+  },
+  disabledIntern: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0",
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
+  },
+  disabledInternTxt: { color: "#94A3B8", fontWeight: "700", fontSize: 11.5 },
+  webBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    borderWidth: 1.2, borderColor: "#DBE7F3",
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+    backgroundColor: "#F8FAFC",
+  },
+  webBtnText: { color: "#193648", fontSize: 12, fontWeight: "700" },
+  internBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "#193648",
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
+    shadowColor: "#193648", shadowOpacity: 0.25, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 }, elevation: 4,
+  },
+  internBtnText: { color: "#fff", fontSize: 12, fontWeight: "800", letterSpacing: 0.3 },
+
+  notRegWrap: {
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+    backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0",
+  },
+  notRegText: { color: "#94A3B8", fontStyle: "italic", fontSize: 11, fontWeight: "600" },
 });
 
 export default NearbyIndustriesScreen;

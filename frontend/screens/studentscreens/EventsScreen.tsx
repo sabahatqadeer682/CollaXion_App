@@ -886,7 +886,8 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import axios from "axios";
-import React, { useCallback, useState } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useCallback, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -924,21 +925,23 @@ interface Event {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const THEME_COLOR = "#193648";
+const THEME_LIGHT = "#2A5A72";
+const THEME_DEEP = "#0F2438";
 
 const COLOR_MAP: Record<string, { bannerColor: string; bannerTextColor: string }> = {
-    "Job Fair":  { bannerColor: "#1A56DB", bannerTextColor: "#EBF5FF" },
-    Seminar:     { bannerColor: "#7C3AED", bannerTextColor: "#F5F3FF" },
-    Workshop:    { bannerColor: "#D97706", bannerTextColor: "#FFFBEB" },
-    Webinar:     { bannerColor: "#059669", bannerTextColor: "#ECFDF5" },
-    Networking:  { bannerColor: "#DC2626", bannerTextColor: "#FEF2F2" },
+    "Job Fair":  { bannerColor: "#193648", bannerTextColor: "#E8F0F5" },
+    Seminar:     { bannerColor: "#1F4357", bannerTextColor: "#E8F0F5" },
+    Workshop:    { bannerColor: "#2A5A72", bannerTextColor: "#E8F0F5" },
+    Webinar:     { bannerColor: "#3A7CA5", bannerTextColor: "#E8F0F5" },
+    Networking:  { bannerColor: "#0F2438", bannerTextColor: "#E8F0F5" },
 };
 
 const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string }> = {
-    "Job Fair":  { icon: "briefcase",    color: "#1A56DB", bg: "#EBF5FF" },
-    Seminar:     { icon: "school",        color: "#7C3AED", bg: "#F5F3FF" },
-    Workshop:    { icon: "tools",         color: "#D97706", bg: "#FFFBEB" },
-    Webinar:     { icon: "video",         color: "#059669", bg: "#ECFDF5" },
-    Networking:  { icon: "account-group", color: "#DC2626", bg: "#FEF2F2" },
+    "Job Fair":  { icon: "briefcase",    color: "#193648", bg: "#E8F0F5" },
+    Seminar:     { icon: "school",        color: "#1F4357", bg: "#EFF4F8" },
+    Workshop:    { icon: "tools",         color: "#2A5A72", bg: "#EFF4F8" },
+    Webinar:     { icon: "video",         color: "#3A7CA5", bg: "#F0F4F8" },
+    Networking:  { icon: "account-group", color: "#0F2438", bg: "#E8F0F5" },
 };
 
 const FILTERS = ["All", "Job Fair", "Seminar", "Workshop", "Webinar", "Networking"];
@@ -962,6 +965,17 @@ const EventsScreen = () => {
         activeFilter === "All"
             ? events
             : events.filter((e) => e.type === activeFilter);
+
+    const stats = useMemo(() => {
+        const upcoming = events.filter(
+            (e) => new Date(e.date).getTime() >= Date.now()
+        ).length;
+        return {
+            total: events.length,
+            joined: registeredIds.length,
+            upcoming,
+        };
+    }, [events, registeredIds]);
 
     // ─── Load events from backend (per-student) ───────────────────────────────
     useFocusEffect(
@@ -1145,16 +1159,53 @@ const EventsScreen = () => {
         <SafeAreaView style={styles.container}>
             <StatusBar backgroundColor={THEME_COLOR} barStyle="light-content" />
 
-            {/* Header */}
-            <View style={styles.headerBanner}>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.bannerTitle}>Events</Text>
-                    <Text style={styles.bannerSub}>Riphah International University</Text>
+            {/* Premium Hero Header */}
+            <LinearGradient
+                colors={[THEME_DEEP, THEME_COLOR, THEME_LIGHT]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.headerBanner}
+            >
+                <View style={styles.heroRow}>
+                    <View style={{ flex: 1 }}>
+                        <View style={styles.heroBadge}>
+                            <MaterialCommunityIcons name="calendar-star" size={12} color="#FFFFFF" />
+                            <Text style={styles.heroBadgeText}>EVENTS HUB</Text>
+                        </View>
+                        <Text style={styles.bannerTitle}>Discover Events</Text>
+                        <Text style={styles.bannerSub}>
+                            Riphah Network · Workshops · Networking
+                        </Text>
+                    </View>
                 </View>
-                <View style={styles.headerBadge}>
-                    <Text style={styles.headerBadgeText}>{registeredIds.length} Joined</Text>
+
+                {/* Stats grid */}
+                <View style={styles.heroStatsRow}>
+                    <View style={styles.heroStat}>
+                        <View style={styles.heroStatIcon}>
+                            <MaterialCommunityIcons name="calendar-multiple" size={14} color="#fff" />
+                        </View>
+                        <Text style={styles.heroStatVal}>{stats.total}</Text>
+                        <Text style={styles.heroStatLab}>Total</Text>
+                    </View>
+                    <View style={styles.heroStatDivider} />
+                    <View style={styles.heroStat}>
+                        <View style={[styles.heroStatIcon, { backgroundColor: "rgba(34,197,94,0.2)" }]}>
+                            <MaterialCommunityIcons name="check-decagram" size={14} color="#34D399" />
+                        </View>
+                        <Text style={styles.heroStatVal}>{stats.joined}</Text>
+                        <Text style={styles.heroStatLab}>Joined</Text>
+                    </View>
+                    <View style={styles.heroStatDivider} />
+                    <View style={styles.heroStat}>
+                        <View style={[styles.heroStatIcon, { backgroundColor: "rgba(245,158,11,0.2)" }]}>
+                            <MaterialCommunityIcons name="clock-outline" size={14} color="#FBBF24" />
+                        </View>
+                        <Text style={styles.heroStatVal}>{stats.upcoming}</Text>
+                        <Text style={styles.heroStatLab}>Upcoming</Text>
+                    </View>
                 </View>
-            </View>
+            </LinearGradient>
 
             {/* Filters */}
             <View style={styles.filterWrapper}>
@@ -1163,25 +1214,25 @@ const EventsScreen = () => {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.filterScroll}
                 >
-                    {FILTERS.map((f) => (
-                        <TouchableOpacity
-                            key={f}
-                            style={[
-                                styles.filterChip,
-                                activeFilter === f && styles.filterChipActive,
-                            ]}
-                            onPress={() => setActiveFilter(f)}
-                        >
-                            <Text
-                                style={[
-                                    styles.filterChipText,
-                                    activeFilter === f && styles.filterChipTextActive,
-                                ]}
+                    {FILTERS.map((f) => {
+                        const active = activeFilter === f;
+                        const count =
+                            f === "All" ? events.length : events.filter((e) => e.type === f).length;
+                        return (
+                            <TouchableOpacity
+                                key={f}
+                                style={[styles.filterChip, active && styles.filterChipActive]}
+                                onPress={() => setActiveFilter(f)}
                             >
-                                {f}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
+                                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                                    {f}
+                                </Text>
+                                <View style={[styles.filterCountBox, active && { backgroundColor: "rgba(255,255,255,0.25)" }]}>
+                                    <Text style={[styles.filterCountText, active && { color: "#fff" }]}>{count}</Text>
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </ScrollView>
             </View>
 
@@ -1377,17 +1428,36 @@ const DetailInfoBox = ({ label, value, full }: any) => (
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#F1F5F9" },
+    container: { flex: 1, backgroundColor: "#F4F7FB" },
     headerBanner: {
-        flexDirection: "row",
-        backgroundColor: THEME_COLOR,
-        paddingHorizontal: 20,
-        paddingVertical: 20,
-        alignItems: "center",
-        paddingTop: Platform.OS === "android" ? 15 : 10,
+        paddingHorizontal: 22,
+        paddingVertical: 22,
+        paddingTop: Platform.OS === "android" ? 24 : 14,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+        shadowColor: THEME_COLOR,
+        shadowOpacity: 0.3,
+        shadowOffset: { width: 0, height: 8 },
+        shadowRadius: 14,
+        elevation: 10,
     },
-    bannerTitle: { color: "#fff", fontSize: 20, fontWeight: "800" },
-    bannerSub: { color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 2 },
+    heroRow: { flexDirection: "row", alignItems: "flex-start" },
+    heroBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        backgroundColor: "rgba(255,255,255,0.18)",
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 10,
+        alignSelf: "flex-start",
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.25)",
+    },
+    heroBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800", letterSpacing: 1 },
+    bannerTitle: { color: "#fff", fontSize: 24, fontWeight: "800", letterSpacing: -0.3 },
+    bannerSub: { color: "rgba(255,255,255,0.75)", fontSize: 12.5, marginTop: 4 },
     headerBadge: {
         backgroundColor: "rgba(255,255,255,0.2)",
         borderRadius: 12,
@@ -1395,94 +1465,144 @@ const styles = StyleSheet.create({
         paddingVertical: 5,
     },
     headerBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
-    filterWrapper: {
-        backgroundColor: "#fff",
-        borderBottomWidth: 1,
-        borderBottomColor: "#E2E8F0",
+
+    heroStatsRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.10)",
+        borderRadius: 16,
+        paddingVertical: 14,
+        marginTop: 16,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.12)",
     },
-    filterScroll: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
+    heroStat: { flex: 1, alignItems: "center", gap: 3 },
+    heroStatIcon: {
+        width: 28,
+        height: 28,
+        borderRadius: 9,
+        backgroundColor: "rgba(255,255,255,0.18)",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 2,
+    },
+    heroStatVal: { color: "#fff", fontSize: 19, fontWeight: "800" },
+    heroStatLab: { color: "rgba(255,255,255,0.75)", fontSize: 10.5, fontWeight: "600", marginTop: 1 },
+    heroStatDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.18)", height: 50 },
+
+    filterWrapper: {
+        marginTop: 14,
+        marginBottom: 4,
+    },
+    filterScroll: { paddingHorizontal: 16, gap: 8 },
     filterChip: {
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: "#F1F5F9",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 7,
+        paddingHorizontal: 13,
+        paddingVertical: 7,
+        borderRadius: 22,
+        backgroundColor: "#fff",
         borderWidth: 1,
         borderColor: "#E2E8F0",
     },
-    filterChipActive: { backgroundColor: THEME_COLOR, borderColor: THEME_COLOR },
-    filterChipText: { fontSize: 12, fontWeight: "600", color: "#64748B" },
+    filterChipActive: {
+        backgroundColor: THEME_COLOR,
+        borderColor: THEME_COLOR,
+        shadowColor: THEME_COLOR,
+        shadowOpacity: 0.25,
+        shadowOffset: { width: 0, height: 3 },
+        shadowRadius: 5,
+        elevation: 3,
+    },
+    filterChipText: { fontSize: 12.5, fontWeight: "700", color: "#475569" },
     filterChipTextActive: { color: "#fff" },
-    listContent: { padding: 12, paddingBottom: 30 },
+    filterCountBox: {
+        backgroundColor: "#F1F5F9",
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 9,
+        minWidth: 20,
+        alignItems: "center",
+    },
+    filterCountText: { fontSize: 10.5, fontWeight: "800", color: "#475569" },
+    listContent: { padding: 14, paddingTop: 16, paddingBottom: 40 },
     card: {
         flex: 1,
         backgroundColor: "#fff",
-        borderRadius: 16,
+        borderRadius: 18,
         overflow: "hidden",
-        elevation: 3,
-        shadowColor: "#000",
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
+        shadowColor: THEME_COLOR,
+        shadowOpacity: 0.10,
+        shadowOffset: { width: 0, height: 5 },
+        shadowRadius: 12,
+        elevation: 4,
     },
-    cardBanner: { height: 100, width: "100%", position: "relative" },
+    cardBanner: { height: 110, width: "100%", position: "relative" },
     cardImage: { width: "100%", height: "100%", resizeMode: "cover" },
     soonBadge: {
         position: "absolute",
         top: 8,
         right: 8,
-        backgroundColor: "rgba(0,0,0,0.6)",
-        borderRadius: 12,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
+        backgroundColor: "rgba(0,0,0,0.55)",
+        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 3,
     },
-    soonBadgeText: { fontSize: 9, color: "#fff", fontWeight: "700" },
+    soonBadgeText: { fontSize: 9.5, color: "#fff", fontWeight: "800", letterSpacing: 0.3 },
     cardBody: { padding: 12 },
     typeBadge: {
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: 7,
-        paddingVertical: 3,
-        borderRadius: 12,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
         alignSelf: "flex-start",
-        marginBottom: 6,
+        marginBottom: 8,
+        gap: 3,
     },
-    typeText: { fontSize: 9, fontWeight: "700", marginLeft: 3 },
+    typeText: { fontSize: 9.5, fontWeight: "800", letterSpacing: 0.3 },
     cardTitle: {
-        fontSize: 13,
+        fontSize: 13.5,
         fontWeight: "800",
-        color: "#1E293B",
-        marginBottom: 6,
+        color: "#0F172A",
+        marginBottom: 8,
         lineHeight: 18,
-        height: 36,
+        minHeight: 36,
     },
-    metaRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 3 },
-    metaText: { fontSize: 10, color: "#64748B", flex: 1 },
-    progressSection: { marginTop: 6 },
+    metaRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 4 },
+    metaText: { fontSize: 10.5, color: "#64748B", flex: 1, fontWeight: "500" },
+    progressSection: { marginTop: 8 },
     progressTrack: {
-        height: 4,
+        height: 5,
         backgroundColor: "#E2E8F0",
-        borderRadius: 10,
+        borderRadius: 3,
         overflow: "hidden",
     },
-    progressFill: { height: "100%", borderRadius: 10 },
+    progressFill: { height: "100%", borderRadius: 3, backgroundColor: THEME_COLOR },
     cardFooter: { marginTop: 10 },
     registeredChip: {
         flexDirection: "row",
         alignItems: "center",
         gap: 4,
         backgroundColor: "#F0FDF4",
-        borderRadius: 12,
-        paddingHorizontal: 8,
+        borderRadius: 10,
+        paddingHorizontal: 9,
         paddingVertical: 5,
         alignSelf: "flex-start",
     },
-    registeredChipText: { fontSize: 10, color: "#166534", fontWeight: "700" },
+    registeredChipText: { fontSize: 10, color: "#166534", fontWeight: "800" },
     registerChip: {
-        borderRadius: 12,
-        paddingHorizontal: 10,
+        borderRadius: 10,
+        paddingHorizontal: 11,
         paddingVertical: 6,
         alignSelf: "flex-start",
+        backgroundColor: THEME_COLOR,
     },
-    registerChipText: { fontSize: 10, color: "#fff", fontWeight: "700" },
+    registerChipText: { fontSize: 10, color: "#fff", fontWeight: "800", letterSpacing: 0.3 },
     modalOverlay: {
         flex: 1,
         backgroundColor: "rgba(0,0,0,0.5)",

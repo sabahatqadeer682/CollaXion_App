@@ -193,7 +193,7 @@ const UpdatePasswordScreen: React.FC<Props> = ({ navigation }) => {
                 }
             }
         } catch (error) {
-            Alert.alert("Network Error", "Server se connect nahi ho saka. IP check karo.");
+            Alert.alert("Network Error", "Could not connect to the server. Please check your network.");
             console.error(error);
         } finally {
             setLoading(false);

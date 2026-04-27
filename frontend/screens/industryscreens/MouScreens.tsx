@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
 import * as WebBrowser from "expo-web-browser";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -10,7 +11,7 @@ import {
 } from "react-native";
 import {
   API_MOU, BASE, C, CT, FieldInput, Header, InfoCard, Row, SBadge,
-  addCL, bldPayload, fmtDate, fmtDT, sharedStyles, useToast, useUser
+  addCL, bldPayload, fmtDate, fmtDT, sharedStyles, useToast, useUser, width as SCREEN_W,
 } from "./shared";
 import socket from "../studentscreens/utils/Socket";
 
@@ -312,6 +313,296 @@ export function MoUScreen() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  CREATE MOU — helpers (calendar picker + suggestion field)
+// ═══════════════════════════════════════════════════════════════
+
+// CollaXion theme colors used inside Create MOU
+const MT = {
+  navy:    "#193648",
+  navySft: "#1f4760",
+  bg:      "#F0F4F8",
+  card:    "#FFFFFF",
+  border:  "#E2EAF0",
+  text:    "#0F2236",
+  sub:     "#64748B",
+  light:   "#94A3B8",
+  iconBg:  "#E8EFF6",
+  navySoft:"rgba(25,54,72,0.08)",
+};
+
+const MO_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAY_NAMES = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+function MouCalendar({
+  visible, onClose, onConfirm, initial, title = "Select Date",
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: (iso: string) => void;
+  initial?: string;
+  title?: string;
+}) {
+  const today = new Date();
+  const init  = initial ? new Date(initial) : null;
+  const [vy, setVy] = useState((init?.getFullYear()) ?? today.getFullYear());
+  const [vm, setVm] = useState((init?.getMonth())    ?? today.getMonth());
+  const [sel, setSel] = useState<Date | null>(init);
+
+  const firstDay    = new Date(vy, vm, 1).getDay();
+  const daysInMonth = new Date(vy, vm + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const isSel = (d: number) =>
+    sel && sel.getFullYear() === vy && sel.getMonth() === vm && sel.getDate() === d;
+  const isTod = (d: number) =>
+    today.getFullYear() === vy && today.getMonth() === vm && today.getDate() === d;
+
+  const prev = () => { if (vm === 0) { setVm(11); setVy(y => y - 1); } else setVm(m => m - 1); };
+  const next = () => { if (vm === 11) { setVm(0); setVy(y => y + 1); } else setVm(m => m + 1); };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={mc.overlay}>
+        <View style={mc.modal}>
+          <View style={mc.titleRow}>
+            <Text style={mc.title}>{title}</Text>
+            <TouchableOpacity onPress={onClose} style={mc.closeBtn}>
+              <Ionicons name="close" size={20} color={MT.sub} />
+            </TouchableOpacity>
+          </View>
+          <View style={mc.navRow}>
+            <TouchableOpacity onPress={prev} style={mc.navBtn}>
+              <Ionicons name="chevron-back" size={18} color={MT.text} />
+            </TouchableOpacity>
+            <Text style={mc.monthLabel}>{MO_NAMES[vm]} {vy}</Text>
+            <TouchableOpacity onPress={next} style={mc.navBtn}>
+              <Ionicons name="chevron-forward" size={18} color={MT.text} />
+            </TouchableOpacity>
+          </View>
+          <View style={mc.weekRow}>
+            {DAY_NAMES.map(d => <Text key={d} style={mc.dayName}>{d}</Text>)}
+          </View>
+          <View style={mc.grid}>
+            {cells.map((cell, idx) => {
+              if (cell === null) return <View key={`e-${idx}`} style={mc.cell} />;
+              const s = isSel(cell), t = isTod(cell);
+              return (
+                <TouchableOpacity key={`d-${idx}`} style={mc.cell}
+                  onPress={() => setSel(new Date(vy, vm, cell))} activeOpacity={0.7}>
+                  <View style={[mc.bubble, s && mc.bubbleSel, !s && t && mc.bubbleTod]}>
+                    <Text style={[mc.dateTxt, s && mc.dateTxtSel, !s && t && mc.dateTxtTod]}>{cell}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <View style={mc.actions}>
+            <TouchableOpacity style={mc.cancelBtn} onPress={onClose}>
+              <Text style={mc.cancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={mc.okBtn}
+              onPress={() => { if (sel) { const iso = sel.toISOString().split("T")[0]; onConfirm(iso); } else onClose(); }}>
+              <Text style={mc.okTxt}>Confirm</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const mc = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", paddingHorizontal: 20 },
+  modal:   { width: "100%", maxWidth: 420, backgroundColor: MT.card, borderRadius: 20, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 22 },
+  titleRow:{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
+  title:   { fontSize: 16, fontWeight: "800", color: MT.text },
+  closeBtn:{ width: 32, height: 32, borderRadius: 10, backgroundColor: MT.iconBg, justifyContent: "center", alignItems: "center" },
+  navRow:  { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  navBtn:  { width: 36, height: 36, borderRadius: 12, backgroundColor: MT.iconBg, justifyContent: "center", alignItems: "center" },
+  monthLabel:{ fontSize: 15, fontWeight: "800", color: MT.text },
+  weekRow: { flexDirection: "row", marginBottom: 4 },
+  dayName: { flex: 1, textAlign: "center", fontSize: 11, fontWeight: "700", color: MT.sub },
+  grid:    { flexDirection: "row", flexWrap: "wrap" },
+  cell:    { width: `${100 / 7}%` as any, aspectRatio: 1, justifyContent: "center", alignItems: "center" },
+  bubble:  { width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center" },
+  bubbleSel:{ backgroundColor: MT.navy },
+  bubbleTod:{ borderWidth: 1.5, borderColor: MT.navy },
+  dateTxt:    { fontSize: 14, color: MT.text, fontWeight: "500" },
+  dateTxtSel: { color: "#fff", fontWeight: "800" },
+  dateTxtTod: { color: MT.navy, fontWeight: "800" },
+  actions: { flexDirection: "row", gap: 10, marginTop: 16 },
+  cancelBtn:{ flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 1.5, borderColor: MT.border, justifyContent: "center", alignItems: "center" },
+  cancelTxt:{ fontSize: 13, fontWeight: "700", color: MT.sub },
+  okBtn:   { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: MT.navy, justifyContent: "center", alignItems: "center" },
+  okTxt:   { fontSize: 13, fontWeight: "800", color: "#fff" },
+});
+
+// Date input — opens calendar on tap
+function DatePickerField({
+  label, value, onChange, placeholder = "Select date", title,
+}: {
+  label: string;
+  value: string;
+  onChange: (iso: string) => void;
+  placeholder?: string;
+  title?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const display = value
+    ? new Date(value).toLocaleDateString("en-PK", { day: "2-digit", month: "short", year: "numeric" })
+    : "";
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={mfs.label}>{label}</Text>
+      <TouchableOpacity onPress={() => setOpen(true)} activeOpacity={0.85} style={mfs.dateBtn}>
+        <Ionicons name="calendar-outline" size={18} color={MT.navy} />
+        <Text style={[mfs.dateTxt, !display && { color: MT.light }]}>{display || placeholder}</Text>
+        <Ionicons name="chevron-down" size={16} color={MT.sub} />
+      </TouchableOpacity>
+      <MouCalendar
+        visible={open}
+        onClose={() => setOpen(false)}
+        onConfirm={(iso) => { onChange(iso); setOpen(false); }}
+        initial={value}
+        title={title || label}
+      />
+    </View>
+  );
+}
+
+// Auto-suggest text field — shows filtered chip suggestions as user types
+function SuggestField({
+  label, value, onChange, placeholder, suggestions, multiline = false, kbType,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  suggestions: string[];
+  multiline?: boolean;
+  kbType?: any;
+}) {
+  const [focused, setFocused] = useState(false);
+  const v = (value || "").trim().toLowerCase();
+  const filtered = (suggestions || [])
+    .filter((s) => s.toLowerCase() !== v)
+    .filter((s) => !v || s.toLowerCase().includes(v))
+    .slice(0, 6);
+
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={mfs.label}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor={MT.light}
+        multiline={multiline}
+        keyboardType={kbType}
+        style={[mfs.input, multiline && { minHeight: 88, textAlignVertical: "top" }, focused && mfs.inputFocus]}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setTimeout(() => setFocused(false), 150)}
+      />
+      {focused && filtered.length > 0 && (
+        <View style={mfs.suggestWrap}>
+          <Text style={mfs.suggestLbl}>Suggestions</Text>
+          <View style={mfs.chipRow}>
+            {filtered.map((s) => (
+              <TouchableOpacity key={s} onPress={() => onChange(s)} style={mfs.chip} activeOpacity={0.85}>
+                <Text style={mfs.chipTxt}>{s}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const mfs = StyleSheet.create({
+  label: { fontSize: 11.5, fontWeight: "800", color: MT.navy, marginBottom: 7, textTransform: "uppercase", letterSpacing: 0.7 },
+  input: {
+    backgroundColor: MT.card, borderWidth: 1.5, borderColor: MT.border,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+    fontSize: 14, color: MT.text,
+  },
+  inputFocus: { borderColor: MT.navy },
+  dateBtn: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: MT.card, borderWidth: 1.5, borderColor: MT.border,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
+  },
+  dateTxt: { flex: 1, fontSize: 14, color: MT.text, fontWeight: "600" },
+  suggestWrap: { marginTop: 6, padding: 10, borderRadius: 10, backgroundColor: MT.navySoft, borderWidth: 1, borderColor: MT.border },
+  suggestLbl:  { fontSize: 10, fontWeight: "800", color: MT.navy, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6 },
+  chipRow:     { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  chip:        { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, backgroundColor: MT.card, borderWidth: 1, borderColor: MT.border },
+  chipTxt:     { fontSize: 12, color: MT.navy, fontWeight: "700" },
+});
+
+// Suggestion datasets
+const SUGG = {
+  titles: [
+    "Industry-Academia Research Collaboration",
+    "Internship & Talent Pipeline MOU",
+    "Joint Curriculum Development",
+    "Student Training Program",
+    "Consultancy & Advisory Services",
+    "Joint R&D Initiative",
+    "Industrial Visits & Guest Lectures",
+  ],
+  objectives: [
+    "Provide internship opportunities to students",
+    "Conduct joint research projects",
+    "Organize guest lectures and workshops",
+    "Co-develop curriculum aligned with industry needs",
+    "Facilitate faculty exchange and training",
+    "Sponsor final-year projects",
+  ],
+  uniResp: [
+    "Nominate qualified students and faculty for collaboration",
+    "Provide academic mentorship and supervision",
+    "Make labs and research facilities available where applicable",
+    "Coordinate scheduling, logistics and academic credit",
+  ],
+  indResp: [
+    "Provide industry mentors and project briefs",
+    "Offer paid / unpaid internship slots as agreed",
+    "Share domain knowledge through guest sessions",
+    "Provide infrastructure and tools for joint work",
+  ],
+  terms: [
+    "Either party may terminate this MOU with 30 days written notice",
+    "All confidential information shall remain protected by both parties",
+    "IP arising out of joint work will be governed by a separate agreement",
+    "Neither party will use the other's name in publicity without written consent",
+    "This MOU is non-binding in financial terms unless a separate contract is signed",
+  ],
+  designations: [
+    "Director", "Manager", "HR Manager", "CEO", "CTO",
+    "Project Lead", "Liaison Officer", "Head of Operations",
+  ],
+  uniDesignations: [
+    "Vice Chancellor", "Dean", "Head of Department",
+    "Industry Liaison Incharge", "Director ORIC", "Coordinator",
+  ],
+  signatoryIndustry: [
+    "CEO, Industry Partner",
+    "Managing Director, Industry Partner",
+    "Director Operations, Industry Partner",
+  ],
+  signatoryUniversity: [
+    "Vice Chancellor, Riphah International University",
+    "Dean Faculty of Computing",
+    "Director ORIC, Riphah International University",
+  ],
+};
+
+// ═══════════════════════════════════════════════════════════════
 //  CREATE MOU
 // ═══════════════════════════════════════════════════════════════
 export function CreateMoUScreen() {
@@ -321,16 +612,62 @@ export function CreateMoUScreen() {
   const [ld, setLd] = useState(false);
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
-    title: "", collaborationType: "", description: "",
-    objectives: [""], terms: [""],
-    startDate: "", endDate: "",
-    signatories: { industry: "" },
-    industryContact: { name: "", designation: "", email: "" },
+    title: "",
+    collaborationType: "",
+    description: "",
+    startDate: "",
+    endDate: "",
+    objectives: [""],
+    terms: [""],
+    responsibilities: { university: [""], industry: [""] },
+    universityLogo: "",
+    industryLogo: "",
+    industryContact:   { name: "", designation: "", email: "" },
+    universityContact: { name: "", designation: "", email: "" },
+    signatories:       { industry: "", university: "" },
   });
 
   const set = (k: string, v: any) => setForm((f) => ({ ...f, [k]: v }));
   const arrAdd = (k: string) => setForm((f: any) => ({ ...f, [k]: [...f[k], ""] }));
-  const arrUpd = (k: string, i: number, v: string) => setForm((f: any) => { const a = [...f[k]]; a[i] = v; return { ...f, [k]: a }; });
+  const arrUpd = (k: string, i: number, v: string) =>
+    setForm((f: any) => { const a = [...f[k]]; a[i] = v; return { ...f, [k]: a }; });
+  const arrRm  = (k: string, i: number) =>
+    setForm((f: any) => ({ ...f, [k]: f[k].filter((_: any, j: number) => j !== i) }));
+  const respAdd = (side: "university" | "industry") =>
+    setForm((f) => ({ ...f, responsibilities: { ...f.responsibilities, [side]: [...f.responsibilities[side], ""] } }));
+  const respUpd = (side: "university" | "industry", i: number, v: string) =>
+    setForm((f) => {
+      const a = [...f.responsibilities[side]]; a[i] = v;
+      return { ...f, responsibilities: { ...f.responsibilities, [side]: a } };
+    });
+  const respRm = (side: "university" | "industry", i: number) =>
+    setForm((f) => ({
+      ...f,
+      responsibilities: {
+        ...f.responsibilities,
+        [side]: f.responsibilities[side].filter((_, j) => j !== i),
+      },
+    }));
+
+  const pickLogo = async (setter: (v: string) => void) => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Permission needed", "Please allow gallery access to upload a logo.");
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.6, aspect: [1, 1], base64: true,
+      });
+      if (!res.canceled) {
+        const a = res.assets[0];
+        setter(a.base64 ? `data:image/jpeg;base64,${a.base64}` : a.uri);
+      }
+    } catch {
+      Alert.alert("Error", "Could not pick image. Please try again.");
+    }
+  };
 
   const submit = async () => {
     if (!form.title || !form.collaborationType) {
@@ -340,26 +677,33 @@ export function CreateMoUScreen() {
     setLd(true);
     try {
       const payload = {
-        title: form.title,
-        university: "Riphah International University",
-        industry: user?.name || "New Industry Partner",
-        industryId: user?._id || "industry_001",
+        title:             form.title,
+        university:        "Riphah International University",
+        industry:          user?.name || "New Industry Partner",
+        industryId:        user?._id || "industry_001",
         collaborationType: form.collaborationType,
-        description: form.description || "",
-        startDate: form.startDate || new Date().toISOString().split('T')[0],
-        endDate: form.endDate || new Date(Date.now() + 31536000000).toISOString().split('T')[0],
-        objectives: form.objectives.filter(Boolean),
-        terms: form.terms.filter(Boolean),
-        industryContact: form.industryContact,
-        signatories: form.signatories,
+        description:       form.description || "",
+        startDate:         form.startDate || new Date().toISOString().split("T")[0],
+        endDate:           form.endDate   || new Date(Date.now() + 31536000000).toISOString().split("T")[0],
+        objectives:        form.objectives.filter(Boolean),
+        terms:             form.terms.filter(Boolean),
+        responsibilities: {
+          university: form.responsibilities.university.filter(Boolean),
+          industry:   form.responsibilities.industry.filter(Boolean),
+        },
+        universityLogo:    form.universityLogo,
+        industryLogo:      form.industryLogo || user?.logo || "",
+        industryContact:   form.industryContact,
+        universityContact: form.universityContact,
+        signatories:       form.signatories,
         status: "Draft",
         changeLog: [{
           id: Date.now(),
           type: "industry_change",
           date: new Date().toISOString(),
           party: "Industry",
-          message: `MOU Request created by ${user?.name}`
-        }]
+          message: `MOU Request created by ${user?.name}`,
+        }],
       };
       const response = await ax().post(API_MOU, payload);
       if (response.status === 201 || response.status === 200) {
@@ -377,128 +721,410 @@ export function CreateMoUScreen() {
 
   const TYPES = ["Research", "Internship", "Training", "Consultancy", "Joint Venture", "Other"];
 
+  const renderArrayField = (
+    items: string[],
+    onUpdate: (i: number, v: string) => void,
+    onAdd: () => void,
+    onRemove: (i: number) => void,
+    placeholderPrefix: string,
+    addLabel: string
+  ) => (
+    <>
+      {items.map((val, i) => (
+        <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <View style={styles.objNum}><Text style={styles.objNumTxt}>{i + 1}</Text></View>
+          <TextInput
+            style={[sharedStyles.fieldInput, { flex: 1, marginTop: 0 }]}
+            value={val}
+            onChangeText={(v) => onUpdate(i, v)}
+            placeholder={`${placeholderPrefix} ${i + 1}`}
+          />
+          {items.length > 1 && (
+            <TouchableOpacity onPress={() => onRemove(i)} style={{ padding: 6 }}>
+              <Ionicons name="close-circle" size={20} color="#dc2626" />
+            </TouchableOpacity>
+          )}
+        </View>
+      ))}
+      <TouchableOpacity onPress={onAdd} style={styles.addRowBtn}>
+        <Ionicons name="add-circle-outline" size={16} color={C.teal} />
+        <Text style={styles.addRowTxt}>{addLabel}</Text>
+      </TouchableOpacity>
+    </>
+  );
+
+  const LogoBox = ({ label, value, onPick, onClear }: { label: string; value: string; onPick: () => void; onClear: () => void }) => (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={sharedStyles.fieldLbl}>{label}</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 6 }}>
+        <TouchableOpacity
+          onPress={onPick}
+          activeOpacity={0.85}
+          style={{
+            width: 64, height: 64, borderRadius: 10,
+            borderWidth: 1.5, borderColor: "#c5d5e8", borderStyle: "dashed",
+            backgroundColor: "#f8fafc", alignItems: "center", justifyContent: "center",
+            overflow: "hidden",
+          }}
+        >
+          {value
+            ? <Image source={{ uri: value }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
+            : <Ionicons name="cloud-upload-outline" size={22} color="#94a3b8" />
+          }
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", gap: 6, marginBottom: 4 }}>
+            <TouchableOpacity onPress={onPick}
+              style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: "#e2eef9", borderWidth: 1, borderColor: "#dbe7f3" }}>
+              <Ionicons name="cloud-upload-outline" size={13} color={C.navy} />
+              <Text style={{ color: C.navy, fontWeight: "700", fontSize: 12 }}>{value ? "Change" : "Upload Logo"}</Text>
+            </TouchableOpacity>
+            {!!value && (
+              <TouchableOpacity onPress={onClear}
+                style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca" }}>
+                <Text style={{ color: "#dc2626", fontWeight: "700", fontSize: 12 }}>Remove</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <Text style={{ fontSize: 11, color: "#94a3b8" }}>PNG / JPG · Square preferred</Text>
+        </View>
+      </View>
+    </View>
+  );
+
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <View style={{ flex: 1, backgroundColor: MT.bg }}>
       <Header title="Request New MOU" back />
 
-      {/* Step Indicator */}
-      <View style={styles.stepRow}>
-        {[1, 2, 3].map(s => (
-          <View key={s} style={styles.stepItem}>
-            <View style={[styles.stepDot, step >= s && styles.stepDotActive]}>
-              {step > s ? <Ionicons name="checkmark" size={12} color="#fff" /> :
-                <Text style={[styles.stepNum, step >= s && { color: "#fff" }]}>{s}</Text>}
-            </View>
-            <Text style={[styles.stepLbl, step >= s && { color: C.teal }]}>
-              {s === 1 ? "Basics" : s === 2 ? "Details" : "Review"}
-            </Text>
-            {s < 3 && <View style={[styles.stepLine, step > s && styles.stepLineActive]} />}
-          </View>
-        ))}
+      {/* Step Indicator — themed CollaXion navy */}
+      <View style={mfs2Stepper.stepRow}>
+        {[1, 2, 3, 4].map(s => {
+          const active = step >= s;
+          const done   = step > s;
+          return (
+            <React.Fragment key={s}>
+              <View style={mfs2Stepper.stepItem}>
+                <View style={[mfs2Stepper.dot, active && mfs2Stepper.dotActive]}>
+                  {done
+                    ? <Ionicons name="checkmark" size={12} color="#fff" />
+                    : <Text style={[mfs2Stepper.dotNum, active && { color: "#fff" }]}>{s}</Text>}
+                </View>
+                <Text style={[mfs2Stepper.dotLbl, active && { color: MT.navy }]}>
+                  {s === 1 ? "Basics" : s === 2 ? "Content" : s === 3 ? "Parties" : "Review"}
+                </Text>
+              </View>
+              {s < 4 && <View style={[mfs2Stepper.line, done && mfs2Stepper.lineActive]} />}
+            </React.Fragment>
+          );
+        })}
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.createForm}>
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: isNarrow ? 14 : 18, paddingTop: 8, paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
 
+          {/* ── STEP 1 — BASICS + LOGOS ── */}
           {step === 1 && (
-            <>
-              <Text style={styles.stepHeading}>Basic Information</Text>
-              <FieldInput label="MOU Title *" value={form.title} onChange={v => set("title", v)} placeholder="e.g. AI Research Collaboration" />
-              <FieldInput label="University" value="Riphah International University" onChange={() => {}} editable={false} />
-              <Text style={sharedStyles.fieldLbl}>Collaboration Type *</Text>
-              <View style={styles.typeGrid}>
-                {TYPES.map(t => (
-                  <TouchableOpacity key={t} onPress={() => set("collaborationType", t)}
-                    style={[styles.typeChip, form.collaborationType === t && styles.typeChipActive]}>
-                    <Text style={[styles.typeChipTxt, form.collaborationType === t && styles.typeChipTxtActive]}>{t}</Text>
-                  </TouchableOpacity>
-                ))}
+            <View style={mfs2.sectionCard}>
+              <Text style={mfs2.cardHeading}>Basic Information</Text>
+              <Text style={mfs2.cardSub}>Tell us what this MOU is about.</Text>
+
+              <SuggestField
+                label="MOU Title *"
+                value={form.title}
+                onChange={(v) => set("title", v)}
+                placeholder="e.g. AI Research Collaboration"
+                suggestions={SUGG.titles}
+              />
+
+              <View style={mfs2.lockedRow}>
+                <View style={[mfs2.lockedField, { flex: 1 }]}>
+                  <Text style={mfs.label}>University</Text>
+                  <View style={mfs2.lockedBox}>
+                    <Ionicons name="school-outline" size={16} color={MT.navy} />
+                    <Text style={mfs2.lockedTxt}>Riphah International University</Text>
+                  </View>
+                </View>
               </View>
-              <FieldInput label="Start Date" value={form.startDate} onChange={v => set("startDate", v)} placeholder="YYYY-MM-DD" />
-              <FieldInput label="End Date" value={form.endDate} onChange={v => set("endDate", v)} placeholder="YYYY-MM-DD" />
-            </>
+              <View style={mfs2.lockedRow}>
+                <View style={[mfs2.lockedField, { flex: 1 }]}>
+                  <Text style={mfs.label}>Industry Partner</Text>
+                  <View style={mfs2.lockedBox}>
+                    <Ionicons name="business-outline" size={16} color={MT.navy} />
+                    <Text style={mfs2.lockedTxt}>{user?.name || "Your Organization"}</Text>
+                  </View>
+                </View>
+              </View>
+
+              <Text style={mfs.label}>Collaboration Type *</Text>
+              <View style={mfs2.chipsWrap}>
+                {TYPES.map(t => {
+                  const active = form.collaborationType === t;
+                  return (
+                    <TouchableOpacity key={t} onPress={() => set("collaborationType", t)}
+                      activeOpacity={0.85}
+                      style={[mfs2.typeChip, active && mfs2.typeChipActive]}>
+                      <Text style={[mfs2.typeChipTxt, active && mfs2.typeChipTxtActive]}>{t}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={mfs2.dateRow}>
+                <View style={{ flex: 1 }}>
+                  <DatePickerField label="Start Date" value={form.startDate} onChange={(v) => set("startDate", v)} title="Select Start Date" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <DatePickerField label="End Date" value={form.endDate} onChange={(v) => set("endDate", v)} title="Select End Date" />
+                </View>
+              </View>
+
+              <SuggestField
+                label="Purpose / Description"
+                value={form.description}
+                onChange={(v) => set("description", v)}
+                placeholder="Describe the purpose and scope of this MOU..."
+                suggestions={SUGG.titles}
+                multiline
+              />
+
+              <View style={mfs2.divider} />
+              <Text style={mfs2.cardHeading}>Party Logos</Text>
+              <Text style={mfs2.cardSub}>Logos appear in the MOU header and the final PDF.</Text>
+              <LogoBox
+                label="Industry / Company Logo"
+                value={form.industryLogo}
+                onPick={() => pickLogo(v => set("industryLogo", v))}
+                onClear={() => set("industryLogo", "")}
+              />
+              <LogoBox
+                label="University Logo (optional)"
+                value={form.universityLogo}
+                onPick={() => pickLogo(v => set("universityLogo", v))}
+                onClear={() => set("universityLogo", "")}
+              />
+            </View>
           )}
 
+          {/* ── STEP 2 — OBJECTIVES, RESPONSIBILITIES, TERMS ── */}
           {step === 2 && (
-            <>
-              <Text style={styles.stepHeading}>Purpose & Objectives</Text>
-              <FieldInput label="Description / Purpose *" value={form.description} onChange={v => set("description", v)}
-                placeholder="Describe the purpose and scope..." multiline />
-              <Text style={sharedStyles.fieldLbl}>Objectives</Text>
+            <View style={mfs2.sectionCard}>
+              <Text style={mfs2.cardHeading}>Objectives</Text>
+              <Text style={mfs2.cardSub}>What do both parties want to achieve?</Text>
               {form.objectives.map((o, i) => (
-                <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <View style={styles.objNum}><Text style={styles.objNumTxt}>{i + 1}</Text></View>
-                  <TextInput style={[sharedStyles.fieldInput, { flex: 1, marginTop: 0 }]} value={o}
-                    onChangeText={(v) => arrUpd("objectives", i, v)} placeholder={`Objective ${i + 1}`} />
-                </View>
+                <SuggestField
+                  key={`obj-${i}`}
+                  label={`Objective ${i + 1}`}
+                  value={o}
+                  onChange={(v) => arrUpd("objectives", i, v)}
+                  placeholder={`Objective ${i + 1}`}
+                  suggestions={SUGG.objectives}
+                />
               ))}
-              <TouchableOpacity onPress={() => arrAdd("objectives")} style={styles.addRowBtn}>
-                <Ionicons name="add-circle-outline" size={16} color={C.teal} />
-                <Text style={styles.addRowTxt}>Add Objective</Text>
-              </TouchableOpacity>
-              <Text style={[sharedStyles.fieldLbl, { marginTop: 16 }]}>Terms & Conditions</Text>
+              <View style={mfs2.btnRow}>
+                <TouchableOpacity onPress={() => arrAdd("objectives")} style={mfs2.addBtn}>
+                  <Ionicons name="add-circle-outline" size={16} color={MT.navy} />
+                  <Text style={mfs2.addBtnTxt}>Add Objective</Text>
+                </TouchableOpacity>
+                {form.objectives.length > 1 && (
+                  <TouchableOpacity onPress={() => arrRm("objectives", form.objectives.length - 1)} style={mfs2.removeBtn}>
+                    <Ionicons name="remove-circle-outline" size={16} color="#dc2626" />
+                    <Text style={mfs2.removeBtnTxt}>Remove last</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={mfs2.divider} />
+              <Text style={mfs2.cardHeading}>Responsibilities</Text>
+              <Text style={mfs2.cardSub}>Who does what under this MOU.</Text>
+
+              <Text style={[mfs.label, { marginTop: 6 }]}>University Responsibilities</Text>
+              {form.responsibilities.university.map((r, i) => (
+                <SuggestField
+                  key={`u-${i}`}
+                  label={`#${i + 1}`}
+                  value={r}
+                  onChange={(v) => respUpd("university", i, v)}
+                  placeholder="e.g. Provide academic mentorship"
+                  suggestions={SUGG.uniResp}
+                />
+              ))}
+              <View style={mfs2.btnRow}>
+                <TouchableOpacity onPress={() => respAdd("university")} style={mfs2.addBtn}>
+                  <Ionicons name="add-circle-outline" size={16} color={MT.navy} />
+                  <Text style={mfs2.addBtnTxt}>Add University Responsibility</Text>
+                </TouchableOpacity>
+                {form.responsibilities.university.length > 1 && (
+                  <TouchableOpacity onPress={() => respRm("university", form.responsibilities.university.length - 1)} style={mfs2.removeBtn}>
+                    <Ionicons name="remove-circle-outline" size={16} color="#dc2626" />
+                    <Text style={mfs2.removeBtnTxt}>Remove last</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <Text style={[mfs.label, { marginTop: 18 }]}>Industry Responsibilities</Text>
+              {form.responsibilities.industry.map((r, i) => (
+                <SuggestField
+                  key={`i-${i}`}
+                  label={`#${i + 1}`}
+                  value={r}
+                  onChange={(v) => respUpd("industry", i, v)}
+                  placeholder="e.g. Provide industry mentors and project briefs"
+                  suggestions={SUGG.indResp}
+                />
+              ))}
+              <View style={mfs2.btnRow}>
+                <TouchableOpacity onPress={() => respAdd("industry")} style={mfs2.addBtn}>
+                  <Ionicons name="add-circle-outline" size={16} color={MT.navy} />
+                  <Text style={mfs2.addBtnTxt}>Add Industry Responsibility</Text>
+                </TouchableOpacity>
+                {form.responsibilities.industry.length > 1 && (
+                  <TouchableOpacity onPress={() => respRm("industry", form.responsibilities.industry.length - 1)} style={mfs2.removeBtn}>
+                    <Ionicons name="remove-circle-outline" size={16} color="#dc2626" />
+                    <Text style={mfs2.removeBtnTxt}>Remove last</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={mfs2.divider} />
+              <Text style={mfs2.cardHeading}>Terms & Conditions</Text>
+              <Text style={mfs2.cardSub}>Standard clauses you can pick from suggestions.</Text>
               {form.terms.map((t, i) => (
-                <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <View style={styles.objNum}><Text style={styles.objNumTxt}>{i + 1}</Text></View>
-                  <TextInput style={[sharedStyles.fieldInput, { flex: 1, marginTop: 0 }]} value={t}
-                    onChangeText={(v) => arrUpd("terms", i, v)} placeholder={`Term ${i + 1}`} />
-                </View>
+                <SuggestField
+                  key={`term-${i}`}
+                  label={`Term ${i + 1}`}
+                  value={t}
+                  onChange={(v) => arrUpd("terms", i, v)}
+                  placeholder={`Term / Clause ${i + 1}`}
+                  suggestions={SUGG.terms}
+                  multiline
+                />
               ))}
-              <TouchableOpacity onPress={() => arrAdd("terms")} style={styles.addRowBtn}>
-                <Ionicons name="add-circle-outline" size={16} color={C.teal} />
-                <Text style={styles.addRowTxt}>Add Term</Text>
-              </TouchableOpacity>
-            </>
+              <View style={mfs2.btnRow}>
+                <TouchableOpacity onPress={() => arrAdd("terms")} style={mfs2.addBtn}>
+                  <Ionicons name="add-circle-outline" size={16} color={MT.navy} />
+                  <Text style={mfs2.addBtnTxt}>Add Term</Text>
+                </TouchableOpacity>
+                {form.terms.length > 1 && (
+                  <TouchableOpacity onPress={() => arrRm("terms", form.terms.length - 1)} style={mfs2.removeBtn}>
+                    <Ionicons name="remove-circle-outline" size={16} color="#dc2626" />
+                    <Text style={mfs2.removeBtnTxt}>Remove last</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
           )}
 
+          {/* ── STEP 3 — CONTACTS & SIGNATORIES ── */}
           {step === 3 && (
-            <>
-              <Text style={styles.stepHeading}>Contact & Review</Text>
-              <FieldInput label="Your Contact Name" value={form.industryContact.name}
-                onChange={v => set("industryContact", { ...form.industryContact, name: v })} />
-              <FieldInput label="Designation" value={form.industryContact.designation}
-                onChange={v => set("industryContact", { ...form.industryContact, designation: v })} />
-              <FieldInput label="Contact Email" value={form.industryContact.email}
-                onChange={v => set("industryContact", { ...form.industryContact, email: v })} kbType="email-address" />
-              <FieldInput label="Authorized Signatory" value={form.signatories.industry}
-                onChange={v => set("signatories", { ...form.signatories, industry: v })} placeholder="Name & Designation" />
-              <View style={styles.reviewCard}>
-                <Text style={styles.reviewTitle}>Summary</Text>
+            <View style={mfs2.sectionCard}>
+              <Text style={mfs2.cardHeading}>Industry Contact (Yours)</Text>
+              <Text style={mfs2.cardSub}>The person liaison can reach out to from your side.</Text>
+              <SuggestField label="Contact Name"
+                value={form.industryContact.name}
+                onChange={v => set("industryContact", { ...form.industryContact, name: v })}
+                placeholder="Full name"
+                suggestions={[]} />
+              <SuggestField label="Designation"
+                value={form.industryContact.designation}
+                onChange={v => set("industryContact", { ...form.industryContact, designation: v })}
+                placeholder="e.g. HR Manager"
+                suggestions={SUGG.designations} />
+              <SuggestField label="Contact Email"
+                value={form.industryContact.email}
+                onChange={v => set("industryContact", { ...form.industryContact, email: v })}
+                placeholder="name@company.com"
+                kbType="email-address"
+                suggestions={[]} />
+
+              <View style={mfs2.divider} />
+              <Text style={mfs2.cardHeading}>University Contact (Proposed)</Text>
+              <Text style={mfs2.cardSub}>Suggest who at Riphah should review this.</Text>
+              <SuggestField label="Contact Name"
+                value={form.universityContact.name}
+                onChange={v => set("universityContact", { ...form.universityContact, name: v })}
+                placeholder="e.g. Dr. A. Khan"
+                suggestions={[]} />
+              <SuggestField label="Designation"
+                value={form.universityContact.designation}
+                onChange={v => set("universityContact", { ...form.universityContact, designation: v })}
+                placeholder="e.g. Industry Liaison Incharge"
+                suggestions={SUGG.uniDesignations} />
+              <SuggestField label="Contact Email"
+                value={form.universityContact.email}
+                onChange={v => set("universityContact", { ...form.universityContact, email: v })}
+                placeholder="name@riphah.edu.pk"
+                kbType="email-address"
+                suggestions={[]} />
+
+              <View style={mfs2.divider} />
+              <Text style={mfs2.cardHeading}>Signatories</Text>
+              <Text style={mfs2.cardSub}>Authorized representatives signing the MOU.</Text>
+              <SuggestField label="Industry Authorized Signatory"
+                value={form.signatories.industry}
+                onChange={v => set("signatories", { ...form.signatories, industry: v })}
+                placeholder="Name & Designation"
+                suggestions={SUGG.signatoryIndustry} />
+              <SuggestField label="University Authorized Signatory (Proposed)"
+                value={form.signatories.university}
+                onChange={v => set("signatories", { ...form.signatories, university: v })}
+                placeholder="e.g. Vice Chancellor"
+                suggestions={SUGG.signatoryUniversity} />
+            </View>
+          )}
+
+          {/* ── STEP 4 — REVIEW ── */}
+          {step === 4 && (
+            <View style={mfs2.sectionCard}>
+              <Text style={mfs2.cardHeading}>Review & Submit</Text>
+              <Text style={mfs2.cardSub}>Double-check before sending to Industry Liaison Incharge.</Text>
+              <View style={mfs2.reviewBox}>
                 {[
-                  { l: "Title",      v: form.title },
-                  { l: "Type",       v: form.collaborationType },
-                  { l: "Duration",   v: `${form.startDate || "—"} → ${form.endDate || "—"}` },
-                  { l: "University", v: "Riphah International University" },
-                  { l: "Industry",   v: user?.name },
+                  { l: "Title",                     v: form.title },
+                  { l: "Type",                      v: form.collaborationType },
+                  { l: "Duration",                  v: `${form.startDate || "—"} → ${form.endDate || "—"}` },
+                  { l: "University",                v: "Riphah International University" },
+                  { l: "Industry",                  v: user?.name },
+                  { l: "Objectives",                v: `${form.objectives.filter(Boolean).length} item(s)` },
+                  { l: "Univ. Responsibilities",    v: `${form.responsibilities.university.filter(Boolean).length} item(s)` },
+                  { l: "Industry Responsibilities", v: `${form.responsibilities.industry.filter(Boolean).length} item(s)` },
+                  { l: "Terms",                     v: `${form.terms.filter(Boolean).length} clause(s)` },
+                  { l: "Industry Contact",          v: form.industryContact.name || "—" },
+                  { l: "Industry Signatory",        v: form.signatories.industry || "—" },
+                  { l: "Industry Logo",             v: form.industryLogo ? "✓ Uploaded" : "—" },
+                  { l: "University Logo",           v: form.universityLogo ? "✓ Uploaded" : "—" },
                 ].map(r => (
-                  <View key={r.l} style={styles.reviewRow}>
-                    <Text style={styles.reviewLbl}>{r.l}</Text>
-                    <Text style={styles.reviewVal}>{r.v || "—"}</Text>
+                  <View key={r.l} style={mfs2.reviewRow}>
+                    <Text style={mfs2.reviewLbl}>{r.l}</Text>
+                    <Text style={mfs2.reviewVal} numberOfLines={2}>{r.v || "—"}</Text>
                   </View>
                 ))}
               </View>
-            </>
+            </View>
           )}
 
-          <View style={styles.stepBtns}>
+          <View style={mfs2.stepBtns}>
             {step > 1 && (
-              <TouchableOpacity style={styles.backStepBtn} onPress={() => setStep(s => s - 1)}>
-                <Ionicons name="arrow-back" size={16} color={C.teal} />
-                <Text style={styles.backStepTxt}>Back</Text>
+              <TouchableOpacity style={mfs2.backBtn} onPress={() => setStep(s => s - 1)}>
+                <Ionicons name="arrow-back" size={16} color={MT.navy} />
+                <Text style={mfs2.backBtnTxt}>Back</Text>
               </TouchableOpacity>
             )}
-            {step < 3 ? (
-              <TouchableOpacity style={[styles.nextStepBtn, { flex: 1 }]} onPress={() => setStep(s => s + 1)}>
-                <Text style={styles.nextStepTxt}>Continue</Text>
+            {step < 4 ? (
+              <TouchableOpacity style={[mfs2.primaryBtn, { flex: 1 }]} onPress={() => setStep(s => s + 1)}>
+                <Text style={mfs2.primaryBtnTxt}>Continue</Text>
                 <Ionicons name="arrow-forward" size={16} color="#fff" />
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity style={[styles.nextStepBtn, { flex: 1, backgroundColor: C.teal }]} onPress={submit} disabled={ld}>
+              <TouchableOpacity style={[mfs2.primaryBtn, { flex: 1 }]} onPress={submit} disabled={ld}>
                 {ld ? <ActivityIndicator color="#fff" size="small" /> : (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <>
                     <Ionicons name="send" size={16} color="#fff" />
-                    <Text style={styles.nextStepTxt}>Submit Request</Text>
-                  </View>
+                    <Text style={mfs2.primaryBtnTxt}>Submit Request</Text>
+                  </>
                 )}
               </TouchableOpacity>
             )}
@@ -508,6 +1134,91 @@ export function CreateMoUScreen() {
     </View>
   );
 }
+
+const isNarrow = SCREEN_W < 360;
+const mfs2 = StyleSheet.create({
+  sectionCard: {
+    backgroundColor: MT.card, borderRadius: 18,
+    padding: isNarrow ? 16 : 20,
+    marginBottom: 20,
+    borderWidth: 1, borderColor: MT.border,
+    shadowColor: MT.navy, shadowOpacity: 0.06, shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 }, elevation: 2,
+  },
+  cardHeading: { fontSize: 16, fontWeight: "800", color: MT.navy, letterSpacing: 0.3 },
+  cardSub:     { fontSize: 12.5, color: MT.sub, marginTop: 2, marginBottom: 14 },
+  divider:     { height: 1, backgroundColor: MT.border, marginVertical: 18 },
+  lockedRow:   { marginBottom: 12 },
+  lockedField: {},
+  lockedBox: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: MT.iconBg, borderWidth: 1.5, borderColor: MT.border,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
+  },
+  lockedTxt:  { flex: 1, fontSize: 14, color: MT.navy, fontWeight: "700" },
+  chipsWrap:  { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 },
+  typeChip:   { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1.5, borderColor: MT.border, backgroundColor: MT.card },
+  typeChipActive: { borderColor: MT.navy, backgroundColor: MT.navy },
+  typeChipTxt:    { fontSize: 12.5, color: MT.sub, fontWeight: "700" },
+  typeChipTxtActive: { color: "#fff" },
+  dateRow:   { flexDirection: "row", gap: 12 },
+  btnRow:    { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 4 },
+  addBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10,
+    backgroundColor: MT.navySoft, borderWidth: 1, borderColor: MT.border,
+  },
+  addBtnTxt:    { color: MT.navy, fontWeight: "700", fontSize: 12.5 },
+  removeBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10,
+    backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca",
+  },
+  removeBtnTxt: { color: "#dc2626", fontWeight: "700", fontSize: 12.5 },
+  reviewBox:    { backgroundColor: MT.iconBg, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: MT.border },
+  reviewRow: {
+    flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between",
+    paddingVertical: 9, gap: 14,
+    borderBottomWidth: 1, borderBottomColor: MT.border,
+  },
+  reviewLbl:    { color: MT.sub, fontSize: 12, fontWeight: "700", flex: 1 },
+  reviewVal:    { color: MT.navy, fontSize: 13, fontWeight: "700", flex: 1.5, textAlign: "right" },
+  stepBtns:     { flexDirection: "row", gap: 12, marginTop: 8, marginBottom: 32 },
+  backBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 18, paddingVertical: 14, borderRadius: 14,
+    borderWidth: 1.5, borderColor: MT.border, backgroundColor: MT.card,
+  },
+  backBtnTxt:    { color: MT.navy, fontWeight: "800", fontSize: 13.5 },
+  primaryBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    paddingHorizontal: 22, paddingVertical: 14, borderRadius: 14,
+    backgroundColor: MT.navy,
+    shadowColor: MT.navy, shadowOpacity: 0.28, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 }, elevation: 4,
+  },
+  primaryBtnTxt: { color: "#fff", fontWeight: "800", fontSize: 13.5, letterSpacing: 0.3 },
+});
+
+const mfs2Stepper = StyleSheet.create({
+  stepRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    paddingVertical: 14, paddingHorizontal: isNarrow ? 12 : 18,
+    backgroundColor: MT.card,
+    borderBottomWidth: 1, borderBottomColor: MT.border,
+  },
+  stepItem: { alignItems: "center" },
+  dot: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: MT.iconBg, borderWidth: 2, borderColor: MT.border,
+    alignItems: "center", justifyContent: "center",
+  },
+  dotActive: { backgroundColor: MT.navy, borderColor: MT.navy },
+  dotNum:    { fontSize: 12, fontWeight: "800", color: MT.light },
+  dotLbl:    { fontSize: 10, color: MT.light, fontWeight: "700", marginTop: 4, letterSpacing: 0.4 },
+  line:      { flex: 1, height: 2, backgroundColor: MT.border, marginHorizontal: 8, borderRadius: 2, marginBottom: 14 },
+  lineActive:{ backgroundColor: MT.navy },
+});
 
 // ═══════════════════════════════════════════════════════════════
 //  MOU DETAIL

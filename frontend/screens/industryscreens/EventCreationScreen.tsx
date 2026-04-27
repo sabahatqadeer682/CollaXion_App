@@ -59,6 +59,61 @@ const SUGGESTED_TAGS = [
   "Data Science", "Internship", "Research", "Networking", "Design",
 ];
 
+// ── Auto-suggestion datasets — keyed by event type so the chips track context.
+const TITLE_SUGGESTIONS: Record<EventType, string[]> = {
+  Seminar:    ["Industry-Academia Seminar", "Career Insights Seminar", "AI in Industry Seminar", "Future of Software Engineering"],
+  "Job Fair": ["Annual Job Fair 2026", "Tech Recruitment Drive", "Spring Career Fair", "Internship & Placement Day"],
+  Workshop:   ["Flutter Workshop 2026", "React Native Bootcamp", "Cloud Fundamentals Workshop", "UI/UX Hands-on Workshop"],
+  "Tech Talk":["AI Trends Tech Talk", "DevOps Tech Talk", "Cybersecurity 101", "Building Scalable APIs"],
+  Hackathon:  ["24-Hour Innovation Hackathon", "AI Hackathon 2026", "Open-Source Hack Day", "FinTech Hackathon"],
+  Networking: ["Industry Mixer Night", "Alumni Networking Evening", "Tech Leaders Meetup", "Founders & Builders Connect"],
+};
+
+const DESCRIPTION_TEMPLATES: Record<EventType, string[]> = {
+  Seminar: [
+    "Join us for an interactive seminar where industry leaders share trends, case studies, and career advice. Open Q&A and refreshments included.",
+    "An informative session on the latest developments in our domain. Attendees will leave with actionable insights and networking opportunities.",
+  ],
+  "Job Fair": [
+    "Meet our hiring team in person. Bring your CV — we'll be conducting on-spot interviews for internships and full-time roles.",
+    "Connect with multiple teams across engineering, product, and design. Limited capacity — RSVP early to confirm a slot.",
+  ],
+  Workshop: [
+    "Hands-on workshop covering fundamentals to project work. Bring your laptop. Certificate awarded on completion.",
+    "Practical training session with real datasets and exercises. Suitable for intermediate participants. Limited seats.",
+  ],
+  "Tech Talk": [
+    "A focused 45-minute talk by a senior engineer, followed by Q&A. Walk away with practical tips you can apply immediately.",
+    "Deep-dive technical session with code walkthroughs and live demos. Open to all students interested in the topic.",
+  ],
+  Hackathon: [
+    "Pitch, build, and demo in 24 hours. Cash prizes for top three teams. Mentors from industry on hand throughout.",
+    "Theme-based hackathon — form teams of up to 4. Food, swag, and judging panel from leading companies.",
+  ],
+  Networking: [
+    "Casual networking evening with industry professionals, alumni, and fellow students. Snacks and drinks provided.",
+    "Connect, share, and grow. Speed-networking rounds followed by free-form mingling.",
+  ],
+};
+
+const LOCATION_SUGGESTIONS = [
+  "Riphah International University, Islamabad",
+  "Riphah International University, Lahore",
+  "Conference Hall, Main Campus",
+  "Auditorium, Block A",
+  "Karachi Expo Center",
+  "Lahore Expo Center",
+  "Online (Zoom)",
+];
+
+const CAPACITY_SUGGESTIONS = ["30", "50", "100", "150", "200", "300", "500"];
+
+const INVITE_MESSAGE_TEMPLATES = [
+  "We'd love to host your students at this event. Looking forward to a productive session together.",
+  "You are cordially invited to participate. Please share this with your students and faculty.",
+  "Limited seats available — kindly confirm participation by the RSVP deadline.",
+];
+
 // ─────────────────────────────────────────────────────────────────
 export function EventCreationScreen() {
   const nav    = useNavigation<any>();
@@ -277,6 +332,17 @@ export function EventCreationScreen() {
                     onChangeText={setTitle}
                   />
                 </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled" style={{ marginTop: 8 }}>
+                  {TITLE_SUGGESTIONS[eventType]
+                    .filter((sg) => sg.toLowerCase() !== title.trim().toLowerCase())
+                    .map((sg) => (
+                      <TouchableOpacity key={sg} onPress={() => setTitle(sg)} style={evChip.chip}>
+                        <Ionicons name="sparkles-outline" size={12} color={THEME.text} />
+                        <Text style={evChip.txt}>{sg}</Text>
+                      </TouchableOpacity>
+                    ))}
+                </ScrollView>
               </View>
 
               <View style={s.divider} />
@@ -293,7 +359,17 @@ export function EventCreationScreen() {
                   multiline
                   numberOfLines={4}
                   textAlignVertical="top"
+                  maxLength={1000}
                 />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled" style={{ marginTop: 8 }}>
+                  {DESCRIPTION_TEMPLATES[eventType].map((tpl, i) => (
+                    <TouchableOpacity key={i} onPress={() => setDesc(tpl)} style={evChip.chip}>
+                      <Ionicons name="document-text-outline" size={12} color={THEME.text} />
+                      <Text style={evChip.txt}>Template {i + 1}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
 
               <View style={s.divider} />
@@ -369,6 +445,19 @@ export function EventCreationScreen() {
                     onChangeText={setLocation}
                   />
                 </View>
+                {mode !== "Virtual" && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled" style={{ marginTop: 8 }}>
+                    {LOCATION_SUGGESTIONS
+                      .filter((sg) => sg.toLowerCase() !== location.trim().toLowerCase())
+                      .map((sg) => (
+                        <TouchableOpacity key={sg} onPress={() => setLocation(sg)} style={evChip.chip}>
+                          <Ionicons name="location-outline" size={12} color={THEME.text} />
+                          <Text style={evChip.txt}>{sg}</Text>
+                        </TouchableOpacity>
+                      ))}
+                  </ScrollView>
+                )}
               </View>
 
               <View style={s.divider} />
@@ -388,6 +477,17 @@ export function EventCreationScreen() {
                       keyboardType="number-pad"
                     />
                   </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled" style={{ marginTop: 6 }}>
+                    {CAPACITY_SUGGESTIONS
+                      .filter((sg) => sg !== capacity)
+                      .map((sg) => (
+                        <TouchableOpacity key={`cap-${sg}`} onPress={() => setCapacity(sg)} style={evChip.chip}>
+                          <Ionicons name="people-outline" size={12} color={THEME.text} />
+                          <Text style={evChip.txt}>{sg}</Text>
+                        </TouchableOpacity>
+                      ))}
+                  </ScrollView>
                 </View>
                 <View style={{ width: 12 }} />
                 <View style={{ flex: 1 }}>
@@ -524,6 +624,15 @@ export function EventCreationScreen() {
                   numberOfLines={4}
                   textAlignVertical="top"
                 />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled" style={{ marginTop: 8 }}>
+                  {INVITE_MESSAGE_TEMPLATES.map((tpl, i) => (
+                    <TouchableOpacity key={i} onPress={() => setInviteMsg(tpl)} style={evChip.chip}>
+                      <Ionicons name="chatbubble-ellipses-outline" size={12} color={THEME.text} />
+                      <Text style={evChip.txt}>Template {i + 1}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
             </View>
           </View>
@@ -823,6 +932,17 @@ const tp = StyleSheet.create({
   optActive:{ backgroundColor:"#193648" },
   optTxt:  { fontSize:14, fontWeight:"600", color:"#0D1F2D" },
   optTxtActive:{ color:"#fff", fontWeight:"800" },
+});
+
+// ── Chip styles for the auto-suggestion rows ──
+const evChip = StyleSheet.create({
+  chip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: "#EEF3F7",
+    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6,
+    marginRight: 8, borderWidth: 1, borderColor: "#E2EAF0",
+  },
+  txt: { fontSize: 11, fontWeight: "700", color: "#193648" },
 });
 
 // ════════════════════════════════════════════════════════════════

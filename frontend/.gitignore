@@ -41,3 +41,10 @@ app-example
 # generated native folders
 /ios
 /android
+
+# uploads (ignore user files)
+backend/uploads/
+
+# env files (important 🔐)
+.env
+.env.*

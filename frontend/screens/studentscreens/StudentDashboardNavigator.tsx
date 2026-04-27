@@ -581,8 +581,24 @@ const uriToBase64 = async (uri: string): Promise<string> => {
 };
 
 // ── Header Right Component ──
-const HeaderRight = ({ navigation, profileImage, notificationCount }) => (
+const HeaderRight = ({ navigation, profileImage, notificationCount, chatUnreadCount = 0 }: any) => (
     <View style={{ flexDirection: "row", marginRight: 14, alignItems: "center", gap: 8 }}>
+        {/* Messages icon */}
+        <TouchableOpacity
+            onPress={() => navigation.navigate("ChatList")}
+            style={styles.headerBtn}
+        >
+            <MaterialCommunityIcons name="chat-processing-outline" size={22} color="#fff" />
+            {chatUnreadCount > 0 && (
+                <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                        {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                    </Text>
+                </View>
+            )}
+        </TouchableOpacity>
+
+        {/* Notification bell */}
         <TouchableOpacity
             onPress={() => navigation.navigate("Notifications")}
             style={styles.headerBtn}
@@ -719,7 +735,16 @@ const CustomDrawerContent = (props) => {
                 onPress: async () => {
                     await AsyncStorage.multiRemove(["studentEmail", "studentToken", "studentProfileImage", "studentFullName"]);
                     setProfileImage(null);
-                    navigation.replace("StudentLogin");
+                    // Sign-out → Role selection screen (not the student login),
+                    // so the user can pick their side again.
+                    const parent = (navigation as any).getParent?.();
+                    if (parent?.reset) {
+                        parent.reset({ index: 0, routes: [{ name: "RolesScreen" }] });
+                    } else {
+                        (navigation as any).reset
+                            ? (navigation as any).reset({ index: 0, routes: [{ name: "RolesScreen" }] })
+                            : navigation.replace("RolesScreen" as any);
+                    }
                 },
             },
         ]);
@@ -921,7 +946,13 @@ const StudentDashboardNavigator = () => {
                 options={(p) => ({ ...sharedHeader(p), ...ac("#193648"), drawerLabel: "Chat Room", drawerIcon: ({ color, size }) => <MaterialIcons name="chat-bubble" color={color} size={size} /> })} /> */}
 
             <Drawer.Screen name="ChatList" component={ChatListScreen}
-                options={(p) => ({ ...sharedHeader(p), ...ac("#193648"), drawerLabel: "Chats", drawerIcon: ({ color, size }) => <MaterialIcons name="chat" color={color} size={size} /> })} />
+                options={(p) => ({
+                    ...sharedHeader(p),
+                    ...ac("#193648"),
+                    headerShown: false,
+                    drawerLabel: "Chats",
+                    drawerIcon: ({ color, size }) => <MaterialIcons name="chat" color={color} size={size} />,
+                })} />
 
             {/* Hidden screens */}
             <Drawer.Screen name="InternshipDetails" component={InternshipDetailsScreen} options={{ drawerItemStyle: { height: 0 } }} />
@@ -930,8 +961,8 @@ const StudentDashboardNavigator = () => {
             <Drawer.Screen name="UpdatePassword" component={UpdatePasswordScreen} options={{ drawerItemStyle: { height: 0 } }} />
        {/* Hidden Chat Room */}
 <Drawer.Screen name="ChatRoom" component={ChatRoomScreen}
-  options={{ drawerItemStyle: { height: 0 }, 
-headerShown: true, 
+  options={{ drawerItemStyle: { height: 0 },
+headerShown: false,
   }}/>
 
         </Drawer.Navigator>
@@ -1017,7 +1048,7 @@ const styles = StyleSheet.create({
     logoutIcon: { width: 28, height: 28, borderRadius: 8, backgroundColor: "rgba(239,68,68,0.12)", justifyContent: "center", alignItems: "center" },
     logoutText: { color: "#EF4444", fontWeight: "700", fontSize: 14 },
     footer: { alignItems: "center", gap: 5, paddingVertical: 18 },
-    footerLogo: { width: 24, height: 24, borderRadius: 6 },
+    footerLogo: { width: 28, height: 28, borderRadius: 8, backgroundColor: "#FFFFFF", padding: 3 },
     footerText: { color: "rgba(0,0,0,0.25)", fontSize: 10 },
 
     // ── Header ──

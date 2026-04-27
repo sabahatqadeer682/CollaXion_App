@@ -6,9 +6,34 @@
 
 import express from "express";
 import mongoose from "mongoose";
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
 import Post from "../models/Post.js";
+import IndustryNotification from "../models/IndustryNotification.js";
 
 const router = express.Router();
+
+// ─── Banner persistence helpers ──────────────────────────────
+// Posts arrive with `poster` as a `data:image/...;base64,...` string from the
+// app. Storing megabytes of base64 inside MongoDB makes documents huge and the
+// React Native <Image/> component can't reliably re-render very long data URIs
+// after a process restart, so banners "disappear" on next login. We decode the
+// base64 once on save, write a real file under uploads/banners/, and persist
+// only the served URL on the document.
+const bannerDir = "uploads/banners/";
+if (!fs.existsSync(bannerDir)) fs.mkdirSync(bannerDir, { recursive: true });
+
+const persistPoster = (poster, req) => {
+  if (!poster || typeof poster !== "string") return poster ?? null;
+  const m = poster.match(/^data:image\/([a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!m) return poster; // already a URL or unknown format — leave alone
+  const ext = (m[1] || "jpg").toLowerCase().replace("jpeg", "jpg");
+  const buf = Buffer.from(m[2], "base64");
+  const filename = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}.${ext}`;
+  fs.writeFileSync(path.join(bannerDir, filename), buf);
+  return `${req.protocol}://${req.get("host")}/uploads/banners/${filename}`;
+};
 
 // ─── simple auth middleware ───────────────────────────────────
 // Aapke existing server mein JWT middleware hai toh us se replace kar lein.
@@ -65,7 +90,17 @@ router.get("/", async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 router.get("/mine", getIndustry, async (req, res) => {
   try {
-    const posts = await Post.find({ postedBy: req.industryId }).sort({ createdAt: -1 });
+    // Match by industry id OR company name. The app's industry "_id" can drift
+    // across sessions (default user, profile discovery), so a strict ObjectId
+    // match would orphan older posts. Falling back to `company` keeps every
+    // post the industry has ever made visible on the dashboard / MyPosts.
+    const filter = {
+      $or: [
+        { postedBy: req.industryId },
+        ...(req.companyName ? [{ company: req.companyName }] : []),
+      ],
+    };
+    const posts = await Post.find(filter).sort({ createdAt: -1 });
     res.json(posts);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -101,7 +136,7 @@ router.post("/", getIndustry, async (req, res) => {
     } = req.body;
 
     if (!type || !title || !description) {
-      return res.status(400).json({ message: "type, title aur description zaroori hain" });
+      return res.status(400).json({ message: "type, title and description are required" });
     }
 
     const post = await Post.create({
@@ -115,13 +150,43 @@ router.post("/", getIndustry, async (req, res) => {
       deadline:    deadline || "",
       location:    location || "",
       mode:        mode     || "Onsite",
-      poster:      poster   || null,
+      poster:      persistPoster(poster, req),
       postedBy:    req.industryId,
       company:     req.companyName,
     });
 
     // Populate kar ke wapas bhejo taake front-end ko company info milti rahe
     await post.populate("postedBy", "name logo email");
+
+    // Push real-time event to all connected sessions of this industry so the
+    // dashboard "Your Posts" list updates without manual refresh.
+    try {
+      req.app.locals.broadcastToIndustry?.(req.companyName, {
+        event: "newPost",
+        data: post,
+      });
+    } catch (_) {}
+
+    // Persist + push a "Post Created" notification so it shows up in the
+    // industry's bell dropdown (and the unread badge bumps instantly).
+    try {
+      const industryEmail = (req.headers["x-industry-email"] || "").toString().trim();
+      if (industryEmail) {
+        const note = await IndustryNotification.create({
+          industryEmail,
+          title:   "Post Created",
+          message: `Your ${type} "${post.title}" is now live.`,
+          type:    "general",
+          meta:    { postId: post._id, postType: type },
+        });
+        req.app.locals.broadcast?.(industryEmail, {
+          event: "newNotification",
+          data: note,
+        });
+      }
+    } catch (e) {
+      console.error("Post-create notification failed:", e?.message);
+    }
 
     res.status(201).json(post);
   } catch (err) {
@@ -139,7 +204,7 @@ router.put("/:id", getIndustry, async (req, res) => {
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     if (post.postedBy.toString() !== req.industryId) {
-      return res.status(403).json({ message: "Sirf apni post update kar sakte hain" });
+      return res.status(403).json({ message: "You can only update your own posts" });
     }
 
     const allowed = [
@@ -147,7 +212,11 @@ router.put("/:id", getIndustry, async (req, res) => {
       "seats", "deadline", "location", "mode", "poster", "isActive",
     ];
     allowed.forEach((field) => {
-      if (req.body[field] !== undefined) post[field] = req.body[field];
+      if (req.body[field] !== undefined) {
+        post[field] = field === "poster"
+          ? persistPoster(req.body.poster, req)
+          : req.body[field];
+      }
     });
 
     // await post.save();
@@ -160,6 +229,14 @@ router.put("/:id", getIndustry, async (req, res) => {
 
 post.updatedAt = new Date();
 await post.save();
+
+try {
+  req.app.locals.broadcastToIndustry?.(req.companyName, {
+    event: "postUpdated",
+    data: post,
+  });
+} catch (_) {}
+
 res.json(post);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -176,11 +253,11 @@ router.delete("/:id", getIndustry, async (req, res) => {
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     if (post.postedBy.toString() !== req.industryId) {
-      return res.status(403).json({ message: "Sirf apni post delete kar sakte hain" });
+      return res.status(403).json({ message: "You can only delete your own posts" });
     }
 
     await post.deleteOne();
-    res.json({ message: "Post delete ho gayi" });
+    res.json({ message: "Post deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -201,7 +278,7 @@ router.patch("/:id/toggle", getIndustry, async (req, res) => {
 
     post.isActive = !post.isActive;
     await post.save();
-    res.json({ message: `Post ${post.isActive ? "active" : "inactive"} kar di`, isActive: post.isActive });
+    res.json({ message: `Post ${post.isActive ? "activated" : "hidden"}`, isActive: post.isActive });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

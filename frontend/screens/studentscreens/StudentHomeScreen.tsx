@@ -78,7 +78,7 @@
 //     const [messages, setMessages] = useState<{ sender: "user" | "ai"; text: string }[]>([
 //         {
 //             sender: "ai",
-//             text: "Assalam o Alaikum! I'm CXbot, your CollaXion AI assistant.\n\nI can help you with:\n• Finding internships\n• CV advice\n• Application tracking\n• Events & more!\n\nAsk me anything! 🚀",
+//             text: "Hello! I'm CXbot, your CollaXion AI assistant.\n\nI can help you with:\n• Finding internships\n• CV advice\n• Application tracking\n• Events & more!\n\nAsk me anything! 🚀",
 //         },
 //     ]);
 //     const [inputText, setInputText] = useState("");
@@ -986,7 +986,7 @@
 //     const [messages, setMessages] = useState<{ sender: "user" | "ai"; text: string }[]>([
 //         {
 //             sender: "ai",
-//             text: "Assalam o Alaikum! I'm CXbot, your CollaXion AI assistant.\n\nI can help you with:\n• Finding internships\n• CV advice\n• Application tracking\n• Events & more!\n\nAsk me anything! 🚀",
+//             text: "Hello! I'm CXbot, your CollaXion AI assistant.\n\nI can help you with:\n• Finding internships\n• CV advice\n• Application tracking\n• Events & more!\n\nAsk me anything! 🚀",
 //         },
 //     ]);
 //     const [inputText, setInputText] = useState("");
@@ -1929,7 +1929,7 @@
 //     const [messages, setMessages] = useState<{ sender: "user" | "ai"; text: string }[]>([
 //         {
 //             sender: "ai",
-//             text: "Assalam o Alaikum! I'm CXbot, your CollaXion AI assistant.\n\nI can help you with:\n• Finding internships\n• CV advice\n• Application tracking\n• Events & more!\n\nAsk me anything! 🚀",
+//             text: "Hello! I'm CXbot, your CollaXion AI assistant.\n\nI can help you with:\n• Finding internships\n• CV advice\n• Application tracking\n• Events & more!\n\nAsk me anything! 🚀",
 //         },
 //     ]);
 //     const [inputText, setInputText] = useState("");
@@ -2822,7 +2822,7 @@
 //     const [messages, setMessages] = useState<{ sender: "user" | "ai"; text: string }[]>([
 //         {
 //             sender: "ai",
-//             text: "Assalam o Alaikum! I'm CXbot, your CollaXion AI assistant.\n\nI can help you with:\n• Finding internships\n• CV advice\n• Application tracking\n• Events & more!\n\nAsk me anything! 🚀",
+//             text: "Hello! I'm CXbot, your CollaXion AI assistant.\n\nI can help you with:\n• Finding internships\n• CV advice\n• Application tracking\n• Events & more!\n\nAsk me anything! 🚀",
 //         },
 //     ]);
 //     const [inputText, setInputText] = useState("");
@@ -3556,6 +3556,7 @@ import {
     ActivityIndicator,
     Animated,
     Image,
+    ImageBackground,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -3616,14 +3617,31 @@ const quickActions = [
 // Mapping each hero stat to its navigation screen
 const heroStatScreens = ["Profile Settings", "My Applications", "My Applications", "Notifications"];
 
+// Auto-cycling hero background — career/professional themed (video-like)
+const DASHBOARD_HERO_IMAGES = [
+    "https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1200&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1556761175-b413da4baf72?q=80&w=1200&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1556157382-97eda2d62296?q=80&w=1200&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1531497865144-0464ef8fb9a9?q=80&w=1200&auto=format&fit=crop",
+];
+
 const StudentHomeScreen = () => {
     const navigation = useNavigation<any>();
     const { profileImage, setProfileImage } = useUser();
     const [isChatOpen, setIsChatOpen] = useState(false);
+    const [heroIdx, setHeroIdx] = useState(0);
+
+    // Auto-cycle hero background every 4s (video-like effect)
+    useEffect(() => {
+        const id = setInterval(() => {
+            setHeroIdx((i) => (i + 1) % DASHBOARD_HERO_IMAGES.length);
+        }, 4000);
+        return () => clearInterval(id);
+    }, []);
     const [messages, setMessages] = useState<{ sender: "user" | "ai"; text: string }[]>([
         {
             sender: "ai",
-            text: "Assalam o Alaikum! I'm CXbot, your CollaXion AI assistant.\n\nI can help you with:\n• Finding internships\n• CV advice\n• Application tracking\n• Events & more!\n\nAsk me anything! 🚀",
+            text: "Hello! I'm CXbot, your CollaXion AI assistant.\n\nI can help you with:\n• Finding internships\n• CV advice\n• Application tracking\n• Events & more!\n\nAsk me anything! 🚀",
         },
     ]);
     const [inputText, setInputText] = useState("");
@@ -3805,8 +3823,31 @@ const StudentHomeScreen = () => {
         <View style={{ flex: 1, backgroundColor: "#F0F4F8" }}>
             <ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
 
-                {/* ── Hero Header ── */}
+                {/* ── Hero Header (with cycling video-like background) ── */}
                 <Animated.View style={[styles.heroSection, { opacity: headerAnim, transform: [{ translateY: headerTranslateY }] }]}>
+                    {/* Cycling background images */}
+                    {DASHBOARD_HERO_IMAGES.map((uri, i) => (
+                        <View
+                            key={uri}
+                            style={[StyleSheet.absoluteFillObject, { opacity: heroIdx === i ? 1 : 0 }]}
+                            pointerEvents="none"
+                        >
+                            <ImageBackground source={{ uri }} style={{ flex: 1 }} resizeMode="cover" />
+                        </View>
+                    ))}
+                    {/* Dark navy gradient overlay */}
+                    <View style={styles.heroOverlay} pointerEvents="none" />
+
+                    {/* Slide indicator dots */}
+                    <View style={styles.heroDots}>
+                        {DASHBOARD_HERO_IMAGES.map((_, i) => (
+                            <View
+                                key={i}
+                                style={[styles.heroDot, heroIdx === i && styles.heroDotActive]}
+                            />
+                        ))}
+                    </View>
+
                     <View style={styles.heroTopRow}>
                         <View style={styles.heroContent}>
                             <View style={styles.greetingPill}>
@@ -3817,30 +3858,10 @@ const StudentHomeScreen = () => {
                                 {studentData?.fullName?.split(" ")[0] || "Student"}
                             </Text>
                             <Text style={styles.heroSubText}>
-                                Your career journey starts here. Let's find your perfect internship!
+                                Your career journey starts here. Discover internships, connect with mentors, and unlock opportunities tailored just for you.
                             </Text>
                         </View>
 
-                        <View style={styles.heroIcons}>
-                            <TouchableOpacity
-                                style={styles.chatActionPill}
-                                onPress={() => {
-                                    setUnreadChatCount(0);
-                                    navigation.navigate("ChatList");
-                                }}
-                                activeOpacity={0.8}
-                            >
-                                <MaterialCommunityIcons name="chat-processing-outline" size={SCREEN_WIDTH * 0.05} color="#fff" />
-                                <Text style={styles.chatPillText}>Messages</Text>
-                                {unreadChatCount > 0 && (
-                                    <View style={styles.chatBadgeModern}>
-                                        <Text style={styles.badgeTextSmall}>
-                                            {unreadChatCount > 9 ? "9+" : unreadChatCount}
-                                        </Text>
-                                    </View>
-                                )}
-                            </TouchableOpacity>
-                        </View>
                     </View>
 
                     {/* ── Mini stats inside hero — each stat is now clickable ── */}
@@ -4172,39 +4193,79 @@ const styles = StyleSheet.create({
     heroSection: {
         backgroundColor: "#193648",
         paddingHorizontal: SCREEN_WIDTH * 0.05,
-        paddingTop: Platform.OS === "ios" ? 60 : 40,
-        paddingBottom: 25,
+        paddingTop: 26,
+        paddingBottom: 40,
+        marginTop: 0,
+        marginBottom: 20,
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
-        marginBottom: 15,
         elevation: 10,
         shadowColor: "#193648",
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.3,
         shadowRadius: 15,
+        overflow: "hidden",
+        position: "relative",
     },
-    heroTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
-    heroContent: { flex: 1, paddingRight: 10 },
+    heroOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: "rgba(25, 54, 72, 0.90)",
+    },
+    heroDots: {
+        position: "absolute",
+        bottom: 16,
+        right: SCREEN_WIDTH * 0.05,
+        flexDirection: "row",
+        gap: 4,
+        zIndex: 5,
+    },
+    heroDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+        backgroundColor: "rgba(255,255,255,0.35)",
+    },
+    heroDotActive: {
+        width: 14,
+        backgroundColor: "#FFFFFF",
+    },
+    heroTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 },
+    heroContent: { flex: 1, paddingRight: 12 },
     greetingPill: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "rgba(255,255,255,0.1)",
+        backgroundColor: "rgba(255,255,255,0.12)",
         alignSelf: "flex-start",
-        paddingHorizontal: 10,
-        paddingVertical: 4,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
         borderRadius: 20,
-        marginBottom: 8,
+        marginBottom: 12,
     },
     greetingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#34D399", marginRight: 6 },
     greetingBadge: { color: "rgba(255,255,255,0.9)", fontSize: 11, fontWeight: "600" },
-    nameText: { color: "#fff", fontSize: SCREEN_WIDTH * 0.065, fontWeight: "800", marginBottom: 4 },
-    heroSubText: { color: "rgba(255,255,255,0.6)", fontSize: 12, lineHeight: 18 },
+    nameText: {
+        color: "#fff",
+        fontSize: SCREEN_WIDTH * 0.07,
+        fontWeight: "800",
+        marginBottom: 8,
+        textShadowColor: "rgba(0,0,0,0.35)",
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 4,
+    },
+    heroSubText: {
+        color: "rgba(255,255,255,0.85)",
+        fontSize: 13,
+        lineHeight: 20,
+        textShadowColor: "rgba(0,0,0,0.3)",
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
+    },
 
     heroIcons: { flexDirection: "row", alignItems: "center", gap: 10 },
     heroAvatarBtn: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         borderWidth: 2,
         borderColor: "rgba(255,255,255,0.35)",
         overflow: "hidden",
@@ -4215,7 +4276,7 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: "rgba(255,255,255,0.15)",
-        paddingVertical: 8,
+        paddingVertical: 6,
         paddingHorizontal: 12,
         borderRadius: 20,
         borderWidth: 1,
@@ -4237,15 +4298,17 @@ const styles = StyleSheet.create({
 
     heroStatsRow: {
         flexDirection: "row",
-        backgroundColor: "rgba(255,255,255,0.08)",
+        backgroundColor: "rgba(255,255,255,0.10)",
         borderRadius: 20,
-        paddingVertical: 15,
-        paddingHorizontal: 10,
+        paddingVertical: 18,
+        paddingHorizontal: 12,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.12)",
     },
-    heroStat: { flex: 1, alignItems: "center" },
-    heroStatNum: { color: "#fff", fontSize: 18, fontWeight: "800" },
-    heroStatLbl: { color: "rgba(255,255,255,0.5)", fontSize: 10, marginTop: 2 },
-    heroStatDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.1)", height: "70%", alignSelf: "center" },
+    heroStat: { flex: 1, alignItems: "center", gap: 4 },
+    heroStatNum: { color: "#fff", fontSize: 20, fontWeight: "800" },
+    heroStatLbl: { color: "rgba(255,255,255,0.65)", fontSize: 10.5, marginTop: 3, fontWeight: "600" },
+    heroStatDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.15)", height: 36, alignSelf: "center" },
 
     alertBanner: {
         marginHorizontal: 16,
@@ -4322,7 +4385,8 @@ const styles = StyleSheet.create({
         height: 38,
         borderRadius: 12,
         marginRight: 12,
-        backgroundColor: "rgba(255,255,255,0.15)",
+        backgroundColor: "#FFFFFF",
+        padding: 4,
     },
     aiText: { color: "#fff", fontSize: 14, fontWeight: "700" },
     aiSubText: { color: "rgba(255,255,255,0.55)", fontSize: 11, marginTop: 2 },

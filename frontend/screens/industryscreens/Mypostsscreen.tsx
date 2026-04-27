@@ -79,7 +79,7 @@
 
 //   const save = () => {
 //     if (!title.trim() || !desc.trim()) {
-//       Alert.alert("Required", "Title aur description zaroori hain.");
+//       Alert.alert("Required", "Title and description are required.");
 //       return;
 //     }
 //     onSave({ title, description: desc, stipend, duration, seats, deadline, location, mode, skills, poster });
@@ -288,7 +288,7 @@
 //       setPosts(prev => prev.map(p => p._id === editPost._id ? res.data : p));
 //       setEditPost(null);
 //     } catch (e) {
-//       Alert.alert("Error", "Update nahi ho saka.");
+//       Alert.alert("Error", "Could not update.");
 //     } finally {
 //       setEditLoading(false);
 //     }
@@ -364,7 +364,7 @@
 //             <LinearGradient colors={["#0066CC", "#004999"]} style={s.emptyIcon}>
 //               <Ionicons name="newspaper-outline" size={32} color="#fff" />
 //             </LinearGradient>
-//             <Text style={s.emptyTitle}>Koi post nahi</Text>
+//             <Text style={s.emptyTitle}>No posts yet</Text>
 //             <Text style={s.emptySub}>
 //               {filter === "All" ? "Abhi tak koi post nahi ki" : `Koi ${filter} post nahi`}
 //             </Text>
@@ -727,7 +727,7 @@ export function EditPostScreen({ route }: { route: any }) {
 
   const handleSave = async () => {
     if (!title.trim() || !desc.trim()) {
-      Alert.alert("Required", "Title aur description zaroori hain.");
+      Alert.alert("Required", "Title and description are required.");
       return;
     }
     setLoading(true);
@@ -738,11 +738,11 @@ export function EditPostScreen({ route }: { route: any }) {
         seats, deadline, location, mode, skills,
         poster,
       }, { headers });
-      Alert.alert("Saved! ✅", "Post update ho gayi.", [
+      Alert.alert("Saved! ✅", "Post updated successfully.", [
         { text: "OK", onPress: () => nav.goBack() }
       ]);
     } catch {
-      Alert.alert("Error", "Update nahi ho saka.");
+      Alert.alert("Error", "Could not update.");
     } finally {
       setLoading(false);
     }
@@ -945,14 +945,14 @@ export function MyPostsScreen() {
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
   const handleDelete = (post: any) => {
-    Alert.alert("Delete Post", `"${post.title}" delete karna chahte hain?`, [
+    Alert.alert("Delete Post", `Are you sure you want to delete "${post.title}"?`, [
       { text: "Cancel", style:"cancel" },
       { text:"Delete", style:"destructive", onPress: async () => {
         try {
           const headers = { "x-industry-id": user?._id, "x-company-name": user?.name };
           await ax().delete(`/api/industry/posts/${post._id}`, { headers });
           setPosts(prev => prev.filter(p => p._id !== post._id));
-        } catch { Alert.alert("Error", "Delete nahi ho saka."); }
+        } catch { Alert.alert("Error", "Could not delete."); }
       }}
     ]);
   };
@@ -962,7 +962,7 @@ export function MyPostsScreen() {
       const headers = { "x-industry-id": user?._id, "x-company-name": user?.name };
       const res = await ax().patch(`/api/industry/posts/${post._id}/toggle`, {}, { headers });
       setPosts(prev => prev.map(p => p._id===post._id ? { ...p, isActive:res.data.isActive } : p));
-    } catch { Alert.alert("Error", "Toggle nahi ho saka."); }
+    } catch { Alert.alert("Error", "Could not toggle status."); }
   };
 
   const sections: { type:"Internship"|"Project"|"Workshop"|"Events"; icon:any; data:any[] }[] = [
@@ -1052,7 +1052,7 @@ export function MyPostsScreen() {
         {!post.isActive && (
           <View style={s.inactiveBanner}>
             <Ionicons name="eye-off-outline" size={13} color="#5B7080" />
-            <Text style={s.inactiveTxt}>Students ko nahi dikh rahi</Text>
+            <Text style={s.inactiveTxt}>Hidden from students</Text>
           </View>
         )}
         <View style={s.cardHead}>
@@ -1188,8 +1188,8 @@ export function MyPostsScreen() {
             <View style={s.emptyIcon}>
               <Ionicons name="newspaper-outline" size={32} color="#193648" />
             </View>
-            <Text style={s.emptyTitle}>Koi post nahi</Text>
-            <Text style={s.emptySub}>Abhi tak koi post / event nahi banaya</Text>
+            <Text style={s.emptyTitle}>No posts yet</Text>
+            <Text style={s.emptySub}>You haven&apos;t created any posts or events yet</Text>
             <TouchableOpacity style={s.emptyBtn} onPress={() => nav.navigate("PostOpportunity")}>
               <Ionicons name="add" size={16} color="#fff" />
               <Text style={s.emptyBtnTxt}>Post Karo</Text>
