@@ -54,9 +54,6 @@ type PasswordFieldProps = {
     placeholder: string;
 };
 
-// ─── Config ───────────────────────────────────────────────────────────────────
-const BASE_URL = "https://collaxionapp-production.up.railway.app";
-
 // ─── Password Field Component ─────────────────────────────────────────────────
 const PasswordField: React.FC<PasswordFieldProps> = ({
     label,
