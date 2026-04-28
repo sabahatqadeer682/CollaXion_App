@@ -29,7 +29,7 @@ import industryNotificationRoutes from "./industry/routes/IndustryNotificationRo
 import dotenv from "dotenv";
 dotenv.config();
 
-console.log("🚀 GEMINI KEY LOADED:", process.env.GEMINI_KEY);
+console.log("GEMINI KEY LOADED:", process.env.GEMINI_KEY);
 
 const app = express();
 const httpServer = createServer(app);
