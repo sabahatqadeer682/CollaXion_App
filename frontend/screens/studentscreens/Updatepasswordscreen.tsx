@@ -55,7 +55,7 @@ type PasswordFieldProps = {
 };
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const BASE_URL = "http://192.168.0.245:5000"; // ← apna PC ka IP daalo (ipconfig se dekho)
+const BASE_URL = "https://collaxionapp-production.up.railway.app";
 
 // ─── Password Field Component ─────────────────────────────────────────────────
 const PasswordField: React.FC<PasswordFieldProps> = ({
